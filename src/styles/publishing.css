@@ -1,0 +1,42 @@
+/* =============================================================================
+   PUBLISHING WING + READER — the editorial destination.
+   Feels like entering a working publishing department: the Editor's Desk, the
+   Writing Wall, and the shelf of works. Never a blog grid or a streaming list.
+   ============================================================================= */
+
+.wing-hero {
+  padding: var(--s-7) 0 var(--s-5);
+  border-bottom: var(--hairline-light);
+}
+.wing-hero__eyebrow { margin-bottom: var(--s-3); }
+.wing-hero__title { font-size: var(--fs-display); font-weight: 200; }
+.wing-hero__intro {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 300;
+  color: var(--plaster);
+  max-width: 46ch;
+}
+
+.wing-body { padding: var(--s-6) 0 var(--s-8); }
+
+/* The shelf: works are held, not gridded. One primary, then a quiet stack. */
+.shelf { display: grid; gap: var(--s-5); }
+.shelf__heading { margin-bottom: var(--s-3); }
+
+/* Aside column: the desk + the wall */
+.wing-aside { display: grid; gap: var(--s-5); }
+
+/* Back-to-corridor line */
+.back-line {
+  padding: var(--s-4) 0;
+}
+.back-line a {
+  font-family: var(--mono);
+  font-size: var(--fs-meta);
+  letter-spacing: var(--tracking-meta);
+  text-transform: uppercase;
+  color: var(--plaster);
+}
+
+.reader-page { padding: var(--s-6) 0 var(--s-8); }

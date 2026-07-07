@@ -1,0 +1,106 @@
+/* =============================================================================
+   LUSCIOUS HONEY COLLECTIVE — DESIGN TOKENS
+   Sprint 04 · Part VII "Design System Production Handoff" — LOCKED.
+   These values are inherited from Vol. 01 and are not reopened. Do not hardcode
+   design values in components; reference these tokens only.
+   ============================================================================= */
+
+:root {
+  /* --- Colour (locked palette; Honey is metal, never yellow) ---------------- */
+  --alabaster: #F3EEE6;
+  --linen:     #E9E2D6;
+  --plaster:   #C9BFB0;
+  --ink:       #211D1A;
+  --ink-900:   #17120E;
+  --umber:     #4A3428;
+  --oxblood:   #7A3B34;
+  --terracotta:#B5623F;
+  --brass:     #B08A4F;
+  --brass-hi:  #D3B072;
+  --signal:    #B5623F; /* Now Recording — used only for a genuine live flag */
+
+  /* Ink as channels, for hairline borders at controlled alpha */
+  --ink-rgb: 33, 29, 26;
+  --alabaster-rgb: 243, 238, 230;
+
+  /* --- Surfaces (alabaster / linen / ink plates only) ---------------------- */
+  --surface-page:  var(--ink-900);   /* the house is dark between the pools */
+  --surface-plate: var(--alabaster); /* solid reading plates */
+  --surface-plate-2: var(--linen);
+  --surface-ink:   var(--ink);
+
+  /* --- Type tokens --------------------------------------------------------- */
+  --serif: 'Newsreader', Georgia, 'Times New Roman', serif;         /* 200/300, ital */
+  --sans:  'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif; /* 400/500/600 */
+  --mono:  'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace; /* 400/500 */
+
+  --tracking-meta: 0.16em; /* meta mono · 0.12–0.2em */
+  --tracking-label: 0.14em;
+
+  /* Fluid type scale — display 200 / editorial ital 300 / body serif 300 */
+  --fs-display: clamp(2.75rem, 1.6rem + 4.6vw, 5rem);
+  --fs-h1:      clamp(2rem, 1.4rem + 2.6vw, 3.25rem);
+  --fs-h2:      clamp(1.5rem, 1.2rem + 1.4vw, 2.1rem);
+  --fs-h3:      clamp(1.2rem, 1.05rem + 0.7vw, 1.5rem);
+  --fs-body:    clamp(1.05rem, 1rem + 0.25vw, 1.2rem);   /* editorial reading */
+  --fs-body-sm: 0.95rem;
+  --fs-label:   0.78rem;
+  --fs-meta:    0.72rem;
+  --leading-body: 1.65;
+  --leading-tight: 1.12;
+
+  /* --- Spacing (8px base rhythm · 8/16/24/32/48/64/96/128) ----------------- */
+  --s-1: 8px;
+  --s-2: 16px;
+  --s-3: 24px;
+  --s-4: 32px;
+  --s-5: 48px;
+  --s-6: 64px;
+  --s-7: 96px;
+  --s-8: 128px;
+
+  /* --- Grid & layout ------------------------------------------------------- */
+  --gutter: 24px;            /* 12-col editorial */
+  --w-text: 720px;           /* editorial reading width */
+  --w-max: 1160px;           /* container max */
+  --section-pad: 128px;      /* desktop; 72px on mobile (see responsive.css) */
+
+  /* --- Borders / radii / shadow / z-index ---------------------------------- */
+  --hairline: 1px solid rgba(var(--ink-rgb), 0.14); /* 0.1–0.16 range */
+  --hairline-light: 1px solid rgba(var(--alabaster-rgb), 0.16);
+  --radius: 0;               /* sharp corners only */
+  /* shadow = light-as-glow, not a drop-box */
+  --glow-brass: 0 0 40px -8px rgba(176, 138, 79, 0.45);
+  --glow-lamp:  0 0 120px -20px rgba(211, 176, 114, 0.5);
+  --glow-plate: 0 24px 80px -40px rgba(0, 0, 0, 0.7);
+
+  --z-base: 0;
+  --z-media: 10;
+  --z-nav: 110;
+  --z-progress: 120;
+  --z-modal: 200;
+
+  /* --- Motion tokens (Part V) — never linear, never bounce ----------------- */
+  --motion-instant: 120ms;   /* micro feedback */
+  --motion-quick:   260ms;   /* hover, focus */
+  --motion-settle:  600ms;   /* reveal, rise */
+  --motion-room:    800ms;   /* dissolve */
+  --motion-arrival: 4500ms;  /* first light-up (hard 5s ceiling) */
+
+  --ease-settle:   cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-door:     cubic-bezier(0.32, 0.08, 0.24, 1);
+  --ease-dissolve: ease-in-out;
+  --ease-camera:   cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* --- Living Clock light temperature (set per time state; see living-clock)
+     These shift atmosphere ONLY — never geometry or content truth. --------- */
+  --lamp: var(--brass-hi);          /* 2200K desk/lantern warmth */
+  --pool: rgba(211, 176, 114, 0.14);/* 2700K door-pool wash */
+  --sky: rgba(150, 170, 190, 0.0);  /* cool daylight fill through the glass */
+  --clock-warmth: 1;                /* 0..1 scalar the presentation layer reads */
+}
+
+/* Focus ring — brass, always visible (Part VII primitives) */
+:root {
+  --focus-ring: 0 0 0 2px var(--ink-900), 0 0 0 4px var(--brass-hi);
+}

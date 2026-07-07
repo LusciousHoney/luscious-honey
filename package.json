@@ -1,0 +1,21 @@
+{
+  "name": "luscious-honey-hq",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Luscious Honey Collective — Headquarters. Production Sprint 01 vertical slice: Arrival → Front Desk → Long Corridor → Publishing Wing → one editorial reader. Built from Sprint 04 (Lock the House) as the canonical source of truth.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test tests/logic.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "typescript": "^5.6.0",
+    "vite": "^5.4.0"
+  },
+  "allowScripts": {
+    "esbuild@0.21.5": true
+  }
+}

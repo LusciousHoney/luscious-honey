@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en" data-env="development" data-tod="evening">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Publishing — Luscious Honey Collective</title>
+    <meta name="description" content="The editorial wing of the House. The work is here." />
+    <meta name="color-scheme" content="dark" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,200;0,6..72,300;1,6..72,200;1,6..72,300&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <a class="skip-link" href="#works">Skip to the works</a>
+
+    <div class="container">
+      <header class="site-header">
+        <span class="wordmark">Luscious&nbsp;Honey <b>Collective</b></span>
+        <span class="label" aria-hidden="true">Publishing · 01</span>
+      </header>
+    </div>
+
+    <main id="main">
+      <section class="wing-hero" aria-labelledby="wing-title">
+        <div class="container">
+          <p class="wing-hero__eyebrow label">The Publishing Wing</p>
+          <h1 id="wing-title" class="wing-hero__title">The work is here.</h1>
+          <p class="wing-hero__intro">
+            A working editorial department inside the House — the editor’s desk,
+            the writing wall, and the pieces we have finished enough to share.
+          </p>
+        </div>
+      </section>
+
+      <section class="wing-body">
+        <div class="container wing-layout">
+          <!-- The shelf of works -->
+          <div id="works" class="shelf">
+            <h2 class="shelf__heading label">In the wing</h2>
+            <div id="work-list" class="shelf">
+              <!-- JS renders WorkCards here; a no-JS message stays otherwise. -->
+              <p class="empty-state">The shelf loads with the wing.</p>
+            </div>
+          </div>
+
+          <!-- The desk + the wall -->
+          <aside class="wing-aside" aria-label="From the desk">
+            <article class="journal plate brass-edge" aria-labelledby="wing-journal-heading">
+              <span class="journal__lamp" aria-hidden="true"></span>
+              <h2 id="wing-journal-heading" class="label">The House Journal
+                <span class="fixture-flag">Fixture</span>
+              </h2>
+              <time id="journal-date" class="meta journal__date"></time>
+              <p id="journal-body" class="journal__body"></p>
+              <p class="journal__sign">— L.H.</p>
+            </article>
+
+            <section class="writing-wall" aria-labelledby="wall-heading" style="padding-block: var(--s-6)">
+              <h2 id="wall-heading" class="visually-hidden">The Writing Wall</h2>
+              <p id="fragment" class="writing-wall__text editorial">
+                She kept the letter, unopened, for nineteen years—
+              </p>
+              <p class="writing-wall__mark meta">In progress
+                <span class="fixture-flag">Fixture</span>
+              </p>
+            </section>
+          </aside>
+        </div>
+      </section>
+
+      <div class="container back-line">
+        <a href="/">← Back to the corridor</a>
+      </div>
+    </main>
+
+    <footer class="colophon">
+      <div class="container">
+        <p class="wordmark">Luscious Honey Collective</p>
+        <p class="meta">A house for storytellers · MMXXVI</p>
+      </div>
+    </footer>
+
+    <script type="module" src="/src/publishing.ts"></script>
+  </body>
+</html>

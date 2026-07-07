@@ -1,0 +1,204 @@
+/* =============================================================================
+   RECEPTION — arrival (Spine Reveal), the Front Desk, and the Long Corridor.
+   Sprint 04 · Frames 02–04, Part V (motion), Part VI (responsive).
+   The dark is the hallway; the plates are the light.
+   ============================================================================= */
+
+/* --- Site chrome: signage, not a menu bar ------------------------------- */
+.site-header {
+  position: relative;
+  z-index: var(--z-nav);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--s-3) 0;
+}
+.site-header .wordmark {
+  font-family: var(--serif);
+  font-weight: 200;
+  font-size: var(--fs-h3);
+  letter-spacing: 0.02em;
+}
+.site-header .wordmark b { font-weight: 300; font-style: italic; }
+
+/* =============================================================================
+   ARRIVAL SCENE — Frame 02, the signature frame.
+   ============================================================================= */
+.arrival {
+  position: relative;
+  min-height: 78vh;
+  display: grid;
+  align-content: end;
+  gap: var(--s-4);
+  padding: var(--s-8) 0 var(--s-6);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* The corridor depth behind the desk: a single warm destination (the Lantern)
+   at the vanishing point, door-pools receding, dark between. */
+.arrival__spine-glow {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-base);
+  background:
+    /* Lantern at the vanishing point */
+    radial-gradient(60% 55% at 50% 34%,
+      rgba(211, 176, 114, calc(0.22 * var(--clock-warmth))) 0%,
+      transparent 60%),
+    /* door-pools left + right, receding */
+    radial-gradient(22% 30% at 22% 66%, var(--pool), transparent 70%),
+    radial-gradient(22% 30% at 78% 66%, var(--pool), transparent 70%),
+    /* the deep dark of the house */
+    radial-gradient(120% 90% at 50% 40%, var(--ink) 0%, var(--ink-900) 70%);
+  transform: scale(1.08);
+}
+
+/* First-arrival light-up: the scene emerges from pure dark. */
+.arrival::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-media);
+  background: var(--ink-900);
+  opacity: 1;
+  pointer-events: none;
+  transition: opacity var(--motion-arrival) var(--ease-camera);
+}
+.arrival[data-lit="true"]::after { opacity: 0; }
+
+/* The desk + greeting rise on arrival. */
+.arrival__desk,
+.arrival__greeting {
+  position: relative;
+  z-index: var(--z-progress);
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity var(--motion-settle) var(--ease-settle) 200ms,
+              transform var(--motion-settle) var(--ease-settle) 200ms;
+}
+.arrival[data-lit="true"] .arrival__desk,
+.arrival[data-lit="true"] .arrival__greeting { opacity: 1; transform: none; }
+
+.arrival__greeting {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 200;
+  font-size: var(--fs-h1);
+  line-height: 1.15;
+  color: var(--alabaster);
+  max-width: 20ch;
+}
+.arrival__reception-label { margin-bottom: var(--s-3); }
+
+.arrival__desk { display: grid; gap: var(--s-3); }
+.arrival__desk-hint {
+  font-family: var(--mono);
+  font-size: var(--fs-meta);
+  letter-spacing: var(--tracking-meta);
+  text-transform: uppercase;
+  color: var(--plaster);
+}
+
+/* Returning visitors and reduced motion: no light-up, quick settle. */
+.arrival[data-arrival="returning"]::after,
+.arrival[data-reduced="true"]::after { transition-duration: var(--motion-settle); }
+.arrival[data-reduced="true"] .arrival__desk,
+.arrival[data-reduced="true"] .arrival__greeting { transition: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .arrival::after { transition: none; }
+  .arrival__desk,
+  .arrival__greeting { transition: none; opacity: 1; transform: none; }
+}
+
+/* =============================================================================
+   THE LONG CORRIDOR — the Dark Spine (default) + Indexed Spine (fallback).
+   ============================================================================= */
+.corridor { padding: var(--s-7) 0 var(--s-8); }
+.corridor__heading { margin-bottom: var(--s-5); }
+.corridor__cue {
+  font-family: var(--serif);
+  font-style: italic;
+  color: var(--plaster);
+  margin-bottom: var(--s-5);
+}
+
+/* The spine: a central rail of doors. In spatial mode, perspective + a slow
+   dolly (driven by --depth from corridor.ts) make scrolling feel like walking. */
+.spine {
+  --depth: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--s-3);
+}
+
+.spine[data-mode="spatial"] {
+  perspective: 1400px;
+  perspective-origin: 50% 40%;
+}
+.spine[data-mode="spatial"] .door {
+  transform: translateZ(calc(var(--depth) * 60px));
+  transition: transform var(--motion-settle) var(--ease-camera);
+}
+
+/* A door on the spine: brass numeral, etched name, warm pool on hover. */
+.door {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border: var(--hairline-light);
+  background:
+    linear-gradient(90deg, rgba(211,176,114,0) 0%, rgba(211,176,114,0) 100%);
+  background-image: none;
+  color: var(--alabaster);
+  min-height: 64px;
+  transition: border-color var(--motion-quick) var(--ease-settle),
+              box-shadow var(--motion-quick) var(--ease-settle);
+}
+a.door:hover,
+a.door:focus-visible {
+  border-color: rgba(211, 176, 114, 0.5);
+  box-shadow: inset 0 0 60px -20px rgba(211, 176, 114, calc(0.6 * var(--clock-warmth))),
+              var(--glow-brass);
+}
+.door__numeral {
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: var(--fs-h3);
+  color: var(--brass-hi);
+  min-width: 2.5ch;
+}
+.door__name {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: var(--fs-h3);
+}
+.door__blurb {
+  display: block;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: var(--fs-body-sm);
+  color: var(--plaster);
+}
+.door__state {
+  font-family: var(--mono);
+  font-size: var(--fs-meta);
+  letter-spacing: var(--tracking-meta);
+  text-transform: uppercase;
+  color: var(--plaster);
+  white-space: nowrap;
+}
+.door[aria-disabled="true"] {
+  opacity: 0.62;
+  cursor: default;
+}
+.door--open .door__state { color: var(--brass-hi); }
+
+/* Indexed Spine: flat, no camera move. Already list-based; just quiet it. */
+.spine[data-mode="indexed"] .door { transform: none; transition: none; }

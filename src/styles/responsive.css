@@ -1,0 +1,54 @@
+/* =============================================================================
+   RESPONSIVE — three honest doors into one house, not one house shrunk thrice.
+   Sprint 04 · Part VI. Breakpoints: desktop >=1024, tablet 640–1023, mobile <640.
+   The switch is STRUCTURAL. Mobile keeps the warm palette, the Newsreader/Archivo
+   voice, brass edges, the time-aware greeting and the honest heartbeat.
+   ============================================================================= */
+
+/* --- Mobile-first section rhythm ---------------------------------------- */
+@media (max-width: 639.98px) {
+  :root { --section-pad: 72px; }
+
+  .arrival { min-height: 68vh; padding-top: var(--s-6); }
+
+  /* Mobile arrival = a single lit Desk card, not a corridor (Frame 02 · 24). */
+  .arrival__spine-glow { transform: none; }
+
+  /* The directory: brass-edged list, 44px+ targets already met by .door. */
+  .corridor { padding: var(--s-6) 0; }
+  .door {
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      "numeral name"
+      "numeral blurb"
+      "state   state";
+    row-gap: 4px;
+  }
+  .door__numeral { grid-area: numeral; }
+  .door__name { grid-area: name; }
+  .door__blurb { grid-area: blurb; }
+  .door__state { grid-area: state; justify-self: start; }
+}
+
+/* --- Tablet: the spine stands upright ----------------------------------- */
+@media (min-width: 640px) and (max-width: 1023.98px) {
+  .spine[data-mode="spatial"] { perspective: 2000px; } /* reduced dolly depth */
+  .arrival { min-height: 72vh; }
+}
+
+/* --- Desktop editorial two-column at the wing --------------------------- */
+@media (min-width: 1024px) {
+  .wing-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+    gap: var(--s-7);
+    align-items: start;
+  }
+}
+
+/* --- Reduced motion: the Indexed Spine, static -------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .spine .door { transform: none !important; transition: none !important; }
+  .arrival__spine-glow { transform: none; }
+  a { transition: none; }
+}

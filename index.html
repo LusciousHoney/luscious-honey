@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en" data-env="development" data-tod="evening">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Luscious Honey Collective — Headquarters</title>
+    <meta name="description" content="A house for storytellers. Walk in." />
+    <meta name="color-scheme" content="dark" />
+
+    <!-- Fonts: Newsreader (serif), Archivo (sans), IBM Plex Mono (mono).
+         Preconnect + display=swap; only the weights the House uses. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,200;0,6..72,300;1,6..72,200;1,6..72,300&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <a class="skip-link" href="#corridor">Skip to the directory</a>
+
+    <div class="container">
+      <header class="site-header">
+        <span class="wordmark">Luscious&nbsp;Honey <b>Collective</b></span>
+        <span class="label" aria-hidden="true">Reception</span>
+      </header>
+    </div>
+
+    <main id="main">
+      <!-- ================= ARRIVAL — The Spine Reveal (Frame 02) ========== -->
+      <section id="arrival" class="arrival" aria-label="Arrival">
+        <div class="arrival__spine-glow" aria-hidden="true"></div>
+        <div class="container">
+          <p class="arrival__greeting">
+            <span class="label arrival__reception-label">Reception</span>
+            <!-- time-aware greeting; JS sets it from the Living Clock.
+                 Static fallback matches the default evening state. -->
+            <span id="greeting">Good evening. The studio is still lit.</span>
+          </p>
+
+          <!-- The Front Desk / House Journal (Frame 04) -->
+          <div class="arrival__desk">
+            <article class="journal plate brass-edge" aria-labelledby="journal-heading">
+              <span class="journal__lamp" aria-hidden="true"></span>
+              <h2 id="journal-heading" class="label">The House Journal
+                <span class="fixture-flag">Fixture</span>
+              </h2>
+              <time id="journal-date" class="meta journal__date" datetime="2026-07-05">
+                Sunday, July 5, 2026
+              </time>
+              <p id="journal-body" class="journal__body">
+                The corridor is dark on purpose. We keep the lamps low so the work is
+                the only thing that carries its own light.
+              </p>
+              <p class="journal__sign">— L.H.</p>
+            </article>
+            <p class="arrival__desk-hint" id="clock-label">Sunday · evening</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= THE LONG CORRIDOR — the Dark Spine ============= -->
+      <section id="corridor" class="corridor" aria-labelledby="corridor-heading">
+        <div class="container">
+          <h2 id="corridor-heading" class="corridor__heading">The Long Corridor</h2>
+          <p class="corridor__cue editorial">To move is to walk deeper.</p>
+
+          <!-- The directory: a plain semantic list of doors underlies the
+               spatial metaphor. Doors are real labelled links. -->
+          <nav aria-label="Directory of wings">
+            <ul id="spine" class="spine">
+              <li>
+                <a class="door door--open" href="/publishing.html">
+                  <span class="door__numeral" aria-hidden="true">01</span>
+                  <span class="door__name">Publishing
+                    <span class="door__blurb">The editorial wing. The work is here.</span>
+                  </span>
+                  <span class="door__state">Open →</span>
+                </a>
+              </li>
+              <li>
+                <span class="door" aria-disabled="true">
+                  <span class="door__numeral" aria-hidden="true">02</span>
+                  <span class="door__name">Productions
+                    <span class="door__blurb">The studio. Dark unless a session is live.</span>
+                  </span>
+                  <span class="door__state">Studio dark</span>
+                </span>
+              </li>
+              <li>
+                <span class="door" aria-disabled="true">
+                  <span class="door__numeral" aria-hidden="true">03</span>
+                  <span class="door__name">Press
+                    <span class="door__blurb">The House Journal and the Writing Wall.</span>
+                  </span>
+                  <span class="door__state">Not yet open</span>
+                </span>
+              </li>
+              <li>
+                <span class="door" aria-disabled="true">
+                  <span class="door__numeral" aria-hidden="true">04</span>
+                  <span class="door__name">Salon
+                    <span class="door__blurb">A room of chairs. It rests until an event is real.</span>
+                  </span>
+                  <span class="door__state">Resting</span>
+                </span>
+              </li>
+              <li>
+                <span class="door" aria-disabled="true">
+                  <span class="door__numeral" aria-hidden="true">05</span>
+                  <span class="door__name">Lantern
+                    <span class="door__blurb">One featured work, at the top of the house.</span>
+                  </span>
+                  <span class="door__state">Not yet lit</span>
+                </span>
+              </li>
+              <li>
+                <span class="door" aria-disabled="true">
+                  <span class="door__numeral" aria-hidden="true">06</span>
+                  <span class="door__name">Archive
+                    <span class="door__blurb">Strata and threads. It opens as works ship.</span>
+                  </span>
+                  <span class="door__state">Not yet open</span>
+                </span>
+              </li>
+            </ul>
+          </nav>
+        </div>
+      </section>
+    </main>
+
+    <footer class="colophon">
+      <div class="container">
+        <p class="wordmark">Luscious Honey Collective</p>
+        <p class="meta">A house for storytellers · MMXXVI</p>
+      </div>
+    </footer>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

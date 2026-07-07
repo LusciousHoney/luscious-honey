@@ -1,0 +1,4 @@
+# Luscious Honey Collective — Headquarters
+# The House is a public front experience. Nothing private is served here.
+User-agent: *
+Allow: /
