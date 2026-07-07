@@ -24,9 +24,10 @@ stream), it can be introduced there in isolation.
 ## File structure
 
 ```
-index.html            Reception (arrival + Front Desk + Long Corridor)
+index.html            Reception (arrival + Front Desk + Long Corridor + Now-Recording signal)
 publishing.html       Publishing Wing
 reader.html           The Reader (one work)
+press.html            The House Journal archive
 vite.config.js        Multi-page inputs (add wings here, never ahead of content)
 
 src/

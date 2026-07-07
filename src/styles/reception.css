@@ -194,10 +194,18 @@ a.door:focus-visible {
   color: var(--plaster);
   white-space: nowrap;
 }
+.door__signal {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  white-space: nowrap;
+}
 .door[aria-disabled="true"] {
   opacity: 0.62;
   cursor: default;
 }
+/* A dark studio is a legitimate resting state — keep the signal fully legible. */
+#productions-door.door[aria-disabled="true"] { opacity: 1; }
 .door--open .door__state { color: var(--brass-hi); }
 
 /* Indexed Spine: flat, no camera move. Already list-based; just quiet it. */

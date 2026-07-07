@@ -80,3 +80,25 @@ export interface HeldFrame extends Governed {
   date?: string;
   media: Media;
 }
+
+/**
+ * Now Recording — the live-session control flag. RecordingFlag { live, since }.
+ * This is NOT publish-governed content: it is a real operational signal that
+ * must default to dark and only be `live` when a session is genuinely on air.
+ * `staleAfterMinutes` makes a forgotten live flag fail back to dark on its own.
+ */
+export interface RecordingFlag {
+  live: boolean;
+  since?: string | null;          // ISO timestamp the session started
+  detail?: string | null;         // optional "what's recording" one-liner
+  staleAfterMinutes?: number;     // fail to dark after this long without refresh
+  fixture?: boolean;
+}
+
+/** Derived presentation state — never fabricated; always resolves from the flag. */
+export interface RecordingState {
+  active: boolean;
+  label: string;      // "Recording now" | "Studio dark"
+  detail?: string;
+  since?: string;
+}

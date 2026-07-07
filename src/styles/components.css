@@ -223,6 +223,47 @@
   background: var(--surface-ink);
 } /* exterior plate + fade, never a spinner */
 
+/* --- Now Recording: the Brass Studio Lamp — two honest states ----------- */
+.lamp {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(176, 138, 79, 0.22);          /* unlit brass, cold */
+  border: 1px solid rgba(176, 138, 79, 0.4);
+  transition: background-color var(--motion-room) var(--ease-dissolve),
+              box-shadow var(--motion-room) var(--ease-dissolve);
+}
+.lamp[data-active="true"] {                        /* on air — warm amber 2200K */
+  background: var(--brass-hi);
+  border-color: var(--brass-hi);
+  box-shadow: 0 0 14px 2px rgba(211, 176, 114, 0.75);
+  animation: lamp-breathe 2400ms var(--ease-dissolve) infinite; /* ~2.4s pulse */
+}
+.door--live .door__state { color: var(--brass-hi); }
+@keyframes lamp-breathe {
+  0%, 100% { box-shadow: 0 0 10px 1px rgba(211, 176, 114, 0.5); }
+  50%      { box-shadow: 0 0 18px 3px rgba(211, 176, 114, 0.9); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lamp[data-active="true"] { animation: none; } /* lit, but does not pulse */
+}
+
+/* --- Journal archive (Press): an editorial ledger, not a blog ---------- */
+.archive { display: grid; gap: 0; }
+.archive__entry {
+  padding: var(--s-5) 0;
+  border-top: var(--hairline);
+}
+.archive__entry:first-child { border-top: 0; }
+.archive__date { display: block; margin-bottom: var(--s-2); color: var(--umber); }
+.archive__body {
+  font-size: var(--fs-body);
+  line-height: var(--leading-body);
+  margin-bottom: var(--s-2);
+}
+.archive__sign { font-family: var(--serif); font-style: italic; color: var(--umber); margin: 0; }
+
 /* --- House Journal: Living Clock time context on the desk ---------------- */
 .journal__clock {
   display: block;

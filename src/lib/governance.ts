@@ -8,7 +8,7 @@
      • Everything   — only `status: 'published'` is ever shown. Default to rest.
    ============================================================================= */
 
-import type { JournalEntry, Fragment, HeldFrame, Work, Governed } from './content-types';
+import type { JournalEntry, Fragment, HeldFrame, Work, Governed, RecordingFlag, RecordingState } from './content-types';
 
 export function isPublished(item: Governed): boolean {
   return item.status === 'published';
@@ -62,6 +62,35 @@ export function selectCurrentHeldFrame(frames: HeldFrame[]): HeldFrame | undefin
   return frames
     .filter(isPublished)
     .sort((a, b) => b.week - a.week || (b.date ?? '').localeCompare(a.date ?? ''))[0];
+}
+
+/* --- Now Recording ------------------------------------------------------- */
+
+/**
+ * Resolve the live-session flag to a presentation state. Truthful by construction:
+ *   • default / not live            → dark ("Studio dark")
+ *   • live but past its stale window → dark (a forgotten flag fails to rest)
+ *   • live and fresh                → active ("Recording now")
+ * It never invents liveness; if the flag isn't genuinely live, the studio is dark.
+ */
+export function selectRecordingState(flag: RecordingFlag | undefined, now: Date): RecordingState {
+  const dark: RecordingState = { active: false, label: 'Studio dark' };
+  if (!flag || !flag.live) return dark;
+
+  if (flag.since && flag.staleAfterMinutes != null) {
+    const started = new Date(flag.since).getTime();
+    if (!Number.isNaN(started)) {
+      const ageMinutes = (now.getTime() - started) / 60000;
+      if (ageMinutes > flag.staleAfterMinutes) return dark; // stale → fails to dark
+    }
+  }
+
+  return {
+    active: true,
+    label: 'Recording now',
+    detail: flag.detail ?? undefined,
+    since: flag.since ?? undefined,
+  };
 }
 
 /* --- Editorial works ----------------------------------------------------- */

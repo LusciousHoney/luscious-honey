@@ -10,7 +10,7 @@
    "published". Nothing here generates or auto-promotes content.
    ============================================================================= */
 
-import type { JournalEntry, Fragment, HeldFrame, Work } from './content-types';
+import type { JournalEntry, Fragment, HeldFrame, Work, RecordingFlag, RecordingState } from './content-types';
 import * as gov from './governance';
 
 /* --- Structured content, imported eagerly (inlined into the bundle) -------
@@ -33,10 +33,16 @@ const heldFrameMods = import.meta.glob('../../content/held-frame/*.json', {
   eager: true, import: 'default',
 }) as Record<string, HeldFrame>;
 
+const recordingMods = import.meta.glob('../../content/now-recording/*.json', {
+  eager: true, import: 'default',
+}) as Record<string, RecordingFlag>;
+
 const journalEntries: JournalEntry[] = Object.values(journalMods);
 const works: Work[] = Object.values(workMods);
 const fragments: Fragment[] = Object.values(fragmentMods).flat();
 const heldFrames: HeldFrame[] = Object.values(heldFrameMods);
+// A missing/absent flag is treated as dark — the studio defaults to rest.
+const recordingFlag: RecordingFlag = Object.values(recordingMods)[0] ?? { live: false };
 
 /* --- Governed selectors (bound to the loaded content) --------------------- */
 
@@ -63,5 +69,9 @@ export const publishedWorks = (): Work[] => gov.selectPublishedWorks(works);
 export const getWork = (slug: string): Work | undefined =>
   publishedWorks().find((w) => w.slug === slug);
 
+/** The current Now-Recording state — defaults to dark; never faked. */
+export const currentRecording = (): RecordingState =>
+  gov.selectRecordingState(recordingFlag, new Date());
+
 export { formatHouseDate } from './governance';
-export type { Work, JournalEntry, Fragment, HeldFrame, Media, BodyBlock } from './content-types';
+export type { Work, JournalEntry, Fragment, HeldFrame, Media, BodyBlock, RecordingState } from './content-types';

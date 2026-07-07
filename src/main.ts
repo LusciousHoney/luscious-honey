@@ -14,7 +14,7 @@ import './styles/responsive.css';
 import { currentClockState, applyClock } from './lib/living-clock';
 import { runArrival, enableSkip } from './lib/arrival';
 import { initCorridor } from './lib/corridor';
-import { latestJournal, formatHouseDate } from './lib/content';
+import { latestJournal, formatHouseDate, currentRecording } from './lib/content';
 
 function byId<T extends HTMLElement>(id: string): T | null {
   return document.getElementById(id) as T | null;
@@ -42,6 +42,19 @@ function boot(): void {
     const flag = byId('journal-fixture');
     if (flag) flag.hidden = !entry.fixture;
   }
+
+  // --- Productions: the Brass Studio Lamp (truthful Now-Recording signal) --
+  const rec = currentRecording();
+  const lamp = byId('productions-lamp');
+  if (lamp) lamp.dataset.active = String(rec.active);
+  const recState = byId('productions-state');
+  if (recState) {
+    recState.textContent = rec.active && rec.detail
+      ? `Recording now — ${rec.detail}`
+      : rec.label;
+  }
+  const prodDoor = byId('productions-door');
+  if (prodDoor) prodDoor.classList.toggle('door--live', rec.active);
 
   // --- The Long Corridor (spatial or Indexed Spine) -----------------------
   const spine = byId('spine');

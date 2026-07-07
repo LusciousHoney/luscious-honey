@@ -42,6 +42,7 @@ content/
   works/*.json            one file per article/interview
   writing-wall/*.json      curated fragments (array)
   held-frame/*.json       the curated Single Held Frame(s)
+  now-recording/*.json    the live-session flag (defaults to dark)
 ```
 
 Loaded at **build time** via `import.meta.glob` (inlined, no runtime fetch). To
@@ -56,7 +57,8 @@ replace this with a CMS / Cloudflare data source later, swap the four loaders in
 | **Writing Wall** | `content/writing-wall/*.json` · Editor | **Manual curation.** Exactly **one** fragment: a manually `active` one wins; else a `scheduled` one whose `showFrom`/`showUntil` window contains today; else **the wall rests**. Unattributed; always marked "in progress" so WIP is never implied as published. |
 | **Held Frame** | `content/held-frame/*.json` · Art Director/Editor | **Manual selection.** The single latest `published` frame; else **it rests**. Real shots only; poster-first; muted; never a montage. |
 | **Editorial works** | `content/works/*.json` · Editor | Only `published` works appear on the shelf and are linkable. Featured first. |
-| **Now Recording / Salon** | — | **Not shown.** Deferred until bound to a real flag / calendar that fails to rest. |
+| **Now Recording** | `content/now-recording/state.json` · Producer | **Manual flag.** Defaults to dark; the Brass Studio Lamp lights only when `live: true`. A forgotten flag past `staleAfterMinutes` **fails back to dark**. State shown as text ("Recording now" / "Studio dark") with `aria-live`, never colour alone. Never faked. |
+| **Salon** | — | **Not shown.** Deferred until bound to a real calendar that fails to rest. |
 | **Living Clock** | Real local clock | Reflects the visitor's real time; changes atmosphere only — now also carried onto the Front Desk / Journal. |
 
 **Default to rest.** A held Journal, a bare wall and an unheld frame are correct
@@ -74,6 +76,9 @@ states — emptiness is never an error to paper over.
    new week and set it `published`; drop the final image at the `media.poster` path.
 4. **New article/interview:** add a file in `content/works/` with `status`
    `draft` until ready, then `published`.
+5. **Go on air:** in `content/now-recording/state.json` set `"live": true`, a
+   `"since"` timestamp, and an optional `"detail"`. Set `"live": false` when the
+   session ends (and it fails to dark on its own after `staleAfterMinutes`).
 
 Nothing publishes itself; every change above is a deliberate human edit.
 

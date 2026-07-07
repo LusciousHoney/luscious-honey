@@ -48,10 +48,13 @@ That's it. The site opens at **Reception**. Scroll to walk the corridor; click
 | `/` | `index.html` | **Reception** — the Spine Reveal arrival, the Front Desk / House Journal, and the Long Corridor. |
 | `/publishing.html` | `publishing.html` | **Publishing Wing** — the works shelf, the editor's desk, the Writing Wall. |
 | `/reader.html?work=…` | `reader.html` | **The Reader** — one work on a solid reading plate. |
+| `/press.html` | `press.html` | **Press** — the House Journal archive (published entries only). |
 
-Doors `02–06` (Productions, Press, Salon, Lantern, Archive) appear on the spine as
-**architecture** but are honestly *not yet furnished* — they are not fake rooms and
-not empty routes. Future wings are built only when real content exists for them.
+Door `02` (Productions) shows a truthful **Now-Recording signal** — the Brass Studio
+Lamp, dark unless a real session is live. Door `03` (Press) opens the **Journal
+archive**. Doors `04–06` (Salon, Lantern, Archive) appear on the spine as
+**architecture** but are honestly *not yet furnished* — not fake rooms, not empty
+routes. Future wings are built only when real content exists for them.
 
 ---
 

@@ -9,9 +9,9 @@ import assert from 'node:assert/strict';
 import {
   selectLatestJournal, selectJournalArchive,
   selectActiveFragment, selectCurrentHeldFrame, selectPublishedWorks,
-  inWindow,
+  selectRecordingState, inWindow,
 } from '../src/lib/governance.ts';
-import type { JournalEntry, Fragment, HeldFrame, Work, BodyBlock } from '../src/lib/content-types.ts';
+import type { JournalEntry, Fragment, HeldFrame, Work, BodyBlock, RecordingFlag } from '../src/lib/content-types.ts';
 
 const journal: JournalEntry[] = [
   { date: '2026-06-28', week: 26, body: 'older', signed: 'L.H.', status: 'published' },
@@ -80,4 +80,49 @@ test('Works: published only, featured first', () => {
   const pub = selectPublishedWorks(works);
   assert.equal(pub.length, 2);
   assert.equal(pub[0].slug, 'b'); // featured first
+});
+
+/* --- Now Recording ------------------------------------------------------- */
+
+const NOW = new Date('2026-07-07T20:00:00');
+
+test('Now Recording: default / not live → Studio dark', () => {
+  assert.deepEqual(selectRecordingState({ live: false }, NOW), { active: false, label: 'Studio dark' });
+  assert.equal(selectRecordingState(undefined, NOW).active, false);
+});
+
+test('Now Recording: live and fresh → Recording now (with detail)', () => {
+  const flag: RecordingFlag = {
+    live: true,
+    since: '2026-07-07T19:45:00',
+    detail: 'a conversation at the hearth',
+    staleAfterMinutes: 240,
+  };
+  const s = selectRecordingState(flag, NOW);
+  assert.equal(s.active, true);
+  assert.equal(s.label, 'Recording now');
+  assert.equal(s.detail, 'a conversation at the hearth');
+});
+
+test('Now Recording: a forgotten live flag past its window fails to dark', () => {
+  const stale: RecordingFlag = { live: true, since: '2026-07-07T10:00:00', staleAfterMinutes: 240 };
+  assert.equal(selectRecordingState(stale, NOW).active, false); // 10h old > 4h window
+  // live with no staleness configured stays active
+  const openEnded: RecordingFlag = { live: true, since: '2026-07-07T10:00:00' };
+  assert.equal(selectRecordingState(openEnded, NOW).active, true);
+});
+
+/* --- Journal archive ----------------------------------------------------- */
+
+test('Journal archive: published only, newest first, drafts excluded', () => {
+  const entries: JournalEntry[] = [
+    { date: '2026-06-14', week: 24, body: 'oldest', signed: 'L.H.', status: 'published' },
+    { date: '2026-07-05', week: 27, body: 'newest', signed: 'L.H.', status: 'published' },
+    { date: '2026-06-28', week: 26, body: 'middle', signed: 'L.H.', status: 'published' },
+    { date: '2026-07-12', week: 28, body: 'hidden draft', signed: 'L.H.', status: 'draft' },
+    { date: '2026-07-19', week: 29, body: 'hidden scheduled', signed: 'L.H.', status: 'scheduled' },
+  ];
+  const archive = selectJournalArchive(entries);
+  assert.deepEqual(archive.map((e) => e.body), ['newest', 'middle', 'oldest']);
+  assert.ok(!archive.some((e) => e.status !== 'published'));
 });

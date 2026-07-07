@@ -28,6 +28,9 @@
   .door__name { grid-area: name; }
   .door__blurb { grid-area: blurb; }
   .door__state { grid-area: state; justify-self: start; }
+  /* Let the live "what's recording" line wrap instead of clipping. */
+  .door__signal { grid-area: state; justify-self: start; white-space: normal; align-items: baseline; }
+  .door__signal .door__state { white-space: normal; }
 }
 
 /* --- Tablet: the spine stands upright ----------------------------------- */

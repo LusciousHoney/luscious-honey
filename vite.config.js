@@ -12,6 +12,7 @@ export default defineConfig({
         reception: resolve(__dirname, 'index.html'),      // /        Reception (arrival + spine)
         publishing: resolve(__dirname, 'publishing.html'), // /publishing  Editorial wing
         reader: resolve(__dirname, 'reader.html'),         // /publishing/:work  the Reader
+        press: resolve(__dirname, 'press.html'),           // /press      House Journal archive
       },
     },
   },
