@@ -39,6 +39,8 @@ function boot(): void {
       date.textContent = formatHouseDate(entry.date);
       date.setAttribute('datetime', entry.date);
     }
+    const flag = byId('journal-fixture');
+    if (flag) flag.hidden = !entry.fixture;
   }
 
   // --- The Long Corridor (spatial or Indexed Spine) -----------------------

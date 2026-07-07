@@ -1,0 +1,31 @@
+{
+  "id": "w-open-the-house",
+  "slug": "opening-the-house",
+  "title": "Opening the House",
+  "creator": "Luscious Honey",
+  "medium": "interview",
+  "year": 2026,
+  "date": "2026-07-05",
+  "status": "published",
+  "fixture": true,
+  "featured": true,
+  "dek": "On why an editorial institution should feel like a building you can walk into — and what it owes the people who step inside.",
+  "media": {
+    "id": "m-desk",
+    "kind": "image",
+    "poster": "/media/frame-04-editors-desk.poster.svg",
+    "alt": "Over-the-shoulder view of a walnut writing desk under a single warm brass lamp, an open dated page beneath the light.",
+    "aspect": "3/2",
+    "caption": "The editor’s desk, just off Reception. Frame 04."
+  },
+  "body": [
+    { "type": "p", "text": "We are told, often, that publishing is a feed — an endless downward scroll of things that arrive and are gone. The House was built to argue with that. It is a place, and places have thresholds." },
+    { "type": "qa", "q": "Why a corridor? Why not a homepage?", "a": "Because a homepage asks nothing of you and remembers nothing of you. A corridor makes you walk, and walking is a small act of consent. You pass doors. You choose one. The architecture is the navigation." },
+    { "type": "pull", "text": "Darkness makes the lit rooms matter." },
+    { "type": "qa", "q": "The lamps stay low. Isn’t that a risk — asking people to read in the dark?", "a": "The rooms are dark; the plates are not. Wherever there is text there is a solid, bright surface under it, at full contrast. The dark is the hallway. The light is the work." },
+    { "type": "h2", "text": "On not faking a pulse" },
+    { "type": "p", "text": "The one rule we will not bend: the House never pretends to be busier than it is. If nothing is recording, the lamp is dark. If no event is booked, the Salon rests. An honest empty room is not a bug to paper over." },
+    { "type": "note", "text": "The Now-Recording lamp is bound to a real session flag and fails to dark." },
+    { "type": "qa", "q": "What does the first slice have to prove?", "a": "That the metaphor survives contact with real reading. Arrival, the desk, the corridor, one working wing, one real piece on a solid reading plate. If that feels like the House, the rest is extension, not reinvention." }
+  ]
+}

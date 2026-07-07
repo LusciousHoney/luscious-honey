@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img"
+     aria-label="Placeholder poster: the Long Corridor at dusk, door-pools receding to a lit room.">
+  <defs>
+    <radialGradient id="lantern" cx="50%" cy="40%" r="34%">
+      <stop offset="0%" stop-color="#D3B072" stop-opacity="0.55"/>
+      <stop offset="60%" stop-color="#B08A4F" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#17120E" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="poolL" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#D3B072" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#17120E" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="floor" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#211D1A"/>
+      <stop offset="100%" stop-color="#17120E"/>
+    </linearGradient>
+  </defs>
+
+  <!-- the dark of the house -->
+  <rect width="1600" height="900" fill="#17120E"/>
+  <rect y="560" width="1600" height="340" fill="url(#floor)"/>
+
+  <!-- receding door-pools, left and right -->
+  <ellipse cx="360" cy="640" rx="240" ry="90" fill="url(#poolL)"/>
+  <ellipse cx="1240" cy="640" rx="240" ry="90" fill="url(#poolL)"/>
+  <ellipse cx="560" cy="560" rx="150" ry="55" fill="url(#poolL)"/>
+  <ellipse cx="1040" cy="560" rx="150" ry="55" fill="url(#poolL)"/>
+
+  <!-- one-point perspective guide lines (walls meeting the vanishing point) -->
+  <g stroke="#B08A4F" stroke-opacity="0.14" stroke-width="1" fill="none">
+    <path d="M0 120 L760 380"/>
+    <path d="M1600 120 L840 380"/>
+    <path d="M0 900 L740 420"/>
+    <path d="M1600 900 L860 420"/>
+  </g>
+
+  <!-- the Lantern at the vanishing point -->
+  <rect width="1600" height="900" fill="url(#lantern)"/>
+  <rect x="748" y="330" width="104" height="150" rx="0" fill="#D3B072" fill-opacity="0.28"/>
+
+  <!-- hairline frame -->
+  <rect x="0.5" y="0.5" width="1599" height="899" fill="none" stroke="#B08A4F" stroke-opacity="0.35"/>
+
+  <!-- honest placeholder label -->
+  <text x="40" y="852" font-family="'IBM Plex Mono', monospace" font-size="24"
+        letter-spacing="4" fill="#C9BFB0" fill-opacity="0.85">
+    HELD FRAME · PLACEHOLDER · 16:9
+  </text>
+</svg>

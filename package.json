@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test tests/logic.test.ts"
+    "test": "node --test tests/logic.test.ts tests/governance.test.ts"
   },
   "devDependencies": {
     "@types/node": "^22.7.0",

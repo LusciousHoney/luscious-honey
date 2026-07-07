@@ -10,7 +10,7 @@ import './styles/components.css';
 import './styles/publishing.css';
 import './styles/responsive.css';
 
-import { getWork, works, formatHouseDate as fmtDate, type BodyBlock, type Work } from './lib/content';
+import { getWork, publishedWorks, formatHouseDate as fmtDate, type BodyBlock, type Work } from './lib/content';
 
 function esc(s: string): string {
   const d = document.createElement('div');
@@ -46,7 +46,7 @@ function render(work: Work): string {
     <p class="reader__kicker metaline">
       <span class="label">${esc(work.medium)}</span>
       <span class="meta">${esc(fmtDate(work.date))}</span>
-      <span class="fixture-flag">Temporary editorial fixture — not a published piece</span>
+      ${work.fixture ? '<span class="fixture-flag">Temporary editorial fixture — not a published piece</span>' : ''}
     </p>
     <h1 class="reader__title">${esc(work.title)}</h1>
     ${work.dek ? `<p class="reader__dek">${esc(work.dek)}</p>` : ''}
@@ -64,7 +64,7 @@ function boot(): void {
   const el = document.getElementById('reader');
   if (!el) return;
 
-  const slug = new URLSearchParams(location.search).get('work') ?? works[0]?.slug;
+  const slug = new URLSearchParams(location.search).get('work') ?? publishedWorks()[0]?.slug;
   const work = slug ? getWork(slug) : undefined;
 
   if (!work) {

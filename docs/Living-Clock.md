@@ -30,6 +30,17 @@ they are not from the frame lock lists.
 3. **Presentation:** CSS reads `--clock-warmth` to scale the lamp/door-pool glow
    and can key off `[data-tod]`. Swapping visuals never touches the logic.
 
+## Where it appears
+
+- **Reception** — the time-aware greeting and the desk label.
+- **Front Desk / House Journal** — the desk carries a Living-Clock line
+  ("The desk · Sunday · evening") and the Journal lamp warmth scales with
+  `--clock-warmth`.
+- **The Held Frame** — its glow breathes with the hour (`--clock-warmth`).
+
+The architecture is unchanged: every surface reads the same `applyClock()` output;
+no new time logic was added.
+
 ## Reduced motion
 
 Transitions between states are gradual crossfades over minutes. Under

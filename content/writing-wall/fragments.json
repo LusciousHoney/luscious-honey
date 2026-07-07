@@ -1,0 +1,25 @@
+[
+  {
+    "id": "f-letter",
+    "text": "She kept the letter, unopened, for nineteen years—",
+    "status": "published",
+    "fixture": true,
+    "active": true
+  },
+  {
+    "id": "f-tape",
+    "text": "and the tape was still running when nobody was left to hear it.",
+    "status": "published",
+    "fixture": true,
+    "active": false,
+    "showFrom": "2026-07-20",
+    "showUntil": "2026-07-27"
+  },
+  {
+    "id": "f-draft",
+    "text": "an unfinished line held back until it is ready",
+    "status": "draft",
+    "fixture": true,
+    "active": false
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "id": "held-2026-w27",
+  "week": 27,
+  "date": "2026-07-05",
+  "status": "published",
+  "fixture": true,
+  "media": {
+    "id": "held-frame-spine-dusk",
+    "kind": "image",
+    "poster": "/media/held-frame-w27.poster.svg",
+    "aspect": "16/9",
+    "alt": "The Long Corridor at dusk: warm door-pools receding to a single glowing room at the far end.",
+    "caption": "Held this week — the spine at dusk."
+  }
+}

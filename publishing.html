@@ -46,13 +46,15 @@
             </div>
           </div>
 
-          <!-- The desk + the wall -->
+          <!-- The desk + the wall + the held frame -->
           <aside class="wing-aside" aria-label="From the desk">
-            <article class="journal plate brass-edge" aria-labelledby="wing-journal-heading">
+            <article id="journal" class="journal plate brass-edge" aria-labelledby="wing-journal-heading">
               <span class="journal__lamp" aria-hidden="true"></span>
               <h2 id="wing-journal-heading" class="label">The House Journal
-                <span class="fixture-flag">Fixture</span>
+                <span id="journal-fixture" class="fixture-flag">Fixture</span>
               </h2>
+              <!-- Living Clock: the desk carries the house's current time context -->
+              <p id="journal-clock" class="meta journal__clock"></p>
               <time id="journal-date" class="meta journal__date"></time>
               <p id="journal-body" class="journal__body"></p>
               <p class="journal__sign">— L.H.</p>
@@ -63,10 +65,15 @@
               <p id="fragment" class="writing-wall__text editorial">
                 She kept the letter, unopened, for nineteen years—
               </p>
-              <p class="writing-wall__mark meta">In progress
+              <p class="writing-wall__mark meta"><span id="wall-mark">In progress</span>
                 <span class="fixture-flag">Fixture</span>
               </p>
             </section>
+
+            <!-- The Single Held Frame — one curated real shot, poster-first -->
+            <figure id="held-frame" class="held-frame" aria-label="The Held Frame">
+              <!-- rendered by publishing.ts; rests honestly when none is held -->
+            </figure>
           </aside>
         </div>
       </section>

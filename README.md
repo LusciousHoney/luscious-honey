@@ -73,9 +73,18 @@ matching the Collective's existing deployment strategy. No deployment configurat
 is committed yet and **no deploy happens automatically** — see
 [`docs/Architecture.md`](docs/Architecture.md) for what will be required.
 
+## Content
+
+Real editorial content lives as structured files in [`content/`](content) and is
+governed by manual publish states — see [`docs/Content-Model.md`](docs/Content-Model.md)
+for the plain-language publishing workflow (how to post a Journal entry, change the
+Writing Wall, or swap the Held Frame).
+
 ## Known limitations (this slice)
 
-- All editorial content is a **clearly-labelled temporary fixture**, not published work.
+- The operational **systems are real** (Journal, Writing Wall, Held Frame,
+  editorial works, governance); the **content is still a clearly-labelled temporary
+  fixture** until real pieces are supplied.
 - Final photography/film for the 11 media slots is not yet delivered; slots use
   documented placeholder treatments that preserve composition and aspect ratio.
 - Deferred by design: Now-Recording live flag, Salon live mode, the Archive graph,
