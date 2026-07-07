@@ -14,8 +14,11 @@ Every governed item carries both:
 
 - **`status`** — `'published' | 'scheduled' | 'draft'`. The publish state a human
   controls. **Only `status: 'published'` is ever shown.** Nothing auto-promotes.
-- **`fixture`** — `true` marks temporary content; drives the development-only flag
-  (`.fixture-flag`, visible only when `<html data-env="development">`).
+- **`fixture`** — `true` marks temporary content; drives the development-only flag.
+  Fixture chips are injected by JS only under `import.meta.env.DEV`, so the
+  production build ships **none** of them; a build-time `data-env` switch (Vite
+  plugin) and the default `display:none` are the safety net. `npm run check:prod`
+  fails the build if any fixture label reaches shipped HTML/JS.
 
 These are independent: a fixture can be "published" (it shows, clearly flagged in
 dev) and real content can be "draft" (it does not show).

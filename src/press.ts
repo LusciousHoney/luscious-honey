@@ -24,7 +24,7 @@ function entry(e: JournalEntry): string {
     <article class="archive__entry">
       <time class="meta archive__date" datetime="${e.date}">
         ${esc(formatHouseDate(e.date))} · week ${e.week}
-        ${e.fixture ? '<span class="fixture-flag">Fixture</span>' : ''}
+        ${import.meta.env.DEV && e.fixture ? '<span class="fixture-flag">Fixture</span>' : ''}
       </time>
       <p class="archive__body">${esc(e.body)}</p>
       <p class="archive__sign">— ${esc(e.signed)}</p>

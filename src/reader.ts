@@ -46,7 +46,7 @@ function render(work: Work): string {
     <p class="reader__kicker metaline">
       <span class="label">${esc(work.medium)}</span>
       <span class="meta">${esc(fmtDate(work.date))}</span>
-      ${work.fixture ? '<span class="fixture-flag">Temporary editorial fixture — not a published piece</span>' : ''}
+      ${import.meta.env.DEV && work.fixture ? '<span class="fixture-flag">Temporary editorial fixture — not a published piece</span>' : ''}
     </p>
     <h1 class="reader__title">${esc(work.title)}</h1>
     ${work.dek ? `<p class="reader__dek">${esc(work.dek)}</p>` : ''}

@@ -39,8 +39,11 @@ function boot(): void {
       date.textContent = formatHouseDate(entry.date);
       date.setAttribute('datetime', entry.date);
     }
-    const flag = byId('journal-fixture');
-    if (flag) flag.hidden = !entry.fixture;
+    // Fixture chip: development only. `import.meta.env.DEV` is statically false in
+    // the production build, so this branch (and its markup) is eliminated.
+    if (import.meta.env.DEV && entry.fixture) {
+      byId('journal-heading')?.insertAdjacentHTML('beforeend', ' <span class="fixture-flag">Fixture</span>');
+    }
   }
 
   // --- Productions: the Brass Studio Lamp (truthful Now-Recording signal) --

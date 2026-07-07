@@ -178,8 +178,11 @@ a:focus-visible { background-size: 100% 1px; color: var(--brass-hi); }
   white-space: nowrap; border: 0;
 }
 
-/* A development-only marker for temporary fixtures. Hidden in production
-   builds via the `data-env` flag set on <html> (see content.ts). */
+/* A development-only marker for temporary fixtures. Two-layer safety:
+   (1) the chips are injected by JS only under `import.meta.env.DEV`, so they are
+       eliminated from the production bundle entirely; (2) as a net, this rule
+       hides `.fixture-flag` unless the build-time `data-env` is "development"
+       (set by the htmlDataEnv plugin in vite.config.js — production ⇒ hidden). */
 .fixture-flag {
   display: none;
   font-family: var(--mono);

@@ -18,8 +18,12 @@ import {
   type Work, type HeldFrame,
 } from './lib/content';
 
-const fixtureFlag = (on?: boolean) =>
-  on ? '<span class="fixture-flag">Fixture</span>' : '';
+// Fixture chips render in development only. `import.meta.env.DEV` is statically
+// false in the production build, so these strings are dead-code-eliminated.
+const fixtureFlag = (on?: boolean, text = 'Fixture'): string => {
+  if (!import.meta.env.DEV || !on) return '';
+  return `<span class="fixture-flag">${text}</span>`;
+};
 
 function workCard(work: Work): string {
   const media = work.media
@@ -87,8 +91,10 @@ function boot(): void {
     if (body) body.textContent = entry.body;
     const date = document.getElementById('journal-date');
     if (date) { date.textContent = fmtDate(entry.date); date.setAttribute('datetime', entry.date); }
-    const flag = document.getElementById('journal-fixture');
-    if (flag) flag.hidden = !entry.fixture;
+    if (import.meta.env.DEV && entry.fixture) {
+      document.getElementById('wing-journal-heading')
+        ?.insertAdjacentHTML('beforeend', ' <span class="fixture-flag">Fixture</span>');
+    }
   } else if (journalEl) {
     journalEl.innerHTML =
       `<h2 class="label">The House Journal</h2>
@@ -102,6 +108,9 @@ function boot(): void {
   if (fragEl) {
     if (frag) {
       fragEl.textContent = frag.text;
+      if (import.meta.env.DEV && frag.fixture) {
+        wallMark?.insertAdjacentHTML('afterend', ' <span class="fixture-flag">Fixture</span>');
+      }
     } else {
       fragEl.textContent = 'The wall is bare this week.';
       if (wallMark) wallMark.textContent = 'At rest';

@@ -8,7 +8,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test tests/logic.test.ts tests/governance.test.ts"
+    "test": "node --test tests/logic.test.ts tests/governance.test.ts",
+    "check:prod": "node scripts/check-prod-safety.mjs",
+    "verify": "npm run build && npm test && npm run check:prod"
   },
   "devDependencies": {
     "@types/node": "^22.7.0",
