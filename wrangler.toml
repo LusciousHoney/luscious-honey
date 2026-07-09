@@ -1,0 +1,11 @@
+# Cloudflare Pages — Luscious Honey Collective Headquarters
+#
+# This is a SEPARATE Pages project from Pull Me Under (which deploys from its own
+# GitHub repo). This project is a static site; Wrangler uploads ./dist directly.
+#
+# Deploy:  npm run build && npx wrangler pages deploy
+#   (reads `name` and `pages_build_output_dir` below — no directory argument needed)
+
+name = "luscious-honey-collective"
+compatibility_date = "2026-07-09"
+pages_build_output_dir = "dist"
