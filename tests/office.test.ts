@@ -109,7 +109,7 @@ test('curated follow-ups: no repeats, then loops', () => {
 
 test("Founder's Interview: ~30–40 questions across the five named stages", () => {
   assert.deepEqual(doc.stages.map((s) => s.name),
-    ['The Foundation', 'The Philosophy', 'The Community', 'The Voice', 'The Legacy']);
+    ['The Foundation', 'The Philosophy', 'The Community', 'The Editorial Voice', 'The Legacy']);
   const n = core.allQuestions(doc).length;
   assert.ok(n >= 30 && n <= 40, `expected 30–40 questions, got ${n}`);
 });

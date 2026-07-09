@@ -54,6 +54,16 @@
 
 .office-elsewhere { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 
+/* --- Founder Dashboard: the relocated Audio Studio --------------------- */
+.office-studio { display: grid; gap: var(--s-2); padding: var(--s-4); }
+.office-studio__name { font-size: var(--fs-h3); font-weight: 300; color: var(--ink); margin: 0; }
+.office-studio__blurb { color: var(--umber); margin: 0; }
+.office-studio__how { color: var(--umber); }
+.office-studio__how code {
+  font-family: var(--mono); font-size: 0.85em;
+  background: var(--surface-plate-2); border: var(--hairline); padding: 1px 6px;
+}
+
 /* --- Interview ----------------------------------------------------------- */
 .interview { display: grid; gap: var(--s-5); max-width: var(--w-text); margin-inline: auto; }
 

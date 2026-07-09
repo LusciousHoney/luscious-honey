@@ -11,7 +11,8 @@
     "test": "node --test tests/logic.test.ts tests/governance.test.ts tests/office.test.ts",
     "check:prod": "node scripts/check-prod-safety.mjs",
     "verify": "npm run build && npm test && npm run check:prod",
-    "deploy": "npm run verify && wrangler pages deploy"
+    "deploy": "npm run verify && wrangler pages deploy",
+    "studio": "node private-voice-notes-studio/serve.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.7.0",

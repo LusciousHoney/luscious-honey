@@ -3,3 +3,9 @@ dist
 .DS_Store
 *.local
 .vite
+
+# Audio Studio — keep the folder + code, but never commit recordings/media
+private-voice-notes-studio/audio/*
+private-voice-notes-studio/images/*
+!private-voice-notes-studio/audio/.gitkeep
+!private-voice-notes-studio/images/.gitkeep

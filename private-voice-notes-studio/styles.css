@@ -1,0 +1,1101 @@
+/* ==========================================================================
+   Private Voice Notes Studio — Luscious Honey x Khalil
+   Creator Dashboard (left) + live TikTok-ready phone preview (right).
+   ========================================================================== */
+
+:root {
+  /* Same brand colors as the main Pull Me Under site, for a consistent
+     Luscious Honey look across projects. */
+  --gold: #d4b06a;
+  --gold-soft: #e8cf9c;
+  --gold-dim: rgba(212, 176, 106, 0.35);
+  --ivory: #f5f0e6;
+
+  --charcoal: #0a0a09;
+  --charcoal-2: #141210;
+  --panel: #121110;
+  --bubble-khalil: #1c1916;
+  --bubble-honey: #2a2013;
+
+  --font-display: 'Cinzel', serif;
+  --font-ui: 'Inter', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #050505;
+  font-family: var(--font-ui);
+  color: var(--ivory);
+}
+
+/* --------------------------------------------------------------------
+   App shell
+   -------------------------------------------------------------------- */
+
+.app {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 28px 20px 60px;
+}
+
+.app-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.app-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(22px, 3.4vw, 30px);
+  letter-spacing: 0.03em;
+  color: var(--ivory);
+}
+
+.app-subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold);
+  opacity: 0.8;
+}
+
+.app-layout {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+
+/* --------------------------------------------------------------------
+   Dashboard
+   -------------------------------------------------------------------- */
+
+.dashboard {
+  flex: 1 1 420px;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.dash-section {
+  background: var(--panel);
+  border: 1px solid rgba(212, 176, 106, 0.16);
+  border-radius: 14px;
+  padding: 18px 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dash-section h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  color: var(--gold-soft);
+}
+
+.dash-hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgba(245, 240, 230, 0.45);
+  font-style: italic;
+}
+
+.dash-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+}
+
+.dash-field > span {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(245, 240, 230, 0.55);
+}
+
+.dash-field-row {
+  display: flex;
+  gap: 12px;
+}
+
+.dash-field input[type='text'],
+.dash-field input[type='number'],
+.dash-field textarea,
+.dash-field select {
+  width: 100%;
+  background: var(--charcoal-2);
+  border: 1px solid rgba(212, 176, 106, 0.22);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--ivory);
+  font-family: var(--font-ui);
+  font-size: 13px;
+}
+
+.dash-field input[type='file'] {
+  font-size: 12px;
+  color: rgba(245, 240, 230, 0.7);
+}
+
+.dash-field textarea {
+  resize: vertical;
+  font-family: var(--font-ui);
+}
+
+.dash-field input:focus,
+.dash-field textarea:focus,
+.dash-field select:focus {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+}
+
+.dash-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ivory);
+  cursor: pointer;
+}
+
+.dashboard :disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Buttons */
+
+.dash-btn {
+  padding: 9px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--gold-dim);
+  background: transparent;
+  color: var(--gold-soft);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.dash-btn:hover:not(:disabled) {
+  background: rgba(212, 176, 106, 0.1);
+}
+
+.dash-btn-primary {
+  background: rgba(212, 176, 106, 0.14);
+}
+
+.dash-btn-gold {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--charcoal);
+  font-weight: 600;
+}
+
+.dash-btn-gold:hover:not(:disabled) {
+  background: var(--gold-soft);
+}
+
+.control-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Anchor styled as a button (export download link) */
+a.dash-btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* --------------------------------------------------------------------
+   Export status
+   -------------------------------------------------------------------- */
+
+.export-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: rgba(245, 240, 230, 0.7);
+}
+
+.export-status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--gold-dim);
+  flex: none;
+}
+
+.export-status[data-phase='recording'] .export-status-dot {
+  background: #e2a3a3;
+  box-shadow: 0 0 8px rgba(226, 163, 163, 0.7);
+  animation: export-pulse 1s ease-in-out infinite;
+}
+
+.export-status[data-phase='preparing'] .export-status-dot,
+.export-status[data-phase='finalizing'] .export-status-dot {
+  background: var(--gold);
+  animation: export-pulse 1s ease-in-out infinite;
+}
+
+.export-status[data-phase='ready'] .export-status-dot {
+  background: #9ede9e;
+  box-shadow: 0 0 8px rgba(158, 222, 158, 0.6);
+}
+
+.export-status[data-phase='error'] .export-status-dot {
+  background: #e26a6a;
+}
+
+@keyframes export-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .export-status-dot { animation: none !important; }
+}
+
+/* --------------------------------------------------------------------
+   Conversation notes table
+   -------------------------------------------------------------------- */
+
+.notes-table {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.note-row {
+  border: 1px solid rgba(212, 176, 106, 0.16);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.note-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.note-row-title {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(245, 240, 230, 0.45);
+}
+
+.note-row-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.note-row-actions button {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid rgba(212, 176, 106, 0.25);
+  background: transparent;
+  color: var(--gold-soft);
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.note-row-actions button:hover:not(:disabled) {
+  background: rgba(212, 176, 106, 0.12);
+}
+
+.note-row-actions .note-delete-btn {
+  color: #e2a3a3;
+  border-color: rgba(226, 163, 163, 0.35);
+}
+
+.note-row-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.note-row-grid .dash-field.span-2 {
+  grid-column: 1 / -1;
+}
+
+.note-duration-badge {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--gold-soft);
+  background: var(--charcoal-2);
+  border: 1px solid rgba(212, 176, 106, 0.22);
+  border-radius: 8px;
+  padding: 8px 10px;
+  text-align: center;
+}
+
+/* Per-note audio status line */
+.note-audio-status {
+  font-size: 11px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(212, 176, 106, 0.14);
+  color: rgba(245, 240, 230, 0.6);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.note-audio-status::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--gold-dim);
+}
+
+.note-audio-status[data-status='loaded'] {
+  color: #bfe0bf;
+  border-color: rgba(158, 222, 158, 0.3);
+}
+
+.note-audio-status[data-status='loaded']::before {
+  background: #9ede9e;
+  box-shadow: 0 0 6px rgba(158, 222, 158, 0.6);
+}
+
+.note-audio-status[data-status='fallback'],
+.note-audio-status[data-status='needed'],
+.note-audio-status[data-status='none'] {
+  color: #e8c79a;
+  border-color: rgba(226, 163, 107, 0.35);
+}
+
+.note-audio-status[data-status='fallback']::before,
+.note-audio-status[data-status='needed']::before,
+.note-audio-status[data-status='none']::before {
+  background: #e2a36b;
+}
+
+/* --------------------------------------------------------------------
+   Project (save/load/duplicate) status
+   -------------------------------------------------------------------- */
+
+.project-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: rgba(245, 240, 230, 0.75);
+}
+
+.project-status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--gold-dim);
+  flex: none;
+}
+
+.project-status[data-phase='saved'] .project-status-dot,
+.project-status[data-phase='loaded'] .project-status-dot,
+.project-status[data-phase='created'] .project-status-dot {
+  background: #9ede9e;
+  box-shadow: 0 0 8px rgba(158, 222, 158, 0.6);
+}
+
+.project-status[data-phase='needed'] .project-status-dot {
+  background: #e2a36b;
+  box-shadow: 0 0 8px rgba(226, 163, 107, 0.55);
+}
+
+.project-status[data-phase='error'] .project-status-dot {
+  background: #e26a6a;
+}
+
+/* --------------------------------------------------------------------
+   Audio mode toggle
+   -------------------------------------------------------------------- */
+
+.dash-sublabel {
+  margin: 4px 0 -2px;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(212, 176, 106, 0.7);
+}
+
+.dash-inline-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(245, 240, 230, 0.7);
+}
+
+.dash-inline-label select {
+  background: var(--charcoal-2);
+  border: 1px solid rgba(212, 176, 106, 0.22);
+  border-radius: 6px;
+  padding: 5px 7px;
+  color: var(--ivory);
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+/* --------------------------------------------------------------------
+   Owner workflow — the Episode Package flow as four spaced steps
+   (Project Metadata → Create Package → Import Return → Export).
+   Visual grouping only; no layout redesign.
+   -------------------------------------------------------------------- */
+
+.owner-workflow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.workflow-step {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 15px 15px 17px;
+  border: 1px solid rgba(212, 176, 106, 0.16);
+  border-radius: 12px;
+  background: rgba(20, 18, 16, 0.4);
+}
+
+.workflow-step-label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--gold-soft);
+}
+
+.workflow-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--gold);
+  color: var(--charcoal);
+  font-size: 11px;
+  font-weight: 700;
+  flex: none;
+}
+
+.workflow-arrow {
+  align-self: center;
+  margin: 3px 0;
+  font-size: 15px;
+  line-height: 1;
+  color: rgba(212, 176, 106, 0.5);
+}
+
+/* Advanced JSON tools tucked into a collapsible to reduce clutter. */
+.dash-advanced {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dash-advanced > summary {
+  cursor: pointer;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(212, 176, 106, 0.7);
+  list-style: none;
+}
+
+.dash-advanced > summary::-webkit-details-marker { display: none; }
+.dash-advanced > summary::before { content: '▸  '; }
+.dash-advanced[open] > summary::before { content: '▾  '; }
+
+/* --------------------------------------------------------------------
+   Owner / Contributor role visibility
+   -------------------------------------------------------------------- */
+
+/* Default (no data-role or data-role="owner"): show owner, hide contributor */
+.contributor-only { display: none; }
+
+#dashboard[data-role='contributor'] .owner-only { display: none !important; }
+#dashboard[data-role='contributor'] .contributor-only { display: block; }
+
+.role-banner {
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--gold-dim);
+  background: rgba(212, 176, 106, 0.08);
+  color: var(--gold-soft);
+}
+
+#dashboard[data-role='contributor'] .role-banner {
+  border-color: rgba(226, 163, 107, 0.4);
+  background: rgba(226, 163, 107, 0.1);
+  color: #e8c79a;
+}
+
+/* Locked (owner-reference) note rows in contributor mode */
+.note-row.note-locked {
+  opacity: 0.72;
+}
+
+.note-row.note-assigned {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px rgba(212, 176, 106, 0.25);
+}
+
+.dash-hint code {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  background: rgba(212, 176, 106, 0.12);
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: var(--gold-soft);
+}
+
+.audio-mode-toggle {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.audio-mode-option {
+  flex: 1 1 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  padding: 11px 13px;
+  border-radius: 10px;
+  border: 1px solid rgba(212, 176, 106, 0.2);
+  background: var(--charcoal-2);
+  color: rgba(245, 240, 230, 0.6);
+  font-family: var(--font-ui);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.audio-mode-option strong {
+  font-size: 13px;
+  color: var(--ivory);
+  font-weight: 600;
+}
+
+.audio-mode-option span {
+  font-size: 11px;
+  color: rgba(245, 240, 230, 0.45);
+}
+
+.audio-mode-option:hover {
+  border-color: var(--gold-dim);
+}
+
+.audio-mode-option.active {
+  border-color: var(--gold);
+  background: rgba(212, 176, 106, 0.12);
+}
+
+.audio-mode-option.active strong {
+  color: var(--gold-soft);
+}
+
+/* --------------------------------------------------------------------
+   Character editors
+   -------------------------------------------------------------------- */
+
+.character-editor {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.character-editor + .character-editor {
+  border-top: 1px solid rgba(212, 176, 106, 0.12);
+  padding-top: 14px;
+}
+
+.character-editor-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+
+.avatar-thumb {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid var(--gold-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--charcoal-2);
+}
+
+.avatar-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.avatar-thumb-fallback {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gold-soft);
+}
+
+/* --------------------------------------------------------------------
+   Preview pane / phone frame (unchanged visual system)
+   -------------------------------------------------------------------- */
+
+.preview-pane {
+  flex: none;
+  position: sticky;
+  top: 24px;
+}
+
+.stage {
+  display: flex;
+  justify-content: center;
+}
+
+.phone-frame {
+  position: relative;
+  width: min(92vw, 380px);
+  aspect-ratio: 9 / 16; /* mirrors the 1080x1920 TikTok export frame */
+  background: radial-gradient(120% 120% at 50% 0%, var(--charcoal-2) 0%, var(--charcoal) 70%);
+  border: 1px solid rgba(212, 176, 106, 0.18);
+  border-radius: 28px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 40px 80px rgba(0, 0, 0, 0.6);
+}
+
+/* --------------------------------------------------------------------
+   Recording Mode: countdown + end screen
+   -------------------------------------------------------------------- */
+
+.countdown-overlay,
+.end-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px;
+}
+
+.countdown-overlay.hidden,
+.end-screen.hidden {
+  display: none;
+}
+
+.countdown-overlay {
+  background: rgba(5, 5, 5, 0.55);
+}
+
+.countdown-number {
+  font-family: var(--font-display);
+  font-size: 92px;
+  font-weight: 600;
+  color: var(--gold-soft);
+  text-shadow: 0 0 30px rgba(212, 176, 106, 0.55);
+}
+
+.end-screen {
+  background: rgba(5, 5, 5, 0.85);
+}
+
+.end-screen p {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(20px, 5.4vw, 27px);
+  letter-spacing: 0.02em;
+  color: var(--gold-soft);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+}
+
+/* --------------------------------------------------------------------
+   Thread header
+   -------------------------------------------------------------------- */
+
+.thread-header {
+  padding: 46px 20px 14px;
+  border-bottom: 1px solid rgba(212, 176, 106, 0.14);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.thread-avatar {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid var(--gold-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--charcoal-2);
+}
+
+.thread-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.thread-avatar-fallback {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gold-soft);
+}
+
+.thread-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  min-width: 0;
+}
+
+.thread-kicker {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+}
+
+.thread-name {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(19px, 4.6vw, 24px);
+  color: var(--ivory);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.thread-status {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--gold);
+  opacity: 0.75;
+}
+
+/* --------------------------------------------------------------------
+   Conversation body
+   -------------------------------------------------------------------- */
+
+.thread-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 14px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  scrollbar-width: none;
+}
+
+.thread-body::-webkit-scrollbar {
+  display: none;
+}
+
+.bubble-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.bubble-row.left {
+  justify-content: flex-start;
+}
+
+.bubble-row.right {
+  justify-content: flex-end;
+  flex-direction: row-reverse;
+}
+
+/* Highlighted during Preview/Recording while its note is playing */
+.bubble-row.current-note .voice-bubble {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px var(--gold-dim), 0 0 18px rgba(212, 176, 106, 0.35);
+}
+
+/* Avatar */
+
+.avatar {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid var(--gold-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--charcoal-2);
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.avatar-fallback {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gold-soft);
+}
+
+/* Bubble + meta column */
+
+.bubble-col {
+  display: flex;
+  flex-direction: column;
+  max-width: 74%;
+}
+
+.bubble-row.right .bubble-col {
+  align-items: flex-end;
+}
+
+.bubble-row.left .bubble-col {
+  align-items: flex-start;
+}
+
+.sender-name {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: rgba(245, 240, 230, 0.45);
+  margin-bottom: 4px;
+  padding: 0 4px;
+}
+
+.voice-bubble {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 18px;
+  min-width: 168px;
+}
+
+.bubble-row.left .voice-bubble {
+  background: var(--bubble-khalil);
+  border: 1px solid rgba(212, 176, 106, 0.12);
+  border-bottom-left-radius: 6px;
+}
+
+.bubble-row.right .voice-bubble {
+  background: var(--bubble-honey);
+  border: 1px solid rgba(212, 176, 106, 0.28);
+  border-bottom-right-radius: 6px;
+}
+
+/* Play button */
+
+.play-btn {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: var(--gold);
+  color: var(--charcoal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.play-btn:hover {
+  background: var(--gold-soft);
+}
+
+.play-btn:active {
+  transform: scale(0.94);
+}
+
+/* During Preview/Recording play buttons are disabled but stay at full
+   opacity — they read as a live playback indicator, not a dead control. */
+.play-btn:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.play-btn svg {
+  display: block;
+}
+
+/* Waveform */
+
+.waveform-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.waveform {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 22px;
+}
+
+.waveform .bar {
+  flex: 1;
+  min-width: 2px;
+  border-radius: 2px;
+  background: rgba(245, 240, 230, 0.22);
+  transform-origin: center;
+  transition: background-color 0.1s linear;
+}
+
+.waveform .bar.played {
+  background: var(--gold);
+}
+
+.playhead {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--gold-soft);
+  box-shadow: 0 0 6px var(--gold);
+  left: 0%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.playhead.active {
+  opacity: 1;
+}
+
+.duration {
+  flex: none;
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  color: rgba(245, 240, 230, 0.55);
+  min-width: 30px;
+  text-align: right;
+}
+
+.receipt {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-style: italic;
+  color: rgba(212, 176, 106, 0.55);
+  margin-top: 4px;
+  padding: 0 4px;
+}
+
+/* --------------------------------------------------------------------
+   Responsive
+   -------------------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .app-layout {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .dashboard {
+    max-width: 480px;
+    width: 100%;
+  }
+
+  .preview-pane {
+    position: static;
+  }
+}
+
+@media (max-width: 420px) {
+  .phone-frame {
+    width: 96vw;
+    border-radius: 20px;
+  }
+
+  .bubble-col {
+    max-width: 80%;
+  }
+
+  .note-row-grid {
+    grid-template-columns: 1fr;
+  }
+}

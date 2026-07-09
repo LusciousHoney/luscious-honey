@@ -94,7 +94,7 @@ const foundersNote: DocType = {
       ],
     },
     {
-      id: 'voice', name: 'The Voice',
+      id: 'voice', name: 'The Editorial Voice',
       questions: [
         { id: 'fn-person', type: 'open', category: 'Tone and voice',
           prompt: "If the House's voice were a person in a room, describe them — how they speak, what they notice, what they would never do." },

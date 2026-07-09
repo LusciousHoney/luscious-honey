@@ -69,6 +69,21 @@ export function mountHome(root: HTMLElement): void {
       <a class="button button--quiet" href="#/reflect">Ask me something different</a>
       <a class="button button--quiet" href="#/memory">Editorial memory</a>
     </section>
+
+    <section class="office-studio plate brass-edge" aria-labelledby="studio-h">
+      <p class="label">Founder Dashboard · Production</p>
+      <h2 id="studio-h" class="office-studio__name">The Audio Studio</h2>
+      <p class="office-studio__blurb editorial">
+        The House's private voice-notes &amp; recording studio — sessions, private
+        artist collaboration (Owner / Contributor), and WebM export. A shared
+        production tool of the House.
+      </p>
+      <p class="meta office-studio__how">
+        Launch locally: <code>npm run studio</code> — opens at
+        <a href="http://localhost:8080/" target="_blank" rel="noopener">localhost:8080</a>.
+        Private; never deployed.
+      </p>
+    </section>
   `);
 }
 

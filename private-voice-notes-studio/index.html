@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Private Voice Notes Studio — Creator Dashboard</title>
+
+  <!-- Brand fonts: Cinzel for display text, Inter for UI/labels (matches Luscious Honey design system) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Inter:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <div class="app">
+    <header class="app-header">
+      <h1 class="app-title">Private Voice Notes Studio</h1>
+      <p class="app-subtitle" id="episode-subtitle">Creator Dashboard</p>
+    </header>
+
+    <div class="app-layout">
+
+      <!-- ============================================================
+           CREATOR DASHBOARD — every control here drives the live phone
+           preview on the right. No code editing required for a normal
+           episode: add/edit/reorder notes, swap avatars and audio,
+           tune recording timing, then hit Preview or Start Recording.
+           ============================================================ -->
+      <aside class="dashboard" id="dashboard">
+
+        <!-- SECTION 0: Project — Episode Packages (primary) bundle the
+             whole episode + audio + avatars into one .zip for passing
+             between collaborators. Save/Load JSON remain for advanced
+             users (metadata only, no media). -->
+        <section class="dash-section">
+          <h2>Project</h2>
+
+          <div class="role-banner" id="role-banner">Owner — Master Project. Full control.</div>
+
+          <!-- OWNER WORKFLOW — the episode moves top-to-bottom through four
+               steps. Contributor session metadata (Contributor + Speaker)
+               are free-text fields that persist with the project JSON and
+               every package, then surface throughout Contributor mode. -->
+          <div class="owner-only owner-workflow">
+
+            <!-- Step 1 -->
+            <div class="workflow-step">
+              <p class="workflow-step-label"><span class="workflow-step-num">1</span> Project Metadata</p>
+              <label class="dash-field">
+                <span>Project Name</span>
+                <input type="text" id="project-name" placeholder="e.g. Pull Me Under — Private Voice Notes" />
+              </label>
+              <label class="dash-field">
+                <span>Cast / Pairing</span>
+                <input type="text" id="project-casting" placeholder="e.g. Luscious Honey x Khalil" />
+              </label>
+              <label class="dash-field">
+                <span>Contributor Name</span>
+                <input type="text" id="contributor-name" placeholder="person receiving the package — e.g. Khalil Vaughn" />
+              </label>
+              <p class="dash-sublabel">Voice memo display names</p>
+              <label class="dash-field">
+                <span>Owner Memo Display Name</span>
+                <input type="text" id="owner-memo-name" placeholder="your name on the thread — e.g. Nia" />
+              </label>
+              <label class="dash-field">
+                <span>Contributor Memo Display Name</span>
+                <input type="text" id="contributor-memo-name" placeholder="their name on the thread — e.g. Malik" />
+              </label>
+              <p class="dash-hint">These two names appear on the voice-memo thread preview and the exported video. The Contributor Name above is just who you send the package to — it never shows on the thread.</p>
+            </div>
+
+            <div class="workflow-arrow" aria-hidden="true">↓</div>
+
+            <!-- Step 2 -->
+            <div class="workflow-step">
+              <p class="workflow-step-label"><span class="workflow-step-num">2</span> Create Episode Package</p>
+              <div class="control-row">
+                <button type="button" id="save-master-btn" class="dash-btn dash-btn-primary">Save Master Project</button>
+                <button type="button" id="open-package-btn" class="dash-btn">Open Episode Package</button>
+              </div>
+              <div class="control-row">
+                <button type="button" id="package-btn" class="dash-btn dash-btn-gold">Package for Contributor</button>
+              </div>
+              <p class="dash-hint">Keep a Master Project for yourself, or build a package for the contributor named above.</p>
+            </div>
+
+            <div class="workflow-arrow" aria-hidden="true">↓</div>
+
+            <!-- Step 3 -->
+            <div class="workflow-step">
+              <p class="workflow-step-label"><span class="workflow-step-num">3</span> Import Return Package</p>
+              <div class="control-row">
+                <button type="button" id="import-return-btn" class="dash-btn">Import Return Package</button>
+              </div>
+              <p class="dash-hint">Merge the contributor's recorded lines back into your master.</p>
+            </div>
+
+            <div class="workflow-arrow" aria-hidden="true">↓</div>
+
+            <!-- Step 4 -->
+            <div class="workflow-step">
+              <p class="workflow-step-label"><span class="workflow-step-num">4</span> Export Final Episode</p>
+              <p class="dash-hint">When every line is in, use <strong>Export Video</strong> at the bottom of the dashboard.</p>
+            </div>
+
+          </div>
+
+          <!-- Contributor-only actions -->
+          <div class="contributor-only">
+            <p class="dash-sublabel">Your contribution</p>
+            <div class="control-row">
+              <button type="button" id="return-btn" class="dash-btn dash-btn-gold">Save Return Package</button>
+            </div>
+          </div>
+
+          <input type="file" id="open-package-input" accept="application/zip,.zip" class="hidden" />
+          <input type="file" id="import-return-input" accept="application/zip,.zip" class="hidden" />
+
+          <div class="project-status hidden" id="project-status">
+            <span class="project-status-dot" id="project-status-dot"></span>
+            <span id="project-status-text"></span>
+          </div>
+
+          <details class="owner-only dash-advanced">
+            <summary>Advanced — JSON only (no media)</summary>
+            <div class="control-row">
+              <button type="button" id="save-json-btn" class="dash-btn">Save Episode JSON</button>
+              <button type="button" id="load-json-btn" class="dash-btn">Load Episode JSON</button>
+              <button type="button" id="duplicate-btn" class="dash-btn">Duplicate Episode</button>
+              <input type="file" id="load-json-input" accept="application/json,.json" class="hidden" />
+            </div>
+            <p class="dash-hint">JSON saves project text but no media. Prefer packages when real audio is involved.</p>
+          </details>
+        </section>
+
+        <!-- SECTION 1: Episode Information — metadata only, never
+             rendered inside the phone preview. -->
+        <section class="dash-section">
+          <h2>Episode Information</h2>
+          <label class="dash-field">
+            <span>Episode Title</span>
+            <input type="text" id="ep-title" placeholder="Episode title" />
+          </label>
+          <div class="dash-field-row">
+            <label class="dash-field">
+              <span>Episode Number</span>
+              <input type="number" id="ep-number" min="1" step="1" />
+            </label>
+            <label class="dash-field">
+              <span>Season</span>
+              <input type="number" id="ep-season" min="1" step="1" />
+            </label>
+          </div>
+          <label class="dash-field">
+            <span>Internal Notes</span>
+            <textarea id="ep-notes" rows="2" placeholder="Notes for yourself — not shown anywhere public"></textarea>
+          </label>
+          <label class="dash-field">
+            <span>POV / Caption</span>
+            <textarea id="ep-pov" rows="2" placeholder="POV: ..."></textarea>
+          </label>
+          <p class="dash-hint">Metadata only — never displayed inside the phone preview. Track it externally when planning the post.</p>
+        </section>
+
+        <!-- SECTION 3: Audio mode — pick per-note (default) or combined.
+             Placed above Conversation so the note rows below render the
+             matching fields (per-note upload vs. Start/End timing). -->
+        <section class="dash-section">
+          <h2>Audio</h2>
+          <div class="audio-mode-toggle" id="audio-mode-toggle" role="radiogroup" aria-label="Audio mode">
+            <button type="button" class="audio-mode-option" data-mode="perNote" aria-pressed="true">
+              <strong>Upload audio for each voice note</strong>
+              <span>Recommended — one clip per note</span>
+            </button>
+            <button type="button" class="audio-mode-option" data-mode="combined" aria-pressed="false">
+              <strong>Advanced: single mastered file</strong>
+              <span>One combined file, sliced by timestamps</span>
+            </button>
+          </div>
+
+          <p class="dash-hint" id="per-note-audio-hint">Each voice note has its own audio field below. Upload a WAV, MP3, or M4A for each line — duration is read automatically. Notes without a file use placeholder timing.</p>
+
+          <div id="combined-audio-block" class="hidden">
+            <label class="dash-field">
+              <span>Mastered Conversation Audio (single WAV or MP3)</span>
+              <input type="file" id="conversation-audio-input" accept="audio/wav,audio/x-wav,audio/mpeg,audio/mp3,audio/mp4,audio/x-m4a,.wav,.mp3,.m4a" />
+            </label>
+            <p class="dash-hint" id="conversation-audio-status">No file selected — placeholder timing will be used for every note.</p>
+          </div>
+        </section>
+
+        <!-- SECTION 2: Conversation — each note row renders per-note audio
+             upload (per-note mode) or Start/End Time slice fields
+             (combined mode), depending on the Audio mode above. -->
+        <section class="dash-section">
+          <h2>Conversation</h2>
+          <p class="dash-hint" id="conversation-hint">Upload an audio clip for each note below. Duration is read from the file automatically. Add, reorder, or delete notes freely.</p>
+          <div class="notes-table" id="notes-table"></div>
+          <button type="button" id="add-note-btn" class="dash-btn">+ Add Note</button>
+        </section>
+
+        <!-- SECTION 5: Characters -->
+        <section class="dash-section">
+          <h2>Characters</h2>
+
+          <div class="character-editor" data-character="khalil">
+            <div class="avatar-thumb" id="khalil-avatar-thumb">
+              <img alt="Khalil avatar preview" />
+              <span class="avatar-thumb-fallback">K</span>
+            </div>
+            <div class="character-editor-fields">
+              <label class="dash-field">
+                <span>Display Name</span>
+                <input type="text" id="khalil-name" />
+              </label>
+              <label class="dash-field">
+                <span>Avatar</span>
+                <input type="file" id="khalil-avatar-input" accept="image/*" />
+              </label>
+            </div>
+          </div>
+
+          <div class="character-editor" data-character="honey">
+            <div class="avatar-thumb" id="honey-avatar-thumb">
+              <img alt="Honey avatar preview" />
+              <span class="avatar-thumb-fallback">LH</span>
+            </div>
+            <div class="character-editor-fields">
+              <label class="dash-field">
+                <span>Display Name</span>
+                <input type="text" id="honey-name" />
+              </label>
+              <label class="dash-field">
+                <span>Avatar</span>
+                <input type="file" id="honey-avatar-input" accept="image/*" />
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <!-- SECTION 6: Recording -->
+        <section class="dash-section">
+          <h2>Recording</h2>
+          <div class="dash-field-row">
+            <label class="dash-field">
+              <span>Countdown (seconds)</span>
+              <input type="number" id="rec-countdown" min="0" step="1" />
+            </label>
+            <label class="dash-field">
+              <span>Delay Before First Note (ms)</span>
+              <input type="number" id="rec-settle" min="0" step="100" />
+            </label>
+          </div>
+          <label class="dash-field">
+            <span>Gap Between Notes (ms)</span>
+            <input type="number" id="rec-gap" min="0" step="50" />
+          </label>
+          <label class="dash-checkbox-row">
+            <input type="checkbox" id="rec-endscreen-toggle" />
+            End Screen
+          </label>
+          <label class="dash-field">
+            <span>End Screen Text</span>
+            <input type="text" id="rec-endscreen-text" />
+          </label>
+        </section>
+
+        <!-- SECTION 7: Preview Controls -->
+        <section class="dash-section">
+          <h2>Preview Controls</h2>
+          <div class="control-row">
+            <button type="button" id="preview-btn" class="dash-btn dash-btn-primary">Preview</button>
+            <button type="button" id="stop-btn" class="dash-btn" disabled>Stop</button>
+            <button type="button" id="record-btn" class="dash-btn dash-btn-gold owner-only">Start Recording Mode</button>
+          </div>
+        </section>
+
+        <!-- SECTION 8: Export — browser-native video capture, no backend.
+             Renders the phone preview to a 1080x1920 canvas, records it
+             with MediaRecorder, mixes in the conversation audio, and
+             offers the result as a downloadable .webm. Owner-only. -->
+        <section class="dash-section owner-only" id="export-section">
+          <h2>Export Video</h2>
+          <p class="dash-hint">Records the phone preview to a 1080×1920 video right here in the browser — no screen recording, no server. WebM today; MP4 is a future enhancement (see README).</p>
+          <label class="dash-checkbox-row">
+            <input type="checkbox" id="export-placeholders-toggle" />
+            Export with placeholders (missing lines play silent)
+          </label>
+          <p class="dash-hint" id="export-gate-hint"></p>
+          <div class="control-row">
+            <button type="button" id="export-btn" class="dash-btn dash-btn-gold">Export Video</button>
+            <a id="export-download" class="dash-btn hidden" download>Download .webm</a>
+          </div>
+          <div class="export-status hidden" id="export-status">
+            <span class="export-status-dot" id="export-status-dot"></span>
+            <span id="export-status-text">Idle</span>
+          </div>
+        </section>
+
+      </aside>
+
+      <!-- ============================================================
+           PHONE PREVIEW — the original TikTok-ready 9:16 screen.
+           Nothing about its internal look changed; it now just lives
+           beside the dashboard and reads live from dashboard state.
+           ============================================================ -->
+      <div class="preview-pane">
+        <div class="stage">
+          <div class="phone-frame" id="phone-frame">
+
+            <div class="countdown-overlay hidden" id="countdown-overlay">
+              <span class="countdown-number" id="countdown-number">3</span>
+            </div>
+
+            <div class="end-screen hidden" id="end-screen">
+              <p id="end-screen-text">Should we post Part 2?</p>
+            </div>
+
+            <header class="thread-header">
+              <div class="thread-avatar" id="thread-avatar">
+                <img alt="Khalil Vaughn" />
+                <span class="thread-avatar-fallback">K</span>
+              </div>
+              <div class="thread-header-text">
+                <span class="thread-kicker">Private Thread</span>
+                <h1 class="thread-name" id="thread-name">Khalil Vaughn</h1>
+                <span class="thread-status" id="thread-status">Voice Notes</span>
+              </div>
+            </header>
+
+            <main class="thread-body" id="thread-body" aria-live="polite"></main>
+
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script type="module" src="script.js"></script>
+</body>
+</html>
