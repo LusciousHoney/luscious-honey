@@ -56,6 +56,12 @@ archive**. Doors `04–06` (Salon, Lantern, Archive) appear on the spine as
 **architecture** but are honestly *not yet furnished* — not fake rooms, not empty
 routes. Future wings are built only when real content exists for them.
 
+### Private tools (not public)
+
+- **Editorial Office** — a founder-only workspace at `/editorial-office.html`,
+  available in `npm run dev` only. It is **excluded from the production build** and
+  never deployed. See [`docs/Editorial-Office.md`](docs/Editorial-Office.md).
+
 ---
 
 ## Documentation

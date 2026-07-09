@@ -2,3 +2,6 @@
 # The House is a public front experience. Nothing private is served here.
 User-agent: *
 Allow: /
+# Defence-in-depth: the private Editorial Office is dev-only and not deployed,
+# but should never be indexed if it is ever hosted.
+Disallow: /editorial-office.html
