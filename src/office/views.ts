@@ -307,6 +307,16 @@ function renderVersion(v: import('./types').DraftVersion): string {
         </div>`).join('')}
     </div>`).join('');
 
+  const themes = (p.themes ?? []).map((t) => `
+    <div class="packet__stage">
+      <p class="label">${esc(t.name)}</p>
+      ${t.items.map((it) => `
+        <div class="packet__item ${it.answered ? '' : 'is-empty'}">
+          <p class="packet__q">${esc(it.prompt)}</p>
+          <p class="packet__a">${it.answered ? esc(it.answer) : '<span class="meta">(unanswered)</span>'}</p>
+        </div>`).join('')}
+    </div>`).join('');
+
   return `
     <article class="plate draft__version">
       <p class="metaline">
@@ -314,7 +324,9 @@ function renderVersion(v: import('./types').DraftVersion): string {
         <span class="meta">${new Date(v.at).toLocaleString()}</span>
         <span class="meta">${p.answered}/${p.total} answered · ${esc(p.engine)}</span>
       </p>
+      <p class="label packet__grouptitle">By interview stage</p>
       <div class="packet">${stages}</div>
+      ${themes ? `<p class="label packet__grouptitle">Organized by theme</p><div class="packet">${themes}</div>` : ''}
 
       <label class="draft__notes-label label" for="draft-notes">Your working notes</label>
       <textarea id="draft-notes" class="office-textarea" data-notes rows="4"

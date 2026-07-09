@@ -117,6 +117,7 @@
 .draft__notes-label { color: var(--umber); }
 
 .packet { display: grid; gap: var(--s-4); }
+.packet__grouptitle { margin-top: var(--s-4); color: var(--brass); }
 .packet__stage { display: grid; gap: var(--s-2); border-top: var(--hairline); padding-top: var(--s-3); }
 .packet__stage:first-child { border-top: 0; padding-top: 0; }
 .packet__stage .label { color: var(--brass); }

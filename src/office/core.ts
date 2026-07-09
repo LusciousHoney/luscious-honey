@@ -63,19 +63,33 @@ export function answerToText(a: Answer | undefined): string {
 
 /* --- The editorial packet (the future AI input) -------------------------- */
 
+function packetItem(q: DocType['stages'][number]['questions'][number], responses: Responses) {
+  const a = responses[q.id];
+  return { questionId: q.id, prompt: q.prompt, type: q.type, answer: answerToText(a), answered: isAnswered(a) };
+}
+
 export function buildPacket(doc: DocType, responses: Responses, engine: string, at: string): DraftPacket {
   const stages: PacketStage[] = doc.stages.map((s) => ({
     name: s.name,
-    items: s.questions.map((q) => {
-      const a = responses[q.id];
-      return { questionId: q.id, prompt: q.prompt, type: q.type, answer: answerToText(a), answered: isAnswered(a) };
-    }),
+    items: s.questions.map((q) => packetItem(q, responses)),
   }));
+
+  // Also group by editorial category, in order of first appearance. Questions
+  // without a category (other document types) simply produce no themes.
+  const order: string[] = [];
+  const byCategory = new Map<string, PacketStage['items']>();
+  for (const q of allQuestions(doc)) {
+    if (!q.category) continue;
+    if (!byCategory.has(q.category)) { byCategory.set(q.category, []); order.push(q.category); }
+    byCategory.get(q.category)!.push(packetItem(q, responses));
+  }
+  const themes: PacketStage[] = order.map((name) => ({ name, items: byCategory.get(name)! }));
+
   const { answered, total } = overallProgress(doc, responses);
   return {
     docTypeId: doc.id, docTypeName: doc.name,
     title: `${doc.name} — editorial packet`,
-    generatedAt: at, engine, answered, total, stages,
+    generatedAt: at, engine, answered, total, stages, themes,
   };
 }
 
@@ -90,6 +104,17 @@ export function packetToMarkdown(p: DraftPacket): string {
     for (const item of stage.items) {
       lines.push(`**${item.prompt}**`, '');
       lines.push(item.answered ? item.answer : '_(unanswered)_', '');
+    }
+  }
+  const themes = p.themes ?? [];
+  if (themes.length) {
+    lines.push('---', '', '# Organized by theme', '');
+    for (const t of themes) {
+      lines.push(`## ${t.name}`, '');
+      for (const item of t.items) {
+        lines.push(`- **${item.prompt}** ${item.answered ? `— ${item.answer}` : '_(unanswered)_'}`);
+      }
+      lines.push('');
     }
   }
   return lines.join('\n');

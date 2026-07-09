@@ -15,6 +15,9 @@ export interface Question {
   options?: string[];      // choice / multi
   allowOther?: boolean;    // "Other…" expands into a writing area
   placeholder?: string;    // open
+  /** Editorial theme this answer feeds (e.g. "Origin story"). Optional and
+      additive: used only to also group the packet by theme for drafting. */
+  category?: string;
 }
 
 export interface Stage {
@@ -66,7 +69,8 @@ export interface DraftPacket {
   engine: string;          // which engine produced it (e.g. "local-packet")
   answered: number;
   total: number;
-  stages: PacketStage[];
+  stages: PacketStage[];     // grouped by interview stage
+  themes: PacketStage[];     // grouped by editorial category (for drafting)
 }
 
 export interface DraftVersion {

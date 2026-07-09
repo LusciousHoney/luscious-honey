@@ -106,3 +106,25 @@ test('curated follow-ups: no repeats, then loops', () => {
   const allAsked = FOLLOWUP_BANK.map((q) => q.id);
   assert.equal(curatedFollowups.next(allAsked)?.id, FOLLOWUP_BANK[0].id); // loops
 });
+
+test("Founder's Interview: ~30–40 questions across the five named stages", () => {
+  assert.deepEqual(doc.stages.map((s) => s.name),
+    ['The Foundation', 'The Philosophy', 'The Community', 'The Voice', 'The Legacy']);
+  const n = core.allQuestions(doc).length;
+  assert.ok(n >= 30 && n <= 40, `expected 30–40 questions, got ${n}`);
+});
+
+test('packet also groups answers by editorial theme (category)', () => {
+  const responses: Responses = { 'fn-line': { type: 'open', text: 'The dark makes the lit rooms matter.' } };
+  const packet = core.buildPacket(doc, responses, 'local-packet', '2026-07-09');
+  const names = packet.themes.map((t) => t.name);
+  for (const cat of ['Origin story', 'Why the House exists', 'Who it serves', 'What it protects',
+                     'Editorial standards', 'Community values', 'Tone and voice', 'Legacy vision',
+                     'Phrases worth preserving', 'Possible pull quotes', 'Possible Writing Wall fragments']) {
+    assert.ok(names.includes(cat), `packet missing theme: ${cat}`);
+  }
+  const pull = packet.themes.find((t) => t.name === 'Possible pull quotes')!;
+  assert.match(pull.items.map((i) => i.answer).join(' '), /lit rooms matter/);
+  // Document types without categories produce no themes (backward compatible).
+  assert.equal(core.buildPacket(getDocType('editorial-charter')!, {}, 'local-packet', 'x').themes.length, 0);
+});
