@@ -32,6 +32,7 @@ export default defineConfig({
         publishing: resolve(__dirname, 'publishing.html'), // /publishing  Editorial wing
         reader: resolve(__dirname, 'reader.html'),         // /publishing/:work  the Reader
         press: resolve(__dirname, 'press.html'),           // /press      House Journal archive
+        tribute: resolve(__dirname, 'tk-tribute.html'),    // /tk-tribute Permanent Collection · Tribute No. 01
       },
     },
   },
