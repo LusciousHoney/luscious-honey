@@ -29,6 +29,19 @@
   .tk-gb-submit { flex:0 0 auto; white-space:nowrap; background:#211D1A; color:#F3EEE6; border:none; cursor:pointer; font-family:'Archivo',sans-serif; font-weight:500; font-size:12px; letter-spacing:0.08em; padding:12px 22px; min-height:44px; transition:background 0.5s ease; }
   .tk-gb-submit:hover { background:#7A3B34; }
 
+  /* Archival portrait — framed print, hover lift + click-to-enlarge in place (no modal) */
+  .tk-portrait-cell { position: relative; }
+  .tk-portrait { --zoom: 1.16; display: block; width: 100%; padding: 0; border: 10px solid #FBF8F2; background: #E4DCCE; box-shadow: 0 40px 70px -46px rgba(33,29,26,0.6); cursor: zoom-in; transform-origin: center center; transition: transform 0.5s cubic-bezier(0.2,0.7,0.2,1), box-shadow 0.5s ease, filter 0.4s ease; will-change: transform; }
+  .tk-portrait img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 5; object-fit: cover; object-position: 50% 40%; }
+  .tk-portrait:hover { transform: translateY(-6px); filter: brightness(1.06); box-shadow: 0 56px 92px -46px rgba(33,29,26,0.66); }
+  .tk-portrait.is-open { transform: rotate(3deg) scale(var(--zoom)); filter: brightness(1.04); box-shadow: 0 70px 130px -40px rgba(33,29,26,0.72); position: relative; z-index: 60; cursor: zoom-out; }
+  @media (max-width: 900px) { .tk-portrait { --zoom: 1.08; } }
+  @media (prefers-reduced-motion: reduce) {
+    .tk-portrait { transition: none; }
+    .tk-portrait:hover { transform: none; }
+    .tk-portrait.is-open { transform: rotate(3deg) scale(var(--zoom)); }
+  }
+
   /* Fixed chrome respects device safe areas */
   header { padding-top: calc(22px + env(safe-area-inset-top)) !important; padding-left: calc(34px + env(safe-area-inset-left)) !important; padding-right: calc(34px + env(safe-area-inset-right)) !important; }
   footer { padding-bottom: calc(18px + env(safe-area-inset-bottom)) !important; padding-left: calc(34px + env(safe-area-inset-left)) !important; padding-right: calc(34px + env(safe-area-inset-right)) !important; }
@@ -182,10 +195,12 @@
     <section data-room data-tone="light" data-title="The Person &amp; The Voice" style="flex:0 0 auto; position:relative; height:100%; width:115vw; box-sizing:border-box; background:#F3EEE6; scroll-snap-align:start; overflow:hidden; display:flex; align-items:center;">
       <div data-depth="0.02" style="position:absolute; top:6%; left:5%; font-family:'Newsreader',serif; font-weight:200; font-size:40vh; line-height:0.8; color:rgba(33,29,26,0.035); pointer-events:none; user-select:none;">TK</div>
       <div class="tk-cols" style="position:relative; z-index:2; padding:0 7vw; display:grid; grid-template-columns:0.9fr 1.1fr; gap:7vw; align-items:center; width:100%; box-sizing:border-box;">
-        <!-- portrait, resting tilted -->
-        <div style="position:relative;">
-          <div data-settle data-rot="-3" style="position:relative; background:#E4DCCE; background-image:repeating-linear-gradient(135deg, rgba(33,29,26,0.05) 0, rgba(33,29,26,0.05) 1px, transparent 1px, transparent 12px); border:10px solid #FBF8F2; box-shadow:0 40px 70px -46px rgba(33,29,26,0.6); aspect-ratio:4/5; display:flex; align-items:flex-end; padding:16px;">
-            <span style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.06em; color:rgba(33,29,26,0.5);">[ portrait &middot; TK at the microphone ]</span>
+        <!-- portrait — archival photograph, resting tilted; click to enlarge in place -->
+        <div class="tk-portrait-cell" style="position:relative;">
+          <div data-settle data-rot="-3" style="position:relative;">
+            <button type="button" class="tk-portrait" aria-pressed="false" aria-label="Enlarge the portrait of TK">
+              <img src="/media/tk-tribute-portrait.webp" alt="Archival portrait of TK — side profile wearing a gold durag, rendered in sepia ink-wash">
+            </button>
           </div>
         </div>
         <div>
@@ -615,6 +630,23 @@
   } else {
     init();
   }
+})();
+</script>
+
+<script>
+(function () {
+  var pt = document.querySelector('.tk-portrait');
+  if (!pt) return;
+  var cell = pt.closest('.tk-portrait-cell');
+  function setOpen(on) {
+    pt.classList.toggle('is-open', on);
+    pt.setAttribute('aria-pressed', on ? 'true' : 'false');
+    pt.setAttribute('aria-label', on ? 'Return the portrait to its original size' : 'Enlarge the portrait of TK');
+    if (cell) cell.style.zIndex = on ? '60' : '';
+  }
+  pt.addEventListener('click', function (e) { e.stopPropagation(); setOpen(!pt.classList.contains('is-open')); });
+  document.addEventListener('click', function (e) { if (pt.classList.contains('is-open') && !pt.contains(e.target)) setOpen(false); });
+  window.addEventListener('keydown', function (e) { if (e.key === 'Escape') setOpen(false); });
 })();
 </script>
 
