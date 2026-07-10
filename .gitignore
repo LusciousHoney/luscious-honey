@@ -12,3 +12,6 @@ private-voice-notes-studio/audio/*
 private-voice-notes-studio/images/*
 !private-voice-notes-studio/audio/.gitkeep
 !private-voice-notes-studio/images/.gitkeep
+
+# TK Tribute — keep the archival WAV master local; never commit (Cloudflare 25 MiB cap)
+public/tribute/tk/*.wav
