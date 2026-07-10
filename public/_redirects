@@ -9,3 +9,6 @@
 
 # Old bookmarks keep working — redirect the raw file to the clean URL.
 /tk-tribute.html   /tribute/tk    301
+
+# Hyphen alias — permanently redirect /tribute-tk to the clean URL.
+/tribute-tk    /tribute/tk    301
