@@ -59,6 +59,12 @@
     #tk-plan button { width: 16px !important; }
   }
 
+  /* ── Room 02 · "A Letter to TK" — live keepsake audio player ── */
+  .tk-fixture-btn[data-audio-toggle] { -webkit-appearance:none; appearance:none; margin:0; padding:0; cursor:pointer; transition:border-color 0.4s ease, color 0.4s ease; }
+  .tk-fixture-btn[data-audio-toggle]:hover { border-color:rgba(122,59,52,0.75) !important; color:#7A3B34 !important; }
+  [data-audio-seek] { cursor:pointer; touch-action:none; }
+  [data-audio-toggle]:focus-visible, [data-audio-seek]:focus-visible { outline:2px solid #7A3B34; outline-offset:4px; }
+
   /* ── Mobile: trim footer text so the floor plan never collides ── */
   @media (max-width: 620px) {
     #tk-roomlabel, #tk-hint { display: none !important; }
@@ -164,16 +170,17 @@
         <!-- Audio fixture — Luscious Honey's letter to TK (permanent player, inactive/forthcoming) -->
         <div data-settle data-rot="-1.4" style="position:relative;">
           <div style="position:absolute; top:-16px; left:-16px; right:22px; bottom:22px; background:rgba(33,29,26,0.05); z-index:0;"></div>
-          <div class="tk-fixture" data-fixture style="position:relative; z-index:1; background:#F3EEE6; border:1px solid rgba(33,29,26,0.14); padding:34px 34px 30px; box-shadow:0 30px 60px -40px rgba(33,29,26,0.5);">
+          <div class="tk-fixture" data-fixture data-audio-player style="position:relative; z-index:1; background:#F3EEE6; border:1px solid rgba(33,29,26,0.14); padding:34px 34px 30px; box-shadow:0 30px 60px -40px rgba(33,29,26,0.5);">
+            <audio data-audio-el preload="metadata" src="/tribute/tk/letter-to-tk.m4a"></audio>
             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:18px; margin-bottom:24px;">
               <div>
                 <div style="font-family:'Newsreader',serif; font-weight:300; font-size:clamp(23px,2.4vw,29px); line-height:1;">A Letter to TK</div>
                 <div style="font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:0.08em; color:rgba(33,29,26,0.55); margin-top:9px;">From the House &middot; read by Luscious Honey</div>
               </div>
-              <span class="tk-fixture-btn" aria-hidden="true" style="flex:0 0 auto; width:56px; height:56px; border-radius:50%; border:1px solid rgba(33,29,26,0.26); background:transparent; color:rgba(33,29,26,0.38); display:flex; align-items:center; justify-content:center; font-size:15px;"><span style="margin-left:2px;">&#9658;</span></span>
+              <button type="button" class="tk-fixture-btn" data-audio-toggle aria-label="Play the letter to TK" style="flex:0 0 auto; width:56px; height:56px; border-radius:50%; border:1px solid rgba(33,29,26,0.26); background:transparent; color:rgba(33,29,26,0.55); display:flex; align-items:center; justify-content:center; font-size:15px; font-family:inherit;"><span data-audio-glyph style="margin-left:2px; line-height:1;">&#9658;</span></button>
             </div>
-            <div data-fixture-wave data-wave-tone="light" style="display:flex; align-items:center; gap:3px; height:44px; margin-bottom:18px; opacity:0.5;"></div>
-            <div style="display:flex; align-items:center; gap:10px; font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.16em; text-transform:uppercase; color:rgba(33,29,26,0.5);"><span style="display:inline-block; width:7px; height:7px; border-radius:50%; border:1px solid rgba(33,29,26,0.4);"></span>A recording will live here</div>
+            <div data-fixture-wave data-wave-tone="light" data-audio-seek role="slider" tabindex="0" aria-label="Seek through the letter to TK" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="0:00 of 0:00" style="display:flex; align-items:center; gap:3px; height:44px; margin-bottom:18px; opacity:0.9;"></div>
+            <div style="display:flex; align-items:center; gap:10px; font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.16em; text-transform:uppercase; color:rgba(33,29,26,0.5);"><span data-audio-dot style="display:inline-block; width:7px; height:7px; border-radius:50%; border:1px solid rgba(33,29,26,0.4); background:transparent; transition:background 0.4s ease;"></span><span data-audio-time>0:00 / 0:00</span></div>
           </div>
         </div>
       </div>
@@ -483,6 +490,86 @@
         wave.appendChild(b);
       }
     });
+
+    // ---------- Room 02 · "A Letter to TK" — live keepsake player ----------
+    // Wires ONLY the fixture carrying [data-audio-player]; the Marcus fixture stays static.
+    (function () {
+      var player = scroller.querySelector('[data-audio-player]');
+      if (!player) return;
+      var audio  = player.querySelector('[data-audio-el]');
+      var toggle = player.querySelector('[data-audio-toggle]');
+      var glyph  = player.querySelector('[data-audio-glyph]');
+      var seek   = player.querySelector('[data-audio-seek]');
+      var timeEl = player.querySelector('[data-audio-time]');
+      var dot    = player.querySelector('[data-audio-dot]');
+      var bars   = Array.prototype.slice.call(seek ? seek.querySelectorAll('span') : []);
+      if (!audio || !toggle || !glyph || !seek || !timeEl) return;
+
+      var PLAYED = 'rgba(122,59,52,0.95)';  // wine — played portion
+      var TRACK  = 'rgba(33,29,26,0.3)';    // muted — remaining portion
+      var PLAY   = '▶';                // ▶
+      var PAUSE  = '❙❙';          // ❙❙
+
+      function fmt(t) {
+        if (!isFinite(t) || t < 0) t = 0;
+        var m = Math.floor(t / 60), s = Math.floor(t % 60);
+        return m + ':' + (s < 10 ? '0' : '') + s;
+      }
+      function render() {
+        var dur = audio.duration || 0, cur = audio.currentTime || 0;
+        var frac = dur > 0 ? Math.max(0, Math.min(1, cur / dur)) : 0;
+        timeEl.textContent = fmt(cur) + ' / ' + fmt(dur);
+        seek.setAttribute('aria-valuenow', String(Math.round(frac * 100)));
+        seek.setAttribute('aria-valuetext', fmt(cur) + ' of ' + fmt(dur));
+        var lit = Math.round(frac * bars.length);
+        for (var i = 0; i < bars.length; i++) bars[i].style.background = i < lit ? PLAYED : TRACK;
+      }
+      function setPlaying(on) {
+        glyph.innerHTML = on ? PAUSE : PLAY;
+        toggle.setAttribute('aria-label', on ? 'Pause the letter to TK' : 'Play the letter to TK');
+        dot.style.background = on ? PLAYED : 'transparent';
+      }
+      function playPause() {
+        if (audio.paused) { var p = audio.play(); if (p && p.catch) p.catch(function () {}); }
+        else audio.pause();
+      }
+      function seekToClientX(x) {
+        var r = seek.getBoundingClientRect();
+        if (!r.width || !audio.duration) return;
+        var frac = Math.max(0, Math.min(1, (x - r.left) / r.width));
+        audio.currentTime = frac * audio.duration;
+        render();
+      }
+
+      toggle.addEventListener('click', playPause);
+      audio.addEventListener('play',  function () { setPlaying(true); });
+      audio.addEventListener('pause', function () { setPlaying(false); });
+      audio.addEventListener('ended', function () { audio.currentTime = 0; setPlaying(false); render(); });
+      audio.addEventListener('timeupdate', render);
+      audio.addEventListener('loadedmetadata', render);
+      audio.addEventListener('durationchange', render);
+
+      seek.addEventListener('pointerdown', function (e) {
+        e.preventDefault();
+        try { seek.setPointerCapture(e.pointerId); } catch (err) {}
+        seekToClientX(e.clientX);
+      });
+      seek.addEventListener('pointermove', function (e) { if (e.buttons) seekToClientX(e.clientX); });
+      seek.addEventListener('keydown', function (e) {
+        var dur = audio.duration || 0, cur = audio.currentTime || 0, step = 5;
+        if (e.key === 'ArrowRight' || e.key === 'ArrowUp') audio.currentTime = Math.min(dur, cur + step);
+        else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') audio.currentTime = Math.max(0, cur - step);
+        else if (e.key === 'Home') audio.currentTime = 0;
+        else if (e.key === 'End') audio.currentTime = dur;
+        else if (e.key === ' ' || e.key === 'Enter') { playPause(); e.preventDefault(); return; }
+        else return;
+        e.preventDefault();
+        render();
+      });
+
+      setPlaying(false);
+      render();
+    })();
 
     // ---------- floor plan ----------
     var plan = document.getElementById('tk-plan');

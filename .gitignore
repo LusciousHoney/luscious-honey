@@ -4,6 +4,9 @@ dist
 *.local
 .vite
 
+# Tribute audio master — ship only the compressed .m4a the player uses, never the raw .wav
+public/tribute/**/*.wav
+
 # Audio Studio — keep the folder + code, but never commit recordings/media
 private-voice-notes-studio/audio/*
 private-voice-notes-studio/images/*
