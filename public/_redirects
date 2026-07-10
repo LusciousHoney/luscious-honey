@@ -1,10 +1,11 @@
 # Cloudflare Pages routing rules (served from dist root)
 
-# The TK Tribute is a real page at /tribute/tk (built to /tribute/tk/index.html),
-# so no rewrite is needed to render it. These rules only canonicalize the aliases.
+# Serve the real Tribute page for the bare clean URL. This is a 200 (internal
+# rewrite) whose destination is a plain static file with NO redirect on it, so
+# it terminates immediately — no loop, and it defeats any directory-index or
+# 404-fallback quirk that was serving Reception for /tribute/tk.
+/tribute/tk     /tribute/tk/index.html    200
 
-# Raw filename -> clean tribute URL.
+# Aliases -> clean tribute URL.
 /tk-tribute.html    /tribute/tk    301
-
-# Hyphen alias -> clean tribute URL.
 /tribute-tk         /tribute/tk    301
