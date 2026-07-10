@@ -1,14 +1,10 @@
 # Cloudflare Pages routing rules (served from dist root)
 
-# Permanent clean URL for the TK Tribute — internally rewrites (200) to the
-# real page so the address bar stays /tribute/tk and no copy is duplicated.
-# Exact-path only, so asset subpaths (/tribute/tk/letter-to-tk.m4a, portrait.webp)
-# keep serving normally.
-/tribute/tk    /tk-tribute.html    200
-/tribute/tk/   /tk-tribute.html    200
+# The TK Tribute is a real page at /tribute/tk (built to /tribute/tk/index.html),
+# so no rewrite is needed to render it. These rules only canonicalize the aliases.
 
-# Old bookmarks keep working — redirect the raw file to the clean URL.
-/tk-tribute.html   /tribute/tk    301
+# Raw filename -> clean tribute URL.
+/tk-tribute.html    /tribute/tk    301
 
-# Hyphen alias — permanently redirect /tribute-tk to the clean URL.
-/tribute-tk    /tribute/tk    301
+# Hyphen alias -> clean tribute URL.
+/tribute-tk         /tribute/tk    301
