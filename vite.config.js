@@ -1,5 +1,26 @@
 import { defineConfig } from 'vite'
-import { resolve } from 'path'
+import { resolve, dirname } from 'path'
+import { copyFileSync, mkdirSync } from 'fs'
+
+/**
+ * Clean URL for the TK Tribute.
+ * The Tribute is authored once as `tk-tribute.html`. After the build, we also
+ * emit it as `dist/tribute/tk/index.html` so `/tribute/tk` is served as a real
+ * static page — no `_redirects` rewrite, no dependence on proxy/rewrite quirks,
+ * no redirect loop. Runs after the bundle (and public/ copy) are written.
+ */
+function tributeCleanUrl() {
+  return {
+    name: 'tribute-clean-url',
+    apply: 'build',
+    closeBundle() {
+      const src = resolve(__dirname, 'dist/tk-tribute.html')
+      const dest = resolve(__dirname, 'dist/tribute/tk/index.html')
+      mkdirSync(dirname(dest), { recursive: true })
+      copyFileSync(src, dest)
+    },
+  }
+}
 
 /**
  * Build-time environment attribute.
@@ -24,7 +45,7 @@ function htmlDataEnv() {
 // it (Sprint 04 · Part IX, Accessibility). Add wings here as they are built —
 // never as empty routes ahead of real content.
 export default defineConfig({
-  plugins: [htmlDataEnv()],
+  plugins: [htmlDataEnv(), tributeCleanUrl()],
   build: {
     rollupOptions: {
       input: {

@@ -14,7 +14,7 @@ import './styles/responsive.css';
 import { currentClockState, applyClock } from './lib/living-clock';
 import {
   publishedWorks, latestJournal, activeFragment, currentHeldFrame,
-  formatHouseDate as fmtDate,
+  formatHouseDate as fmtDate, houseTimestamp,
   type Work, type HeldFrame,
 } from './lib/content';
 
@@ -90,7 +90,11 @@ function boot(): void {
     const body = document.getElementById('journal-body');
     if (body) body.textContent = entry.body;
     const date = document.getElementById('journal-date');
-    if (date) { date.textContent = fmtDate(entry.date); date.setAttribute('datetime', entry.date); }
+    if (date) {
+      const ts = houseTimestamp(entry.date);
+      date.innerHTML = ts.timeLine ? `${ts.dateLine}<br>${ts.timeLine}` : ts.dateLine;
+      date.setAttribute('datetime', entry.date);
+    }
     if (import.meta.env.DEV && entry.fixture) {
       document.getElementById('wing-journal-heading')
         ?.insertAdjacentHTML('beforeend', ' <span class="fixture-flag">Fixture</span>');

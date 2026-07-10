@@ -11,7 +11,7 @@ import './styles/publishing.css';
 import './styles/responsive.css';
 
 import { currentClockState, applyClock } from './lib/living-clock';
-import { journalArchive, formatHouseDate, type JournalEntry } from './lib/content';
+import { journalArchive, houseTimestamp, type JournalEntry } from './lib/content';
 
 function esc(s: string): string {
   const d = document.createElement('div');
@@ -20,11 +20,13 @@ function esc(s: string): string {
 }
 
 function entry(e: JournalEntry): string {
+  const ts = houseTimestamp(e.date);
   return `
     <article class="archive__entry">
       <time class="meta archive__date" datetime="${e.date}">
-        ${esc(formatHouseDate(e.date))} · week ${e.week}
+        ${esc(ts.dateLine)} · week ${e.week}
         ${import.meta.env.DEV && e.fixture ? '<span class="fixture-flag">Fixture</span>' : ''}
+        ${ts.timeLine ? `<br>${esc(ts.timeLine)}` : ''}
       </time>
       <p class="archive__body">${esc(e.body)}</p>
       <p class="archive__sign">— ${esc(e.signed)}</p>

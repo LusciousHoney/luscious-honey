@@ -14,7 +14,7 @@ import './styles/responsive.css';
 import { currentClockState, applyClock } from './lib/living-clock';
 import { runArrival, enableSkip } from './lib/arrival';
 import { initCorridor } from './lib/corridor';
-import { latestJournal, formatHouseDate, currentRecording } from './lib/content';
+import { latestJournal, houseTimestamp, currentRecording } from './lib/content';
 
 function byId<T extends HTMLElement>(id: string): T | null {
   return document.getElementById(id) as T | null;
@@ -36,7 +36,8 @@ function boot(): void {
     if (body) body.textContent = entry.body;
     const date = byId('journal-date');
     if (date) {
-      date.textContent = formatHouseDate(entry.date);
+      const ts = houseTimestamp(entry.date);
+      date.innerHTML = ts.timeLine ? `${ts.dateLine}<br>${ts.timeLine}` : ts.dateLine;
       date.setAttribute('datetime', entry.date);
     }
     // Fixture chip: development only. `import.meta.env.DEV` is statically false in
