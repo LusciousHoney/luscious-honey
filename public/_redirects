@@ -1,11 +1,11 @@
 # Cloudflare Pages routing rules (served from dist root)
 
-# Permanent clean URL for the TK Tribute — internally rewrites (200) to the
-# real page so the address bar stays /tribute/tk and no copy is duplicated.
-# Exact-path only, so asset subpaths (/tribute/tk/letter-to-tk.m4a, portrait.webp)
-# keep serving normally.
-/tribute/tk    /tk-tribute.html    200
-/tribute/tk/   /tk-tribute.html    200
+# Serve the real Tribute page for the bare clean URL. This is a 200 (internal
+# rewrite) whose destination is a plain static file with NO redirect on it, so
+# it terminates immediately — no loop, and it defeats any directory-index or
+# 404-fallback quirk that was serving Reception for /tribute/tk.
+/tribute/tk     /tribute/tk/index.html    200
 
-# Old bookmarks keep working — redirect the raw file to the clean URL.
-/tk-tribute.html   /tribute/tk    301
+# Aliases -> clean tribute URL.
+/tk-tribute.html    /tribute/tk    301
+/tribute-tk         /tribute/tk    301
