@@ -73,5 +73,5 @@ export const getWork = (slug: string): Work | undefined =>
 export const currentRecording = (): RecordingState =>
   gov.selectRecordingState(recordingFlag, new Date());
 
-export { formatHouseDate } from './governance';
+export { formatHouseDate, houseTimestamp } from './governance';
 export type { Work, JournalEntry, Fragment, HeldFrame, Media, BodyBlock, RecordingState } from './content-types';

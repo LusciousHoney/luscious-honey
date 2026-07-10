@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import {
   selectLatestJournal, selectJournalArchive,
   selectActiveFragment, selectCurrentHeldFrame, selectPublishedWorks,
-  selectRecordingState, inWindow,
+  selectRecordingState, inWindow, houseTimestamp, editorialTimePhrase,
 } from '../src/lib/governance.ts';
 import type { JournalEntry, Fragment, HeldFrame, Work, BodyBlock, RecordingFlag } from '../src/lib/content-types.ts';
 
@@ -51,6 +51,37 @@ test('Writing Wall: scheduled window applies when no manual active; else rests',
   assert.equal(selectActiveFragment(frags, new Date('2026-07-10T09:00:00')), undefined);
   // a draft is never selected even if flagged active
   assert.equal(selectActiveFragment([frags[1]], new Date('2026-07-22')), undefined);
+});
+
+test('House timestamp: Pacific-Time editorial phrasing matches the brief examples', () => {
+  const a = houseTimestamp('2026-07-05T21:15:00-07:00');
+  assert.equal(a.dateLine, 'Sunday, July 5, 2026');
+  assert.equal(a.timeLine, 'After 9:00 PM PT');
+
+  const b = houseTimestamp('2026-10-14T12:05:00-07:00');
+  assert.equal(b.dateLine, 'Wednesday, October 14, 2026');
+  assert.equal(b.timeLine, 'Just after Noon PT');
+
+  const c = houseTimestamp('2027-01-16T23:50:00-08:00');
+  // The brief's example said "Friday", but Jan 16 2027 is a Saturday — the point
+  // of auto-generation is to compute the true day. Trust the date, not the typo.
+  assert.equal(c.dateLine, 'Saturday, January 16, 2027');
+  assert.equal(c.timeLine, 'Shortly before Midnight PT');
+
+  // A UTC instant is still shown in PT, never UTC/local.
+  const d = houseTimestamp('2026-07-06T04:15:00Z'); // = 2026-07-05 21:15 PT
+  assert.equal(d.dateLine, 'Sunday, July 5, 2026');
+  assert.equal(d.timeLine, 'After 9:00 PM PT');
+
+  // Date-only entries get the date, no invented time.
+  assert.equal(houseTimestamp('2026-07-05').timeLine, undefined);
+});
+
+test('editorialTimePhrase: buckets + Noon/Midnight rollover, always PT', () => {
+  assert.equal(editorialTimePhrase(0, 5), 'Just after Midnight PT');
+  assert.equal(editorialTimePhrase(11, 55), 'Shortly before Noon PT');
+  assert.equal(editorialTimePhrase(7, 30), 'After 7:00 AM PT');
+  assert.equal(editorialTimePhrase(23, 45), 'Shortly before Midnight PT');
 });
 
 test('inWindow: bounds inclusive; a fragment with no window is not scheduled', () => {

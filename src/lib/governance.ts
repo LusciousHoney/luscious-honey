@@ -114,3 +114,45 @@ export function formatHouseDate(iso: string): string {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
   });
 }
+
+/* --- House timestamp — the House keeps Pacific Time, always -------------- */
+// The House Journal shows the publication day + full date and an editorial time
+// phrase, rendered in Pacific Time (never UTC, never the visitor's local time).
+
+const HOUSE_TZ = 'America/Los_Angeles';
+
+export interface HouseStamp { dateLine: string; timeLine?: string; }
+
+/** 24h hour → "Noon" / "Midnight" / "9:00 PM". */
+function houseHourLabel(h24: number): string {
+  const hh = ((h24 % 24) + 24) % 24;
+  if (hh === 0) return 'Midnight';
+  if (hh === 12) return 'Noon';
+  const ampm = hh < 12 ? 'AM' : 'PM';
+  const h12 = hh % 12 === 0 ? 12 : hh % 12;
+  return `${h12}:00 ${ampm}`;
+}
+
+/** Literary phrase for a Pacific-Time hour:minute, always suffixed " PT". */
+export function editorialTimePhrase(hour: number, minute: number): string {
+  let phrase: string;
+  if (minute <= 9) phrase = `Just after ${houseHourLabel(hour)}`;
+  else if (minute <= 39) phrase = `After ${houseHourLabel(hour)}`;
+  else phrase = `Shortly before ${houseHourLabel(hour + 1)}`;
+  return `${phrase} PT`;
+}
+
+/** Full editorial timestamp for a Journal entry, in Pacific Time. */
+export function houseTimestamp(iso: string): HouseStamp {
+  if (!iso.includes('T')) return { dateLine: formatHouseDate(iso) }; // date-only → no time
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return { dateLine: formatHouseDate(iso) };
+  const dateLine = new Intl.DateTimeFormat('en-US', {
+    timeZone: HOUSE_TZ, weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  }).format(d);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: HOUSE_TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(d);
+  const val = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? '0');
+  return { dateLine, timeLine: editorialTimePhrase(val('hour'), val('minute')) };
+}
