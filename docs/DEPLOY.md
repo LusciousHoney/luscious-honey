@@ -37,6 +37,66 @@ npm run deploy      # = npm run verify (build + tests + fixture-safety) && wrang
   Office.)
 - Production ships `data-env="production"`, so no fixture labels are visible.
 
+## Private surfaces — Cloudflare Access (REQUIRED before deploy)
+
+Unlike the Editorial Office (dev-only, never built), the **Production Studio**
+*is* part of the production build so it can live at a real URL. That means it is
+**published to `dist/` and would be publicly reachable unless it is gated.**
+
+### What the repo now enforces (in code)
+
+A Cloudflare Pages **Function middleware fails closed** for the entire
+`/production-studio` namespace on **every hostname** (production custom domain
+*and* every `*.pages.dev` preview alias):
+
+- `functions/_middleware.js` — boundary-safe prefix gate over `/production-studio`,
+  `/production-studio/`, and `/production-studio/*` (lookalike public routes like
+  `/production-studio-notes` are unaffected). Any request without a valid
+  Cloudflare Access identity gets a **403**. It denies on missing config, missing
+  token, invalid/expired token, or any verification error. **There is no preview
+  bypass and no localhost bypass** — local work uses `npm run dev` / `npm run studio`,
+  which never run this middleware.
+- `functions/_lib/access.js` — the Pull Me Under Access JWT verifier (WebCrypto,
+  RS256, audience + expiry), reused verbatim minus the preview bypass.
+- Covered by `tests/access.test.mjs` (`npm test`).
+
+Because the middleware denies when Access config is absent, a deploy that forgets
+the steps below is **blocked, not exposed** — it fails closed.
+
+### Remaining external steps (Cloudflare dashboard / env — cannot live in git)
+
+1. **Set two environment variables in the Pages project, in BOTH scopes**
+   (Settings → Environment variables → *Production* **and** *Preview*):
+   - `ACCESS_TEAM_DOMAIN` — e.g. `luscioushoney.cloudflareaccess.com`
+   - `ACCESS_AUD` — the Access application's **Application Audience (AUD) tag**
+     (copied from the app in step 2). These are what the middleware verifies against.
+2. **Create the Cloudflare Access application** for the production custom-domain
+   `/production-studio` prefix. Either:
+   - **One command:** `CF_API_TOKEN=… CF_ACCOUNT_ID=… node scripts/setup-access.mjs --apply`
+     (token needs *Access: Apps and Policies: Edit*; dry-run without `--apply`; add
+     teammates via `ACCESS_EMAILS="a@…,b@…"`), **or**
+   - **Dashboard:** Zero Trust → Access → Applications → Add → **Self-hosted** →
+     domain `luscioushoneycollective.com` path `/production-studio` (prefix match
+     covers the hub, the Voice Notes Studio, and all its assets) → Policy: Allow
+     `melody@melodyrash.com` (+ contributors).
+3. **Preview-coverage decision (choose one):**
+   - **(a) Cover previews with Access** — add the project's preview domain
+     (`*.luscious-honey-collective.pages.dev`) to an Access application (or enable
+     Access for preview deployments) so House members can reach the Studio on
+     preview URLs. **or**
+   - **(b) Leave previews hard-blocked** — do nothing extra. The middleware denies
+     every `/production-studio*` request on `*.pages.dev` (no Access token is
+     present there), so previews return 403 to everyone. Test locally instead.
+   Either choice keeps previews non-public; (b) is the safe default.
+
+Defence-in-depth also present: both pages carry
+`<meta name="robots" content="noindex, nofollow">` and `robots.txt` disallows
+`/production-studio`. **These are not security controls** — the middleware +
+Access are the gate.
+
+> If Access is not in place, treat `/production-studio*` as public and do **not**
+> deploy the Studio.
+
 ## Verify a deployment
 
 ```bash

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en" data-env="development" data-tod="evening">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Production Studio — Luscious Honey Collective (private)</title>
+    <meta name="description" content="The House's private making tools." />
+    <!-- Private, founder-only. Never indexed; the real gate is Cloudflare
+         Access on /production-studio* — see docs/DEPLOY.md. -->
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,200;0,6..72,300;1,6..72,200;1,6..72,300&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to the Studio</a>
+
+    <div class="container">
+      <header class="site-header">
+        <span class="wordmark">Luscious&nbsp;Honey <b>Collective</b></span>
+        <span class="label" aria-hidden="true">Production Studio · private</span>
+      </header>
+    </div>
+
+    <main id="main" class="reader-page">
+      <div class="container back-line">
+        <a href="/">← Back to the corridor</a>
+      </div>
+
+      <article class="reader" aria-labelledby="studio-title">
+        <p class="reader__kicker metaline">
+          <span class="label">Production Studio</span>
+          <span class="meta">Private · founder &amp; contributors</span>
+        </p>
+        <h1 id="studio-title" class="reader__title">The Studio</h1>
+        <p class="reader__dek">
+          The House's private making tools. Each tool below opens to its own
+          workspace.
+        </p>
+
+        <ul class="container" style="list-style: none; padding: 0; margin: 0;">
+          <li>
+            <!-- Voice Notes Studio — the existing recording tool, now served
+                 through the House build at /production-studio/voice-notes. -->
+            <section class="plate brass-edge" aria-labelledby="voice-notes-h">
+              <p class="label">Tool · Audio</p>
+              <h2 id="voice-notes-h">Voice Notes Studio</h2>
+              <p class="editorial">
+                The House's private voice-notes &amp; recording studio — sessions,
+                private artist collaboration (Owner / Contributor), audio import,
+                package import/export, and video export.
+              </p>
+              <p>
+                <a class="button" href="/production-studio/voice-notes/">Open the Voice Notes Studio →</a>
+              </p>
+            </section>
+          </li>
+        </ul>
+      </article>
+    </main>
+
+    <footer class="colophon">
+      <div class="container">
+        <p class="wordmark">Luscious Honey Collective</p>
+        <p class="meta">A house for storytellers · MMXXVI</p>
+      </div>
+    </footer>
+
+    <script type="module" src="/src/production-studio.ts"></script>
+  </body>
+</html>

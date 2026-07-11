@@ -25,7 +25,13 @@ const files = [];
   }
 })(DIST);
 
-const htmlFiles = files.filter((f) => extname(f) === '.html');
+// The Voice Notes Studio ships verbatim from public/ — it is a self-contained
+// tool, not a House-templated page, so it carries no data-env attribute and no
+// fixture machinery. Exempt it from the data-env requirement below (it is still
+// scanned for forbidden fixture markers via `shippedCode`, and has none).
+const isTemplatedPage = (f) => !f.includes(join('production-studio', 'voice-notes'));
+
+const htmlFiles = files.filter((f) => extname(f) === '.html' && isTemplatedPage(f));
 // HTML + JS are the surfaces that could render a visible label. CSS legitimately
 // defines the `.fixture-flag` rule (hidden by default) and is not a leak.
 const shippedCode = files.filter((f) => ['.html', '.js'].includes(extname(f)));

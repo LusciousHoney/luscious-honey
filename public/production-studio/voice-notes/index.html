@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Private House tool. Defence-in-depth: never indexed. The real gate is
+       Cloudflare Access on /production-studio* (see docs/DEPLOY.md). -->
+  <meta name="robots" content="noindex, nofollow" />
   <title>Private Voice Notes Studio — Creator Dashboard</title>
 
   <!-- Brand fonts: Cinzel for display text, Inter for UI/labels (matches Luscious Honey design system) -->
@@ -16,6 +19,13 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+
+  <!-- Breadcrumb back to the private Production Studio hub. -->
+  <nav class="studio-breadcrumb" aria-label="Breadcrumb"
+       style="max-width:1200px;margin:0 auto;padding:1rem 1.5rem 0;font-family:var(--font-ui);font-size:.8rem;letter-spacing:.02em;line-height:1.5;">
+    <a href="/production-studio/" style="color:var(--gold);text-decoration:none;">Production Studio</a>
+    <span aria-current="page" style="display:block;color:var(--gold-soft);opacity:.85;">← Voice Notes Studio</span>
+  </nav>
 
   <div class="app">
     <header class="app-header">

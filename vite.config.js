@@ -54,6 +54,12 @@ export default defineConfig({
         reader: resolve(__dirname, 'reader.html'),         // /publishing/:work  the Reader
         press: resolve(__dirname, 'press.html'),           // /press      House Journal archive
         tribute: resolve(__dirname, 'tk-tribute.html'),    // /tk-tribute Permanent Collection · Tribute No. 01
+        // Private making tools. Gated by Cloudflare Access on /production-studio*
+        // (see docs/DEPLOY.md). Emitted as production-studio/index.html so the
+        // hub IS the directory index — avoids a file-vs-directory trailing-slash
+        // collision with the Voice Notes app shipped verbatim from
+        // public/production-studio/voice-notes/.
+        productionStudio: resolve(__dirname, 'production-studio/index.html'), // /production-studio/  Studio hub (private)
       },
     },
   },

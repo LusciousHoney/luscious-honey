@@ -1,5 +1,19 @@
 # Audio Studio — Verification Report (Obj 4)
 
+> **Superseded (integration update).** The Studio has since been relocated from a
+> standalone external room into the production build. It now lives at
+> `public/production-studio/voice-notes/` and is served at
+> **`/production-studio/voice-notes`** inside the private **Production Studio**
+> hub (`production-studio/index.html`). The standalone `npm run studio` launcher
+> is **retained** as a supported offline dev option, now at
+> `scripts/serve-voice-notes-studio.mjs` — kept out of `public/` so it is **never
+> emitted to `dist/`** (it serves the app assets from
+> `public/production-studio/voice-notes/`). The Studio app ships in `dist/` and is
+> gated by **Cloudflare Access** on `/production-studio*` via `functions/` — see
+> [`../DEPLOY.md`](../DEPLOY.md). The app code itself is still the PMU original
+> (only a `noindex` meta and a breadcrumb back to the hub were added). The
+> verification below describes the earlier external-room model.
+
 Verification only. **No rebuild, no redesign.** The Studio is treated as a
 permanent Headquarters room.
 

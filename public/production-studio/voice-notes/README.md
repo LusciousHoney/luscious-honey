@@ -9,45 +9,40 @@ field in the dashboard on the left writes live into the phone preview
 on the right — add notes, retime them, swap avatars, rename
 characters, tune the recording — all from the UI.
 
-## Run it on your Mac
+## Where it lives now
 
-This is your everyday tool — you launch it locally in your own browser.
+The Studio is part of the Headquarters build and is served at
+**`/production-studio/voice-notes`** inside the private **Production Studio**.
+There are two supported ways to open it — pick whichever suits you.
 
-**One-time setup:** make sure **Node.js** is installed (you already
-have it if you run the main site with `npm run dev`). If not, download
-the "LTS" installer from [nodejs.org](https://nodejs.org) and run it —
-nothing else to install for the studio.
+**1) Through the House (recommended).** While developing the House, run:
 
-**Every time you want to use it:**
+```
+npm run dev
+```
 
-1. Open the **Terminal** app.
-2. Go to the project folder (drag the folder onto the Terminal window
-   after typing `cd `, then press Return):
-   ```
-   cd path/to/pull-me-under-site
-   ```
-3. Run this single command:
-   ```
-   npm run studio
-   ```
+then open **http://localhost:5173/production-studio/voice-notes/**. It deploys with
+the rest of the site behind **Cloudflare Access** on `/production-studio*`, so only
+signed-in House members reach it — see [`docs/DEPLOY.md`](../../../docs/DEPLOY.md).
+It is never public.
 
-Your browser opens automatically at **http://localhost:8080**. That's
-the studio — bookmark it if you like.
+**2) Standalone offline launcher (still supported).** The zero-dependency local
+server is retained for offline work — no House build needed:
 
-**To stop it:** click the Terminal window and press **Control-C** (or
-just close the Terminal window).
+```
+npm run studio
+```
 
-Notes:
-- If port 8080 is busy, it quietly picks the next free one (8081, …) —
-  the Terminal prints the exact address to open.
-- The launcher has **no dependencies** — it uses only what comes with
-  Node, so there's nothing to `npm install` for it.
-- Prefer to run it from inside this folder instead? `cd
-  private-voice-notes-studio` and run `node serve.mjs` — same result.
-- Why a launcher instead of double-clicking `index.html`? The app loads
-  its code as browser "modules," which only work over a real
-  `http://` address, not a `file://` one. The launcher provides that
-  address locally.
+Your browser opens at **http://localhost:8080**. Stop it with Control-C. (If 8080
+is busy it picks the next free port; the Terminal prints the address.) The launcher
+lives at `scripts/serve-voice-notes-studio.mjs` (kept out of `public/` so it is
+never emitted to `dist/`); it serves the app assets from this folder.
+
+Either way the app loads its code as browser "modules," which need a real `http://`
+address (not `file://`) — both methods provide that.
+
+The app itself is unchanged: plain HTML/CSS/JS, no build step, no backend, and
+every field in the dashboard still writes live into the phone preview.
 
 ## Layout
 

@@ -1,13 +1,16 @@
 /* ==========================================================================
    Private Voice Notes Studio — local launcher
    A tiny static file server with ZERO dependencies (Node built-ins only).
-   It serves this folder over http:// (required — the app uses ES module
-   scripts, which browsers refuse to load from a file:// path) and opens
-   your browser automatically.
+   It serves the Studio folder over http:// (required — the app uses ES module
+   scripts, which browsers refuse to load from a file:// path) and opens your
+   browser automatically.
 
-   Run it with either:
+   This launcher lives in scripts/ (NOT in public/) so it is never emitted to
+   dist/ or deployed. It serves the app assets from public/production-studio/
+   voice-notes/.
+
+   Run it with:
      npm run studio                 (from the repository root)
-     node serve.mjs                 (from inside this folder)
 
    Stop it with Control-C. Change the port with:  PORT=9000 npm run studio
    ========================================================================== */
@@ -18,7 +21,12 @@ import { join, normalize, extname, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 
-const ROOT = dirname(fileURLToPath(import.meta.url));
+// The script sits in scripts/; the app assets live in public/production-studio/
+// voice-notes/. Resolve that folder relative to this file so `npm run studio`
+// works from any CWD.
+const ROOT = normalize(
+  join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'production-studio', 'voice-notes'),
+);
 const START_PORT = Number(process.env.PORT) || 8080;
 
 const MIME = {

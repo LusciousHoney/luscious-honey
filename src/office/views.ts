@@ -79,9 +79,9 @@ export function mountHome(root: HTMLElement): void {
         production tool of the House.
       </p>
       <p class="meta office-studio__how">
-        Launch locally: <code>npm run studio</code> — opens at
-        <a href="http://localhost:8080/" target="_blank" rel="noopener">localhost:8080</a>.
-        Private; never deployed.
+        Open the <a href="/production-studio/voice-notes/">Voice Notes Studio</a>,
+        inside the <a href="/production-studio/">Production Studio</a>. Private —
+        gated by Cloudflare Access; never public.
       </p>
     </section>
   `);

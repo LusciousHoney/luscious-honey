@@ -61,6 +61,12 @@ routes. Future wings are built only when real content exists for them.
 - **Editorial Office** — a founder-only workspace at `/editorial-office.html`,
   available in `npm run dev` only. It is **excluded from the production build** and
   never deployed. See [`docs/Editorial-Office.md`](docs/Editorial-Office.md).
+- **Production Studio** — a private hub at `/production-studio` holding the
+  **Voice Notes Studio** at `/production-studio/voice-notes`. Unlike the Office it
+  *is* part of the build (so it has a real URL), so it must be gated by
+  **Cloudflare Access** on `/production-studio*` before deploy — see
+  [`docs/DEPLOY.md`](docs/DEPLOY.md). It is `noindex` and robots-disallowed as
+  defence-in-depth.
 
 ---
 
