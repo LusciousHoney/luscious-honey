@@ -62,13 +62,24 @@
 
   /* ── Tablet portrait + mobile: stack columns, keep the museum-walk, clear the chrome ── */
   @media (max-width: 900px) {
+    /* The scroll pane tracks the *visual* viewport (dvh), so nothing is trapped
+       behind iOS Safari / Android Chrome dynamic toolbars. 100vh is the fallback
+       for browsers without dvh. #tk-root is position:fixed inset:0, so we release
+       its bottom and drive height instead. */
+    #tk-root { inset: 0 0 auto 0 !important; height: 100vh !important; height: 100dvh !important; }
     #tk-scroller > section[data-room] {
       width: 100vw !important;
-      overflow-y: auto; overflow-x: hidden;
+      /* !important is REQUIRED here: it overrides each section's inline
+         `overflow:hidden`, which was silently blocking vertical scroll on touch
+         devices and trapping any content below the fold (e.g. Room 03). */
+      overflow-y: auto !important; overflow-x: hidden !important;
       -webkit-overflow-scrolling: touch;
-      align-items: flex-start !important;
+      overscroll-behavior-y: contain;   /* don't chain vertical over-scroll to pull-to-refresh */
+      align-items: flex-start !important; /* top-align so tall content isn't centered out of reach */
       padding-top: calc(84px + env(safe-area-inset-top)) !important;
       padding-bottom: calc(78px + env(safe-area-inset-bottom)) !important;
+      padding-left: env(safe-area-inset-left) !important;   /* clear the notch in landscape */
+      padding-right: env(safe-area-inset-right) !important;
     }
     #tk-scroller > section[data-room] > [style*="z-index:2"] { height: auto !important; }
     #tk-scroller > section[data-doorway] { width: 12vw !important; min-width: 60px; }
