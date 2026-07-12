@@ -31,6 +31,14 @@ binding = "LHC_DB"
 database_name = "lhc-hq"
 database_id = "8df865d4-a6ba-429d-8f2f-76001c3de294"
 
+# --- Production environment variables (Wrangler-managed) ---------------------
+# Top-level [vars] applies to the PRODUCTION environment. EMAIL_FROM is the
+# Resend-verified sender used by functions/_lib/email.js. It is a non-secret
+# identifier; the RESEND_API_KEY is stored separately as a Production secret.
+# Preview scope (below) is defined independently and is unaffected.
+[vars]
+EMAIL_FROM = "Luscious Honey Collective <editorial@luscioushoneycollective.com>"
+
 # --- Cloudflare Access verifier config — PREVIEW ONLY ------------------------
 # The middleware verifies Access JWTs against these. They are set ONLY for the
 # preview environment so the branch preview can authenticate reviewers via the
