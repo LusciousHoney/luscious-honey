@@ -375,8 +375,9 @@
                 <div style="font-family:'IBM Plex Mono',monospace; font-size:9px; letter-spacing:0.1em; text-transform:uppercase; color:rgba(33,29,26,0.38); margin-top:6px;">For TK &middot; Tribute No. 01</div>
                 <div style="font-family:'Newsreader',serif; font-style:italic; font-weight:300; font-size:20px; line-height:1.35; color:#211D1A; margin:20px 0 4px;">What stayed with you after time in TK&rsquo;s room?</div>
                 <div style="font-family:'IBM Plex Mono',monospace; font-size:9.5px; letter-spacing:0.1em; text-transform:uppercase; color:rgba(33,29,26,0.45); margin:0 0 16px;">(If you&rsquo;re new here&hellip;)</div>
-                <textarea data-gb-text rows="4" placeholder="Write your reflection&hellip;" style="width:100%; box-sizing:border-box; border:none; outline:none; resize:none; background-image:linear-gradient(rgba(33,29,26,0.12) 1px, transparent 1px); background-size:100% 30px; background-position:0 29px; font-family:'Newsreader',serif; font-weight:300; font-size:16px; line-height:30px; color:#211D1A;"></textarea>
-                <input data-gb-name type="text" placeholder="&mdash; your name (optional)" style="width:100%; box-sizing:border-box; border:none; border-bottom:1px solid rgba(33,29,26,0.2); outline:none; background:transparent; font-family:'Newsreader',serif; font-style:italic; font-size:15px; color:#211D1A; padding:8px 0; margin-top:14px;">
+                <textarea data-gb-text rows="4" maxlength="2000" placeholder="Write your reflection&hellip;" style="width:100%; box-sizing:border-box; border:none; outline:none; resize:none; background-image:linear-gradient(rgba(33,29,26,0.12) 1px, transparent 1px); background-size:100% 30px; background-position:0 29px; font-family:'Newsreader',serif; font-weight:300; font-size:16px; line-height:30px; color:#211D1A;"></textarea>
+                <input data-gb-name type="text" maxlength="80" placeholder="&mdash; your name (optional)" style="width:100%; box-sizing:border-box; border:none; border-bottom:1px solid rgba(33,29,26,0.2); outline:none; background:transparent; font-family:'Newsreader',serif; font-style:italic; font-size:15px; color:#211D1A; padding:8px 0; margin-top:14px;">
+                <div aria-hidden="true" style="position:absolute; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden;"><label>Website<input data-gb-hp type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
                 <div class="tk-gb-actions" style="display:flex; align-items:center; flex-wrap:wrap; gap:12px 16px; margin-top:20px;">
                   <button data-gb-submit class="tk-gb-submit">Leave your reflection</button>
                   <span data-gb-confirm style="font-family:'Caveat',cursive; font-size:18px; color:#7A3B34; opacity:0; transition:opacity 0.6s ease;">signed &mdash; thank you</span>
@@ -600,44 +601,74 @@
     if (!room) return;
     var ta = room.querySelector('[data-gb-text]');
     var nameEl = room.querySelector('[data-gb-name]');
+    var hpEl = room.querySelector('[data-gb-hp]');
     var btn = room.querySelector('[data-gb-submit]');
     var list = room.querySelector('[data-gb-entries]');
     var note = room.querySelector('[data-gb-confirm]');
-    var KEY = 'lhc_tribute_01_guestbook';
-    // First reflection — reserved for a future authentic reflection from Luscious Honey.
+    var ENDPOINT = '/api/tribute/tk/guestbook';
+    var submitting = false;
+    var noteTimer;
+    // The pinned reflection from Luscious Honey — always shown, first in the ledger.
+    // Approved visitor reflections are moderated server-side; pending ones are never shown here.
     var HOUSE = { text: 'Thank you for reminding me that the most meaningful work isn’t measured by applause, but by what quietly stays with someone long after the moment has passed. I’m grateful that a small part of my own story now carries the imprint of yours.', name: 'Luscious Honey', dateText: 'MMXXVI', pinned: true };
-    var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    var gbNote;
-    function load() { try { return JSON.parse(localStorage.getItem(KEY) || '[]') || []; } catch (e) { return []; } }
-    function fmt(iso) { try { var d = new Date(iso); return d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear(); } catch (e) { return ''; } }
     function entryEl(en) {
       var wrap = document.createElement('div');
       wrap.style.cssText = 'padding:15px 0; border-top:1px solid rgba(33,29,26,0.14);';
       var q = document.createElement('div');
       q.style.cssText = "font-family:'Newsreader',serif; font-weight:300; font-size:16px; line-height:1.5; color:rgba(33,29,26,0.82);";
-      q.textContent = '“' + en.text + '”';
+      q.textContent = '“' + en.text + '”';   // textContent — never HTML, so no injection
       var m = document.createElement('div');
       m.style.cssText = "font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; margin-top:9px; color:" + (en.pinned ? '#9C7638' : 'rgba(33,29,26,0.5)') + ";";
-      m.textContent = '— ' + (en.name || 'Anonymous') + ' · ' + (en.dateText || fmt(en.date));
+      m.textContent = '— ' + (en.name || 'Anonymous') + ' · ' + (en.dateText || '');
       wrap.appendChild(q); wrap.appendChild(m);
       return wrap;
     }
     function render() {
       if (!list) return;
       list.innerHTML = '';
-      var all = [HOUSE].concat(load().slice().reverse());
-      all.forEach(function (en) { list.appendChild(entryEl(en)); });
+      list.appendChild(entryEl(HOUSE));   // pinned only; pending reflections are not shown publicly
+    }
+    function setMessage(msg, kind) {
+      if (!note) return;
+      note.textContent = msg;
+      note.style.color = kind === 'err' ? '#9E5A5A' : '#7A3B34';
+      note.style.opacity = '1';
+      clearTimeout(noteTimer);
+      if (kind === 'ok') noteTimer = setTimeout(function () { note.style.opacity = '0'; }, 4000);
     }
     function submit() {
+      if (submitting) return;                                   // prevent duplicate taps
       var text = ((ta && ta.value) || '').trim();
-      if (!text) { if (ta) ta.focus(); return; }
-      var arr = load();
-      arr.push({ text: text, name: (((nameEl && nameEl.value) || '').trim() || 'Anonymous'), date: new Date().toISOString() });
-      try { localStorage.setItem(KEY, JSON.stringify(arr)); } catch (e) {}
-      if (ta) ta.value = '';
-      if (nameEl) nameEl.value = '';
-      render();
-      if (note) { note.style.opacity = '1'; clearTimeout(gbNote); gbNote = setTimeout(function () { note.style.opacity = '0'; }, 2600); }
+      if (!text) { if (ta) ta.focus(); return; }                // validate non-empty
+      submitting = true;
+      if (btn) { btn.disabled = true; btn.setAttribute('aria-busy', 'true'); }
+      if (note) note.style.opacity = '0';
+      var payload = {
+        reflection: (ta && ta.value) || '',
+        display_name: (nameEl && nameEl.value) || '',
+        website: (hpEl && hpEl.value) || ''                     // honeypot
+      };
+      fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (data) { return { ok: res.ok, data: data }; });
+      }).then(function (r) {
+        if (r.ok && r.data && r.data.ok !== false) {
+          if (ta) ta.value = '';                                // clear ONLY after successful storage
+          if (nameEl) nameEl.value = '';
+          if (hpEl) hpEl.value = '';
+          setMessage('Your reflection has been received.', 'ok');
+        } else {
+          setMessage((r.data && r.data.error) || 'Something went wrong — please try again.', 'err');
+        }
+      }).catch(function () {
+        setMessage('Couldn’t reach the guest book. Check your connection and try again.', 'err');
+      }).then(function () {
+        submitting = false;
+        if (btn) { btn.disabled = false; btn.removeAttribute('aria-busy'); }
+      });
     }
     if (btn) btn.addEventListener('click', submit);
     render();
