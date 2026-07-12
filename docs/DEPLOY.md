@@ -97,6 +97,58 @@ Access are the gate.
 > If Access is not in place, treat `/production-studio*` as public and do **not**
 > deploy the Studio.
 
+## TK Guest Book — D1 database (REQUIRED for the guest book to work)
+
+The TK Tribute guest book (`/tribute/tk`) stores reflections in **Cloudflare D1**
+via the Function `functions/api/tribute/tk/guestbook.js`. New submissions default
+to `pending` and are **never shown publicly** — only the pinned Luscious Honey
+reflection renders on the page. Until the binding exists, `POST /api/tribute/tk/guestbook`
+returns a graceful `503` and the visitor is asked to try again later.
+
+### One-time setup
+
+```bash
+# 1. Create the database (once).
+npx wrangler d1 create luscious-honey-guestbook
+#    → copy the printed database_id into wrangler.toml ([[d1_databases]] → database_id)
+
+# 2. Apply the schema (remote = the live D1, not the local dev copy).
+npx wrangler d1 execute luscious-honey-guestbook \
+  --file migrations/0001_tribute_guestbook.sql --remote
+
+# 3. Bind it to the Pages project (dashboard):
+#    Settings → Functions → D1 database bindings → Add →
+#      Variable name: DB     Database: luscious-honey-guestbook
+#    Add the binding in BOTH Production and Preview scopes.
+```
+
+`binding = "DB"` in `wrangler.toml` and the dashboard variable name **must both be
+`DB`** — that is the exact name the Function reads as `env.DB`.
+
+### Abuse protection (already in code)
+
+- Off-screen **honeypot** field (`website`); tripped submissions are silently
+  accepted and never stored.
+- **Server-side validation + length limits** (reflection ≤ 2000, name ≤ 80),
+  control-character stripping, no HTML sink (client renders via `textContent`).
+- **Rate limiting** by hashed IP: no more than one submission per 20 s and 10 per
+  rolling hour (`ip_hash` is a salted SHA-256 — no raw addresses are stored).
+
+### Admin retrieval — read the pending queue
+
+`GET /api/tribute/tk/guestbook` returns pending submissions as JSON. It is gated by
+the **same Cloudflare Access verifier** as the Production Studio (`_lib/access.js`,
+fails closed) — so it requires a valid House identity and needs the
+`ACCESS_TEAM_DOMAIN` / `ACCESS_AUD` env vars (see above) plus an Access application
+covering the path. Optional `?status=pending|active|declined|all` (default `pending`).
+
+Approve a reflection by promoting it in D1 (it then becomes eligible to show):
+
+```bash
+npx wrangler d1 execute luscious-honey-guestbook --remote --command \
+  "UPDATE tribute_guestbook SET status='active', approved_at=datetime('now'), approved_by='melody@melodyrash.com' WHERE id=<ID>;"
+```
+
 ## Verify a deployment
 
 ```bash
