@@ -17,5 +17,5 @@ pages_build_output_dir = "dist"
 # (Settings → Functions → D1 database bindings → Variable name: DB). See docs/DEPLOY.md.
 [[d1_databases]]
 binding = "DB"
-database_name = "luscious-honey-collective-database"
+database_name = "luscious-honey-collective-guestbook"
 database_id = "a756b1fc-1b3b-4fd3-8a4c-ae5b6eb8a55d"
