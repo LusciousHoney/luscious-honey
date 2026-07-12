@@ -9,3 +9,13 @@
 name = "luscious-honey-collective"
 compatibility_date = "2026-07-09"
 pages_build_output_dir = "dist"
+
+# D1 database — backs the TK Guest Book (functions/api/tribute/tk/guestbook.js).
+# The binding name `DB` is what the Function reads as `env.DB`. Create the
+# database and apply migrations/0001_tribute_guestbook.sql, then set the real
+# `database_id` here AND bind it in the Pages dashboard
+# (Settings → Functions → D1 database bindings → Variable name: DB). See docs/DEPLOY.md.
+[[d1_databases]]
+binding = "DB"
+database_name = "luscious-honey-collective-guestbook"
+database_id = "a756b1fc-1b3b-4fd3-8a4c-ae5b6eb8a55d"
