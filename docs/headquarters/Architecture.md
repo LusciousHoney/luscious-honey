@@ -78,7 +78,7 @@ The Office home becomes a **Founder Dashboard** rendered from the registry:
 
 ## Privacy / build exclusion (invariant for every room)
 
-- Internal rooms: `editorial-office.html` is **not** a Vite input → never in
+- Internal rooms: `interview-workbench.html` is **not** a Vite input → never in
   `dist`. Future internal rooms mount into the same page, inheriting exclusion.
 - External rooms: served by their own `serve.mjs`, not under `public/`, not a
   Vite input → never in `dist`.

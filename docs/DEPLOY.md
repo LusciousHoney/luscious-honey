@@ -31,27 +31,32 @@ npm run deploy      # = npm run verify (build + tests + fixture-safety) && wrang
 
 - `npm run verify` runs first: build + 23 tests + the production fixture-safety
   check. A failing check aborts the deploy.
-- The **Editorial Office is never deployed** — `editorial-office.html` is not a
-  Vite build input, so it is absent from `dist/`. (Verified: requesting
-  `/editorial-office.html` on the live site serves the public homepage, never the
-  Office.)
+- The **private surfaces are gated, not hidden** — both the Production Studio
+  (`/production-studio/`) and the Editorial Office (`/editorial-office/`) are real
+  Vite build inputs shipped to `dist/`, reachable only through the Cloudflare
+  Access gate below (the middleware fails closed).
 - Production ships `data-env="production"`, so no fixture labels are visible.
 
 ## Private surfaces — Cloudflare Access (REQUIRED before deploy)
 
-Unlike the Editorial Office (dev-only, never built), the **Production Studio**
-*is* part of the production build so it can live at a real URL. That means it is
-**published to `dist/` and would be publicly reachable unless it is gated.**
+Two private areas — the **Production Studio** (`/production-studio/`) and the
+**Editorial Office** (`/editorial-office/`) — are part of the production build so
+they live at real URLs. That means each is **published to `dist/` and would be
+publicly reachable unless it is gated.** Both share the same Access infrastructure.
+
+(The **Interview Workbench** — the founder-interview authoring tool at
+`interview-workbench.html` — is **not** a Vite build input, so it never ships to
+`dist/` and needs **no** production Access application. It is local/dev-only.)
 
 ### What the repo now enforces (in code)
 
 A Cloudflare Pages **Function middleware fails closed** for the entire
-`/production-studio` namespace on **every hostname** (production custom domain
-*and* every `*.pages.dev` preview alias):
+`/production-studio` **and** `/editorial-office` namespaces on **every hostname**
+(production custom domain *and* every `*.pages.dev` preview alias):
 
-- `functions/_middleware.js` — boundary-safe prefix gate over `/production-studio`,
-  `/production-studio/`, and `/production-studio/*` (lookalike public routes like
-  `/production-studio-notes` are unaffected). Any request without a valid
+- `functions/_middleware.js` — boundary-safe prefix gate over both
+  `/production-studio(/*)` and `/editorial-office(/*)` (lookalike public routes like
+  `/production-studio-notes` or `/editorial-office-notes` are unaffected). Any request without a valid
   Cloudflare Access identity gets a **403**. It denies on missing config, missing
   token, invalid/expired token, or any verification error. **There is no preview
   bypass and no localhost bypass** — local work uses `npm run dev` / `npm run studio`,
@@ -79,6 +84,11 @@ the steps below is **blocked, not exposed** — it fails closed.
      domain `luscioushoneycollective.com` path `/production-studio` (prefix match
      covers the hub, the Voice Notes Studio, and all its assets) → Policy: Allow
      `melody@melodyrash.com` (+ contributors).
+   **Repeat step 2 for the Editorial Office:** create (or extend) a Cloudflare
+   Access application covering the `/editorial-office` prefix on the same custom
+   domain, with the same Allow policy. Both `/production-studio*` and
+   `/editorial-office*` are gated by the same `functions/_middleware.js` and the
+   same `ACCESS_TEAM_DOMAIN` / `ACCESS_AUD`.
 3. **Preview-coverage decision (choose one):**
    - **(a) Cover previews with Access** — add the project's preview domain
      (`*.luscious-honey-collective.pages.dev`) to an Access application (or enable

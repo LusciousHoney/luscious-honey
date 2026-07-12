@@ -2,9 +2,9 @@
 # The House is a public front experience. Nothing private is served here.
 User-agent: *
 Allow: /
-# Defence-in-depth: the private Editorial Office is dev-only and not deployed,
-# but should never be indexed if it is ever hosted.
-Disallow: /editorial-office.html
+# Defence-in-depth: the private Editorial Office is gated by Cloudflare Access;
+# keep it out of any index.
+Disallow: /editorial-office
 # The Production Studio (and the Voice Notes Studio within it) is private and
 # gated by Cloudflare Access; keep it out of any index as defence-in-depth.
 Disallow: /production-studio
