@@ -1,0 +1,88 @@
+/* =============================================================================
+   INTAKE REVIEW — styling for the TEMPORARY submission-services test harness.
+   Reuses House primitives (.plate, .brass-edge, .label/.meta). Deliberately
+   plain; the canonical Editorial Office UI will supply the real workspace.
+   ============================================================================= */
+
+.temp-banner {
+  font-family: var(--mono); font-size: var(--fs-meta); line-height: 1.6;
+  letter-spacing: 0.04em; color: var(--ink);
+  background: var(--brass-hi); border: 1px solid var(--brass);
+  padding: var(--s-2) var(--s-3); margin-bottom: var(--s-5);
+}
+.temp-banner code { font-family: var(--mono); background: rgba(0,0,0,0.08); padding: 0 4px; }
+
+.subs__title { font-size: var(--fs-h1); font-weight: 200; margin: var(--s-2) 0 var(--s-4); }
+
+.subs__filters { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-bottom: var(--s-5); }
+.subs__filter {
+  font-family: var(--sans); font-size: var(--fs-label); font-weight: 600;
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--plaster); background: transparent;
+  border: 1px solid rgba(var(--alabaster-rgb), 0.2); border-radius: var(--radius);
+  min-height: 40px; padding: 8px 14px; cursor: pointer;
+  transition: color var(--motion-quick) var(--ease-settle), border-color var(--motion-quick) var(--ease-settle);
+}
+.subs__filter:hover { border-color: var(--brass); color: var(--brass-hi); }
+.subs__filter.is-active { color: var(--ink); background: var(--brass-hi); border-color: var(--brass); }
+
+.subs__list { display: grid; gap: var(--s-4); padding-bottom: var(--s-8); }
+.subs__card { padding: var(--s-4); display: grid; gap: var(--s-3); }
+.subs__head { display: flex; flex-wrap: wrap; gap: var(--s-3); justify-content: space-between; align-items: start; }
+.subs__name { font-size: var(--fs-h3); font-weight: 300; margin: 0; color: var(--ink); }
+.subs__meta { margin: 4px 0 0; color: var(--umber); }
+.subs__statuswrap { display: grid; gap: var(--s-1); justify-items: end; }
+.subs__status {
+  font-family: var(--sans); font-size: var(--fs-body-sm);
+  color: var(--ink); background: var(--surface-plate-2);
+  border: var(--hairline); border-radius: var(--radius);
+  padding: 8px 10px; min-height: 40px; cursor: pointer;
+}
+.subs__status:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.subs__badge {
+  font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: var(--tracking-meta);
+  text-transform: uppercase; padding: 3px 8px;
+  border: 1px solid rgba(var(--ink-rgb), 0.2); color: var(--umber);
+}
+
+.subs__fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--s-3); margin: 0; }
+.subs__fields > div { margin: 0; }
+.subs__fields dt {
+  font-family: var(--sans); font-weight: 600; font-size: var(--fs-meta);
+  letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--umber); margin-bottom: 2px;
+}
+.subs__fields dd { margin: 0; color: var(--ink); font-family: var(--serif); }
+.subs__muted { color: var(--plaster); }
+.subs__card a { color: var(--oxblood); }
+
+/* Internal note */
+.subs__note { border-top: var(--hairline); padding-top: var(--s-3); display: grid; gap: var(--s-1); }
+.subs__notelabel {
+  font-family: var(--sans); font-weight: 600; font-size: var(--fs-meta);
+  letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--umber);
+}
+.subs__notehint { font-weight: 400; text-transform: none; letter-spacing: 0.02em; color: var(--plaster); }
+.subs__noterow { display: flex; gap: var(--s-2); flex-wrap: wrap; }
+.subs__noteinput {
+  flex: 1; min-width: 12ch;
+  font-family: var(--serif); font-size: var(--fs-body-sm); color: var(--ink);
+  background: var(--surface-plate-2); border: var(--hairline); border-radius: var(--radius);
+  padding: 10px var(--s-2); min-height: 40px;
+}
+.subs__noteinput:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.subs__notesaved { font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.08em; color: var(--brass); }
+
+/* Correspondence + history thread */
+.subs__thread { border-top: var(--hairline); padding-top: var(--s-2); }
+.subs__reveal {
+  font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--oxblood); background: none; border: 0; padding: 0; cursor: pointer;
+}
+.subs__reveal:hover { text-decoration: underline; }
+.subs__threadbody { margin-top: var(--s-3); display: grid; gap: var(--s-2); }
+.subs__subhead { font-size: var(--fs-body-sm); font-weight: 600; color: var(--umber); margin: var(--s-2) 0 0; font-family: var(--sans); text-transform: uppercase; letter-spacing: var(--tracking-label); }
+.subs__msgs, .subs__events { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); }
+.subs__msg { border-left: 2px solid var(--brass); padding-left: var(--s-2); }
+.subs__msg p { margin: 0 0 2px; color: var(--ink); font-family: var(--serif); font-size: var(--fs-body-sm); }
+.subs__err { color: var(--terracotta) !important; }
+.subs__events li { color: var(--umber); }

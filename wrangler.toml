@@ -10,6 +10,9 @@ name = "luscious-honey-collective"
 compatibility_date = "2026-07-09"
 pages_build_output_dir = "dist"
 
+# Two independent D1 databases are bound to this Pages project. Both bindings
+# are required; they are distinct databases with distinct binding names.
+
 # D1 database — backs the TK Guest Book (functions/api/tribute/tk/guestbook.js).
 # The binding name `DB` is what the Function reads as `env.DB`. Create the
 # database and apply migrations/0001_tribute_guestbook.sql, then set the real
@@ -19,3 +22,11 @@ pages_build_output_dir = "dist"
 binding = "DB"
 database_name = "luscious-honey-collective-guestbook"
 database_id = "a756b1fc-1b3b-4fd3-8a4c-ae5b6eb8a55d"
+
+# D1 — the House's own database (dedicated to LHC; NOT the Pull Me Under DB).
+# Pages reads this binding at deploy time and exposes it to Functions as env.LHC_DB.
+# Local `wrangler pages dev` uses a local shadow of this database.
+[[d1_databases]]
+binding = "LHC_DB"
+database_name = "lhc-hq"
+database_id = "8df865d4-a6ba-429d-8f2f-76001c3de294"

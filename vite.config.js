@@ -46,6 +46,14 @@ function htmlDataEnv() {
 // never as empty routes ahead of real content.
 export default defineConfig({
   plugins: [htmlDataEnv(), tributeCleanUrl()],
+  // Dev server only (never affects `vite build`): proxy API calls to a locally
+  // running `wrangler pages dev` so Functions + D1 can be exercised while the
+  // page is served by Vite. Cloudflare Pages ignores this block entirely.
+  server: {
+    proxy: {
+      '/api': 'http://localhost:8788',
+    },
+  },
   build: {
     rollupOptions: {
       input: {
@@ -53,6 +61,7 @@ export default defineConfig({
         publishing: resolve(__dirname, 'publishing.html'), // /publishing  Editorial wing
         reader: resolve(__dirname, 'reader.html'),         // /publishing/:work  the Reader
         press: resolve(__dirname, 'press.html'),           // /press      House Journal archive
+        artistFeatures: resolve(__dirname, 'artist-features.html'), // /artist-features  Artist Features intake
         tribute: resolve(__dirname, 'tk-tribute.html'),    // /tk-tribute Permanent Collection · Tribute No. 01
         // Private making tools. Gated by Cloudflare Access on /production-studio*
         // (see docs/DEPLOY.md). Emitted as production-studio/index.html so the
@@ -60,6 +69,8 @@ export default defineConfig({
         // collision with the Voice Notes app shipped verbatim from
         // public/production-studio/voice-notes/.
         productionStudio: resolve(__dirname, 'production-studio/index.html'), // /production-studio/  Studio hub (private)
+        editorialOffice: resolve(__dirname, 'editorial-office/index.html'), // /editorial-office/  Editorial Office · Submission Review (private, Access-gated)
+        notFound: resolve(__dirname, '404.html'),          // /404       Not-found page (templated so build applies data-env)
       },
     },
   },

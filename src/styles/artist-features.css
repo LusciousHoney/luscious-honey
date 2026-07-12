@@ -1,0 +1,91 @@
+/* =============================================================================
+   ARTIST FEATURES — the public intake form.
+   A thin layer only. The card is a reading .plate with a .brass-edge; fields
+   borrow the office input surface, the CTA is the shared .button, and the
+   interest choice reuses the chip aesthetic as an accessible radio group.
+   No new design language — spacing and field layout only.
+   ============================================================================= */
+
+.feature-body { padding: var(--s-6) 0 var(--s-8); }
+
+/* Keep the intake to a single comfortable reading column. */
+.feature-layout { display: grid; }
+.intro-form {
+  width: min(100%, var(--w-text));
+  margin-inline: auto;
+  padding: clamp(var(--s-4), 5vw, var(--s-6));
+  display: grid;
+  gap: var(--s-4);
+}
+
+.intro-form__lede { color: var(--umber); margin: 0 0 var(--s-2); max-width: 52ch; }
+
+/* --- A field: stacked label + control ----------------------------------- */
+.field { display: grid; gap: var(--s-1); margin: 0; padding: 0; border: 0; }
+.field__label { color: var(--umber); display: flex; align-items: baseline; gap: var(--s-2); }
+.field__help { font-family: var(--serif); font-style: italic; color: var(--plaster); margin: 0; }
+.field__optional {
+  font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: var(--tracking-meta);
+  text-transform: uppercase; color: var(--plaster);
+}
+
+/* Text/email/url inputs — match the office textarea surface. */
+.field__input {
+  width: 100%;
+  font-family: var(--serif); font-size: var(--fs-body); line-height: var(--leading-body);
+  color: var(--ink); background: var(--surface-plate-2);
+  border: var(--hairline); border-radius: var(--radius);
+  padding: 12px var(--s-3); min-height: 44px;
+}
+.field__input:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.field__input::placeholder { color: rgba(var(--ink-rgb), 0.4); }
+textarea.field__input { min-height: auto; }
+
+/* --- Interest: an accessible radio group wearing the chip look ---------- */
+.field--choice { gap: var(--s-2); }
+.choice-row { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.choice { display: inline-flex; cursor: pointer; }
+/* The real radio stays in the a11y tree but is visually replaced by the face. */
+.choice__input {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
+}
+.choice__face {
+  display: inline-flex; align-items: center; min-height: 44px;
+  font-family: var(--sans); font-size: var(--fs-body-sm); font-weight: 500;
+  color: var(--ink); background: var(--surface-plate-2);
+  border: 1px solid rgba(var(--ink-rgb), 0.18); border-radius: var(--radius);
+  padding: 10px 16px;
+  transition: background-color var(--motion-quick) var(--ease-settle),
+              border-color var(--motion-quick) var(--ease-settle);
+}
+.choice:hover .choice__face { border-color: var(--brass); }
+.choice__input:checked + .choice__face {
+  background: var(--umber); color: var(--alabaster); border-color: var(--umber);
+}
+.choice__input:focus-visible + .choice__face { box-shadow: var(--focus-ring); }
+
+/* Closing editorial line above the CTA. */
+.intro-form__closing {
+  margin: var(--s-2) 0 0;
+  color: var(--umber);
+  font-size: var(--fs-h3);
+  font-weight: 300;
+}
+
+/* --- Foot: the CTA and a reassuring line -------------------------------- */
+.intro-form__foot {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3);
+  margin-top: var(--s-2);
+}
+.intro-form__reassure { color: var(--umber); margin: 0; text-transform: none; letter-spacing: 0.04em; }
+.intro-form__status { color: var(--oxblood); margin: 0; }
+
+/* Honest error banner — a struck oxblood line, in voice, never a red alert box. */
+.intro-form__error {
+  margin: 0;
+  color: var(--oxblood);
+  border-left: 2px solid var(--oxblood);
+  padding-left: var(--s-3);
+}

@@ -97,6 +97,10 @@ test('isProtectedPath: protected root, nested, and assets match', () => {
     '/production-studio/voice-notes/styles.css',
     '/production-studio/voice-notes/serve.mjs',
     '/PRODUCTION-STUDIO/', // case-insensitive
+    '/editorial-office',   // second private area, same gate
+    '/editorial-office/',
+    '/editorial-office/submission-review',
+    '/EDITORIAL-OFFICE/', // case-insensitive
   ]) {
     assert.equal(isProtectedPath(p), true, `expected protected: ${p}`)
   }
@@ -112,6 +116,9 @@ test('isProtectedPath: public + lookalike routes are NOT matched', () => {
     '/production-studiox',        // boundary: extra char
     '/production-studioabc/thing',
     '/not/production-studio',     // prefix not at path start
+    '/editorial-office-notes',    // boundary: hyphen, not a slash
+    '/editorial-officex',         // boundary: extra char
+    '/artist-features',           // the PUBLIC intake page is never gated
   ]) {
     assert.equal(isProtectedPath(p), false, `expected public: ${p}`)
   }
@@ -185,7 +192,7 @@ test('bad signature (same kid, wrong key) → 403', async () => {
 
 // ── 6) A real, valid token → allowed ────────────────────────────────────────
 test('valid token → next() is called (200 passthrough)', async () => {
-  const token = await signJwt({ aud: AUD, iat: now(), exp: now() + 3600, email: 'melody@melodyrash.com' })
+  const token = await signJwt({ aud: AUD, iat: now(), exp: now() + 3600, email: 'editor@example.com' })
   const res = await run('/production-studio/voice-notes/', { headers: { 'Cf-Access-Jwt-Assertion': token } })
   assert.equal(res.status, 200)
   assert.equal(await res.text(), NEXT_BODY)

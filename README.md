@@ -58,9 +58,13 @@ routes. Future wings are built only when real content exists for them.
 
 ### Private tools (not public)
 
-- **Editorial Office** — a founder-only workspace at `/editorial-office.html`,
-  available in `npm run dev` only. It is **excluded from the production build** and
-  never deployed. See [`docs/Editorial-Office.md`](docs/Editorial-Office.md).
+- **Editorial Office** — the private editorial operations app at `/editorial-office/`
+  (Submission Review, approvals, correspondence, scheduling, accounts, Access &
+  Audit). Built and gated by Cloudflare Access. See [`docs/DEPLOY.md`](docs/DEPLOY.md).
+- **Interview Workbench** — a founder-interview authoring tool at
+  `/interview-workbench.html`, available in `npm run dev` only. It is **excluded
+  from the production build** and never deployed. See
+  [`docs/Interview-Workbench.md`](docs/Interview-Workbench.md).
 - **Production Studio** — a private hub at `/production-studio` holding the
   **Voice Notes Studio** at `/production-studio/voice-notes`. Unlike the Office it
   *is* part of the build (so it has a real URL), so it must be gated by

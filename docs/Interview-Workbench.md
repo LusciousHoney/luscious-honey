@@ -1,4 +1,4 @@
-# The Editorial Office (Sprint 1A)
+# The Interview Workbench (Sprint 1A)
 
 A private, founder-only workspace where every permanent House document begins.
 It is **not** a CMS, a blog editor, or a document manager — it is a calm,
@@ -10,7 +10,7 @@ believes before anything is written.
 - **Local, dev-only for Sprint 1A.** The Office is **excluded from the production
   build** — it is not in `vite.config.js` inputs, so `npm run build` never emits
   it and it is never deployed to a public URL.
-- Open it locally: `npm run dev`, then visit **`/editorial-office.html`**.
+- Open it locally: `npm run dev`, then visit **`/interview-workbench.html`**.
 - All data (interview answers, drafts, reflections) lives in **your browser's
   localStorage** on your machine. Nothing is synced or sent anywhere.
 - The page carries `<meta name="robots" content="noindex, nofollow">` and is
@@ -56,7 +56,7 @@ dropped in later **without changing the UI or the Founder's workflow**:
 ## Architecture
 
 ```
-editorial-office.html          Private entry (dev-only; not a build input)
+interview-workbench.html          Private entry (dev-only; not a build input)
 src/office/
   types.ts       Reusable types (a document type is just data)
   schema.ts      The 7 document schemas (stages of questions)
