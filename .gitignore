@@ -4,6 +4,15 @@ dist
 *.local
 .vite
 
+# Cloudflare local dev secrets/vars — never commit
+.dev.vars
+
+# Local Wrangler state (D1 shadow / persistence) — never commit
+.wrangler
+
+# Local agent/editor session state — never commit
+.claude
+
 # Tribute audio master — ship only the compressed .m4a the player uses, never the raw .wav
 public/tribute/**/*.wav
 

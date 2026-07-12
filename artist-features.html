@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en" data-env="development" data-tod="evening">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Artist Features — Luscious Honey Collective</title>
+    <meta
+      name="description"
+      content="An invitation for independent artists to introduce themselves to Luscious Honey Collective — for an interview, a live performance, or both."
+    />
+    <meta name="color-scheme" content="dark" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,200;0,6..72,300;1,6..72,200;1,6..72,300&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <a class="skip-link" href="#intro-form">Skip to the form</a>
+
+    <div class="container">
+      <header class="site-header">
+        <span class="wordmark">Luscious&nbsp;Honey <b>Collective</b></span>
+        <span class="label" aria-hidden="true">Artist Features</span>
+      </header>
+    </div>
+
+    <main id="main">
+      <section class="wing-hero" aria-labelledby="feature-title">
+        <div class="container">
+          <p class="wing-hero__eyebrow label">Artist Features</p>
+          <h1 id="feature-title" class="wing-hero__title">Introduce yourself.</h1>
+          <p class="wing-hero__intro">
+            I’d love to learn more about your work and what you’re creating. Tell
+            me who you are and what you’re working on — this is simply an
+            introduction, the first note before we talk.
+          </p>
+        </div>
+      </section>
+
+      <section class="feature-body">
+        <div class="container feature-layout">
+          <form
+            id="intro-form"
+            class="intro-form plate brass-edge"
+            action="/api/intake/artist-feature"
+            method="post"
+            novalidate
+          >
+            <p class="intro-form__lede editorial">
+              A few details to start. There are no wrong answers, and nothing here
+              is a test — I read every note myself.
+            </p>
+
+            <p class="intro-form__error editorial" id="form-error" role="alert" hidden></p>
+
+            <div class="field">
+              <label class="field__label label" for="artist-name">Artist / Stage Name</label>
+              <input
+                class="field__input"
+                id="artist-name"
+                name="Artist / Stage Name"
+                type="text"
+                autocomplete="off"
+                required
+              />
+            </div>
+
+            <div class="field">
+              <label class="field__label label" for="artist-email">Email Address</label>
+              <input
+                class="field__input"
+                id="artist-email"
+                name="Email"
+                type="email"
+                autocomplete="email"
+                inputmode="email"
+                required
+              />
+            </div>
+
+            <div class="field">
+              <label class="field__label label" for="artist-music">Where can I hear your music?</label>
+              <p class="field__help" id="music-help">A streaming link — Spotify, Apple Music, Bandcamp, SoundCloud.</p>
+              <input
+                class="field__input"
+                id="artist-music"
+                name="Where can I hear your music"
+                type="url"
+                placeholder="https://"
+                inputmode="url"
+                aria-describedby="music-help"
+                required
+              />
+            </div>
+
+            <div class="field">
+              <label class="field__label label" for="artist-social">Social Media</label>
+              <p class="field__help" id="social-help">Instagram, TikTok, or wherever you’re most active.</p>
+              <input
+                class="field__input"
+                id="artist-social"
+                name="Social Media"
+                type="text"
+                autocomplete="off"
+                aria-describedby="social-help"
+              />
+            </div>
+
+            <fieldset class="field field--choice">
+              <legend class="field__label label">What are you interested in?</legend>
+              <div class="choice-row">
+                <label class="choice">
+                  <input class="choice__input" type="radio" name="Interested in" value="Interview" required />
+                  <span class="choice__face">Interview</span>
+                </label>
+                <label class="choice">
+                  <input class="choice__input" type="radio" name="Interested in" value="Live Performance" />
+                  <span class="choice__face">Live Performance</span>
+                </label>
+                <label class="choice">
+                  <input class="choice__input" type="radio" name="Interested in" value="Interview + Live Performance" />
+                  <span class="choice__face">Interview + Live Performance</span>
+                </label>
+              </div>
+            </fieldset>
+
+            <div class="field">
+              <label class="field__label label" for="artist-promoting">Tell me about what you’re promoting right now.</label>
+              <textarea
+                class="field__input office-textarea"
+                id="artist-promoting"
+                name="What you're promoting"
+                rows="4"
+                required
+              ></textarea>
+            </div>
+
+            <div class="field">
+              <label class="field__label label" for="artist-notes">
+                Anything you’d like me to know before we talk?
+                <span class="field__optional">Optional</span>
+              </label>
+              <textarea
+                class="field__input office-textarea"
+                id="artist-notes"
+                name="Anything else"
+                rows="3"
+              ></textarea>
+            </div>
+
+            <!-- Anti-bot honeypot. Not a real field: hidden from people and
+                 assistive tech, never focusable. Real artists leave it empty;
+                 automated spam that fills it is silently discarded server-side. -->
+            <div class="hp-field" aria-hidden="true" style="position:absolute!important;left:-9999px!important;top:auto;width:1px;height:1px;overflow:hidden;">
+              <label for="artist-company">Company</label>
+              <input id="artist-company" name="Company" type="text" tabindex="-1" autocomplete="off" />
+            </div>
+
+            <p class="intro-form__closing editorial">Every feature begins with a conversation.</p>
+
+            <div class="intro-form__foot">
+              <button class="button" type="submit">Send to the Editor</button>
+              <p class="intro-form__reassure meta">Your note goes directly to the editor’s desk. I read every submission myself.</p>
+            </div>
+
+            <p class="intro-form__status editorial" id="form-status" role="status" aria-live="polite" hidden></p>
+          </form>
+        </div>
+      </section>
+
+      <div class="container back-line">
+        <a href="/">← Back to the House</a>
+      </div>
+    </main>
+
+    <footer class="colophon">
+      <div class="container">
+        <p class="wordmark">Luscious Honey Collective</p>
+        <p class="meta">A house for storytellers · MMXXVI</p>
+      </div>
+    </footer>
+
+    <script type="module" src="/src/artist-features.ts"></script>
+  </body>
+</html>

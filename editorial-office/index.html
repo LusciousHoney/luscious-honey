@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en" data-env="development" data-tod="evening">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Editorial Office — Luscious Honey Collective (private)</title>
+    <meta name="description" content="Editorial operations for Luscious Honey Collective — submission review and correspondence." />
+    <!-- Private, founder-only. Never indexed; the real gate is Cloudflare
+         Access on /editorial-office* — see docs/DEPLOY.md. -->
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,200;0,6..72,300;1,6..72,200;1,6..72,300&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to the submissions</a>
+
+    <div class="container">
+      <header class="site-header">
+        <span class="wordmark">Luscious&nbsp;Honey <b>Collective</b></span>
+        <span class="label" aria-hidden="true">Editorial Office · private</span>
+      </header>
+    </div>
+
+    <main id="main" class="reader-page">
+      <div class="container back-line">
+        <a href="/">← Back to the corridor</a>
+      </div>
+
+      <div class="container">
+        <p class="metaline">
+          <span class="label">Editorial Office</span>
+          <span class="meta">Private · Submission Review</span>
+        </p>
+        <h1 class="subs__title">Submission Review</h1>
+
+        <!-- One review queue for every submission type. Filter by type (Artist
+             Features is the first) and by editorial status. -->
+        <div class="subs__filters" id="subs-typefilters" role="group" aria-label="Filter by submission type"></div>
+        <div class="subs__filters" id="subs-filters" role="group" aria-label="Filter by status"></div>
+
+        <div id="subs-list" class="subs__list" aria-live="polite">
+          <p class="empty-state">Loading…</p>
+        </div>
+      </div>
+    </main>
+
+    <footer class="colophon">
+      <div class="container">
+        <p class="wordmark">Luscious Honey Collective</p>
+        <p class="meta">A house for storytellers · MMXXVI</p>
+      </div>
+    </footer>
+
+    <script type="module" src="/src/editorial-office.ts"></script>
+  </body>
+</html>

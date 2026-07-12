@@ -22,17 +22,20 @@
 
 import { verifyAccessRequest } from './_lib/access.js'
 
-const PREFIX = '/production-studio'
+// The private institutional areas, both gated by the SAME Cloudflare Access
+// infrastructure. Production Studio (creative production tools) and Editorial
+// Office (editorial operations) are separate surfaces sharing one gate.
+const PREFIXES = ['/production-studio', '/editorial-office']
 
 /**
- * Boundary-safe prefix test. Protects `/production-studio`,
- * `/production-studio/`, and `/production-studio/<anything>` — but NOT lookalike
- * public routes such as `/production-studio-notes` or `/production-studiox`.
- * Trailing slashes are normalized so `/production-studio/` matches the bare form.
+ * Boundary-safe prefix test. Protects each prefix exactly — e.g.
+ * `/editorial-office`, `/editorial-office/`, and `/editorial-office/<anything>`
+ * — but NOT lookalike public routes such as `/editorial-office-notes` or
+ * `/editorial-officex`. Trailing slashes are normalized so the bare form matches.
  */
 export function isProtectedPath(pathname) {
   const p = (String(pathname || '').replace(/\/+$/, '') || '/').toLowerCase()
-  return p === PREFIX || p.startsWith(PREFIX + '/')
+  return PREFIXES.some((prefix) => p === prefix || p.startsWith(prefix + '/'))
 }
 
 function deny(reason) {
@@ -68,6 +71,12 @@ export async function onRequest(context) {
   const access = await verifyAccessRequest(request, env)
 
   if (!access.configured) {
+    // Access not configured for this deployment. Locally — and only locally,
+    // where the gitignored .dev.vars sets LHC_LOCAL_DEV=true — allow the private
+    // pages to be developed and previewed. In production Access IS configured,
+    // so access.configured is true and this affordance never runs. Mirrors the
+    // identical local-dev bypass in functions/api/submissions.js.
+    if (env.LHC_LOCAL_DEV === 'true') return next()
     // ACCESS_TEAM_DOMAIN / ACCESS_AUD not set for this deployment → deny.
     return deny('Cloudflare Access is not configured for this deployment.')
   }
