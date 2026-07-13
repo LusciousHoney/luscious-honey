@@ -38,6 +38,12 @@ database_id = "8df865d4-a6ba-429d-8f2f-76001c3de294"
 # Preview scope (below) is defined independently and is unaffected.
 [vars]
 EMAIL_FROM = "Luscious Honey Collective <editorial@luscioushoneycollective.com>"
+# Production Cloudflare Access verifier config. The existing self-hosted Access
+# application "Production Studio (private)" protects /production-studio* and
+# /editorial-office* on the custom domain; the middleware verifies JWTs against
+# these. Non-secret identifiers (team subdomain + Access app audience tag).
+ACCESS_TEAM_DOMAIN = "late-rain-ce05.cloudflareaccess.com"
+ACCESS_AUD = "c6e2468653cbba2cdeff5f44a8bb7be24739ace96742ac099a1334640d183794"
 
 # --- Cloudflare Access verifier config — PREVIEW ONLY ------------------------
 # The middleware verifies Access JWTs against these. They are set ONLY for the
