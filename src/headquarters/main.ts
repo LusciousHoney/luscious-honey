@@ -31,6 +31,7 @@ import {
   inlineActions, STATUS_LABELS,
   type SubmissionDetail, type SubmissionStatus,
 } from './adapters.ts';
+import { operationsFlow, type OperationsFlow } from './operations.ts';
 
 /* --- small helpers ------------------------------------------------------- */
 
@@ -310,6 +311,138 @@ function renderEmptyState(room: Room): HTMLElement {
       `The ${room.name} is reserved. It will open when there is real work for it to hold — the residence does not furnish empty rooms.`,
     ),
   );
+}
+
+/* =============================================================================
+   OPERATIONS OFFICE — the flow view (Milestone 4).
+
+   Route: #/operations. A DIFFERENT room from the Executive Office: not another
+   inbox and not a decision surface, but the room of alignment — "is the House's
+   work flowing well, and what is stalling?". One architectural object: an
+   operations board on the wall (a calm standup/plans board) showing the pipeline
+   of work across stages, the longest wait, an in-motion/resolved summary, and a
+   single quiet routing line into the Founder's Desk where decisions are made.
+
+   It reads only the EXISTING Daily Briefing (GET /api/headquarters/briefing) and
+   shapes it with the pure `operationsFlow` helper. No submission rows, no detail,
+   no correspondence, no decision controls, no writes — those live at the Desk /
+   Editorial Office. Operations summarises and escalates; it never re-decides here.
+   ============================================================================= */
+function renderOperations(root: HTMLElement, room: Room): void {
+  setMode('seated');
+
+  // The board arrives asynchronously; the room reads completely before it does.
+  const board = el('div', { class: 'hq-board', 'aria-label': 'The flow of the House’s work', 'aria-busy': 'true' },
+    el('p', { class: 'hq-state__lede' }, 'Reading the board…'));
+
+  const view = el(
+    'section',
+    { class: 'hq-view hq-view--seated hq-view--operations', 'aria-label': room.name },
+    el(
+      'div',
+      { class: 'hq-view__inner container' },
+      el(
+        'div',
+        { class: 'hq-seated__bar' },
+        el('a', { class: 'hq-back', href: getRoom(HOME_ROOM)!.route }, '← Return to the Executive Office'),
+        renderRail(room.id),
+      ),
+      el(
+        'header',
+        { class: 'hq-seated__head' },
+        el('p', { class: 'hq-eyebrow label' }, room.name),
+        el('h1', { class: 'hq-title hq-title--seated' }, room.name),
+        el('p', { class: 'hq-lede' }, 'The flow of the House’s work — where it sits, and what is waiting. Decisions are made at the Founder’s Desk; this is the room that keeps them in view.'),
+      ),
+      board,
+    ),
+  );
+
+  root.replaceChildren(view);
+  void mountOperationsBoard(board);
+}
+
+/**
+ * Fill the operations board from the submissions spine. Honest states — loading /
+ * offline / error / empty — never a fabricated dashboard. On success: the pipeline
+ * as ordered lanes with counts, an in-motion/resolved summary, the longest wait,
+ * and one routing line to the Desk. Observational only; nothing here is a control.
+ */
+async function mountOperationsBoard(host: HTMLElement): Promise<void> {
+  const res = await fetchBriefing();
+  host.setAttribute('aria-busy', 'false');
+
+  if (!res.ok) {
+    host.replaceChildren(deskState(
+      res.offline ? 'The board is offline' : 'The board couldn’t load',
+      res.offline ? 'Your work is safe — try again in a moment.' : res.error,
+    ));
+    return;
+  }
+
+  const flow = operationsFlow(res.data);
+
+  // Nothing has moved through the House yet — stay honestly empty (House P11: no
+  // faked activity), not a grid of zeroes.
+  if (flow.total === 0) {
+    host.replaceChildren(deskState(
+      'The board is quiet',
+      'No work is in the House yet. As submissions arrive and move, the pipeline will fill in here — you’ll see the flow at a glance.',
+    ));
+    return;
+  }
+
+  host.replaceChildren(operationsBoard(flow));
+}
+
+/** The board itself, as furniture: a header summary, the stage lanes, and a foot
+    with the longest wait and the single routing line to the Desk. */
+function operationsBoard(flow: OperationsFlow): HTMLElement {
+  const summary =
+    flow.inMotion === 0
+      ? 'All at rest — nothing in motion just now.'
+      : `${flow.inMotion} in motion · ${flow.resolved} at rest`;
+
+  const head = el('div', { class: 'hq-board__head' },
+    el('p', { class: 'hq-board__eyebrow label' }, 'The House today'),
+    el('p', { class: 'hq-board__summary' }, summary));
+
+  // The pipeline as an ORDERED list of lanes (flow reads left → right). The lanes
+  // are observational — no lane is a button; the only action is the routing line.
+  const stages = el('ol', { class: 'hq-board__stages' });
+  for (const s of flow.stages) {
+    const lane = el('li', {
+      class: 'hq-board__stage', 'data-stage': s.id,
+      ...(s.id === flow.busiestId && s.count > 0 ? { 'data-busiest': 'true' } : {}),
+    },
+      el('span', { class: 'hq-board__count' }, String(s.count)),
+      el('span', { class: 'hq-board__label' }, s.label),
+      el('span', { class: 'hq-board__note' }, s.note),
+    );
+    stages.append(lane);
+  }
+
+  // The foot: the longest wait (the one stall worth naming), then the routing line.
+  const foot = el('div', { class: 'hq-board__foot' });
+  if (flow.oldest) {
+    const days = flow.oldest.waitingDays && flow.oldest.waitingDays > 0
+      ? `, ${flow.oldest.waitingDays} day${flow.oldest.waitingDays === 1 ? '' : 's'}` : '';
+    foot.append(el('p', { class: 'hq-board__wait' }, `Waiting longest: ${flow.oldest.name}${days}`));
+  } else {
+    foot.append(el('p', { class: 'hq-board__wait hq-board__wait--calm' }, 'Nothing is waiting on you.'));
+  }
+
+  const deskRoute = `${getRoom(HOME_ROOM)!.route}/desk`;
+  foot.append(
+    flow.awaiting > 0
+      ? el('a', { class: 'hq-board__route', href: deskRoute },
+          `${flow.awaiting} awaiting a decision → Go to the Founder’s Desk`)
+      : el('a', { class: 'hq-board__route hq-board__route--quiet', href: deskRoute },
+          'Open the Founder’s Desk →'),
+  );
+
+  return el('div', { class: 'hq-board__inner', role: 'group', 'aria-label': 'Operations board' },
+    head, stages, foot);
 }
 
 /** ERROR — an unrecognised route. Offers the way home rather than a dead end. */
@@ -719,6 +852,11 @@ function route(): void {
     // The Executive Office has a seated work state: the Founder’s Desk.
     if (room.id === HOME_ROOM && subSegment() === 'desk') renderDesk(root);
     else renderScene(root);
+  } else if (room.id === 'operations') {
+    // The Operations Office is the first department with a real, room-first
+    // purpose — the flow view over the spine. Every other live department keeps
+    // the generic seated placeholder until its own milestone.
+    renderOperations(root, room);
   } else {
     renderSeated(root, room);
   }
@@ -745,5 +883,5 @@ if (document.readyState === 'loading') {
 }
 
 // Re-exported for tests and future milestones (kept off the module's happy path).
-export { renderScene, renderSeated, renderError, renderAccessDenied };
+export { renderScene, renderSeated, renderOperations, renderError, renderAccessDenied };
 export type { Room, RoomId };
