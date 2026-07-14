@@ -1,88 +1,441 @@
 /* =============================================================================
-   INTAKE REVIEW — styling for the TEMPORARY submission-services test harness.
-   Reuses House primitives (.plate, .brass-edge, .label/.meta). Deliberately
-   plain; the canonical Editorial Office UI will supply the real workspace.
+   EDITORIAL OFFICE — the editorial floor. Scoped presentation.
+
+   The APPROVED dark Office identity is preserved: this is the private, back-of-
+   house editorial floor, not a light workspace. What changes is the material
+   language — warm walnut, limestone, linen, white oak, and brass in trace —
+   layered over the dark environment so the Office reads as the editorial floor
+   of a luxury publishing house rather than an admin dashboard.
+
+   All colour/material values here are Office-scoped custom properties under
+   `.office-page` — the global design system (tokens.css) is NOT modified. Type,
+   spacing, and motion come from the locked global tokens.
    ============================================================================= */
 
-.temp-banner {
-  font-family: var(--mono); font-size: var(--fs-meta); line-height: 1.6;
-  letter-spacing: 0.04em; color: var(--ink);
-  background: var(--brass-hi); border: 1px solid var(--brass);
-  padding: var(--s-2) var(--s-3); margin-bottom: var(--s-5);
+.office-page {
+  /* --- Materials (dark floor · warm surfaces) ---------------------------- */
+  --office-floor:    #14100C; /* deep walnut-black — the floor of the office */
+  --office-panel:    #1E1712; /* walnut panel surface */
+  --office-panel-2:  #271D16; /* raised walnut (menus, inputs) */
+  --office-limestone:#ECE4D6; /* primary light text (warm limestone) */
+  --office-linen:    #C7BCA9; /* secondary text (linen) */
+  --office-oak:      #C9A26B; /* white-oak / warm accent edge */
+  --office-brass:    #B08A4F;
+  --office-brass-hi: #D3B072;
+  --office-terra:    #C06B44; /* attention — within the warm family */
+
+  --office-line:      1px solid rgba(211, 176, 114, 0.18); /* brass hairline */
+  --office-line-soft: 1px solid rgba(236, 228, 214, 0.08);
+  --office-glow:      0 0 40px -14px rgba(176, 138, 79, 0.55);
+  --office-plate:     0 24px 70px -46px rgba(0, 0, 0, 0.8);
+
+  background: var(--office-floor);
+  color: var(--office-limestone);
+  min-height: 100vh;
 }
-.temp-banner code { font-family: var(--mono); background: rgba(0,0,0,0.08); padding: 0 4px; }
 
-.subs__title { font-size: var(--fs-h1); font-weight: 200; margin: var(--s-2) 0 var(--s-4); }
+/* Shared masthead + colophon, warmed for the floor. */
+.office-page .site-header,
+.office-page .office,
+.office-page .colophon { position: relative; z-index: 1; }
+.office-page .office-masthead { border-bottom: var(--office-line); padding-bottom: var(--s-2); }
+.office-page .site-header .wordmark,
+.office-page .colophon .wordmark { color: var(--office-limestone); }
+.office-page .site-header .label,
+.office-page .colophon .meta { color: var(--office-linen); }
+.office-page .colophon { border-top: var(--office-line); }
+.office-page .skip-link { color: var(--office-limestone); }
 
-.subs__filters { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-bottom: var(--s-5); }
-.subs__filter {
-  font-family: var(--sans); font-size: var(--fs-label); font-weight: 600;
-  letter-spacing: var(--tracking-label); text-transform: uppercase;
-  color: var(--plaster); background: transparent;
-  border: 1px solid rgba(var(--alabaster-rgb), 0.2); border-radius: var(--radius);
-  min-height: 40px; padding: 8px 14px; cursor: pointer;
+.office { padding-block: var(--s-4) var(--s-8); }
+.office-app { animation: eo-fade var(--motion-quick) var(--ease-settle) both; }
+@keyframes eo-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* --- shared editorial type ----------------------------------------------- */
+.eo-eyebrow { color: var(--office-oak); }
+.eo-title {
+  font-family: var(--serif);
+  font-weight: 200;
+  font-size: var(--fs-h1);
+  line-height: var(--leading-tight);
+  margin: var(--s-1) 0 0;
+  color: var(--office-limestone);
+}
+.eo-link { color: var(--office-brass-hi); text-underline-offset: 3px; }
+.eo-link:hover { color: var(--office-oak); }
+.eo-muted { color: var(--office-linen); opacity: 0.7; }
+
+/* --- top view nav -------------------------------------------------------- */
+.eo-nav {
+  display: flex;
+  gap: var(--s-4);
+  align-items: baseline;
+  border-bottom: var(--office-line-soft);
+  padding-bottom: var(--s-2);
+  margin-bottom: var(--s-5);
+}
+.eo-nav__link {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: var(--fs-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--office-linen);
+  text-decoration: none;
+  padding-bottom: 6px;
+  border-bottom: 2px solid transparent;
   transition: color var(--motion-quick) var(--ease-settle), border-color var(--motion-quick) var(--ease-settle);
 }
-.subs__filter:hover { border-color: var(--brass); color: var(--brass-hi); }
-.subs__filter.is-active { color: var(--ink); background: var(--brass-hi); border-color: var(--brass); }
+.eo-nav__link:hover { color: var(--office-limestone); }
+.eo-nav__link.is-active { color: var(--office-brass-hi); border-bottom-color: var(--office-brass); }
 
-.subs__list { display: grid; gap: var(--s-4); padding-bottom: var(--s-8); }
-.subs__card { padding: var(--s-4); display: grid; gap: var(--s-3); }
-.subs__head { display: flex; flex-wrap: wrap; gap: var(--s-3); justify-content: space-between; align-items: start; }
-.subs__name { font-size: var(--fs-h3); font-weight: 300; margin: 0; color: var(--ink); }
-.subs__meta { margin: 4px 0 0; color: var(--umber); }
-.subs__statuswrap { display: grid; gap: var(--s-1); justify-items: end; }
-.subs__status {
-  font-family: var(--sans); font-size: var(--fs-body-sm);
-  color: var(--ink); background: var(--surface-plate-2);
-  border: var(--hairline); border-radius: var(--radius);
-  padding: 8px 10px; min-height: 40px; cursor: pointer;
+/* =============================================================================
+   STATUS CHIP — the shared workflow status, read at a glance.
+   ============================================================================= */
+.ochip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: var(--fs-meta);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
 }
-.subs__status:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.subs__badge {
-  font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: var(--tracking-meta);
-  text-transform: uppercase; padding: 3px 8px;
-  border: 1px solid rgba(var(--ink-rgb), 0.2); color: var(--umber);
+.ochip::before {
+  content: '';
+  width: 6px; height: 6px;
+  background: currentColor;
+  border-radius: 50%;
+  flex: none;
 }
+.ochip[data-tone='neutral']   { color: var(--office-linen); }
+.ochip[data-tone='active']    { color: var(--office-brass); }
+.ochip[data-tone='attention'] { color: var(--office-terra); }
+.ochip[data-tone='go']        { color: var(--office-brass-hi); }
 
-.subs__fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--s-3); margin: 0; }
-.subs__fields > div { margin: 0; }
-.subs__fields dt {
+/* =============================================================================
+   DASHBOARD — the daily briefing.
+   ============================================================================= */
+.eo-dash__head { margin-bottom: var(--s-5); display: grid; gap: var(--s-1); }
+.eo-dash__lede,
+.eo-review__lede { font-family: var(--serif); font-style: italic; color: var(--office-linen); margin: var(--s-2) 0 0; max-width: 58ch; }
+
+.eo-briefing {
+  display: grid;
+  gap: var(--s-4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+}
+.eo-section {
+  background: var(--office-panel);
+  border: var(--office-line-soft);
+  border-top: 2px solid var(--office-oak);
+  padding: var(--s-4);
+  display: grid;
+  gap: var(--s-3);
+  align-content: start;
+}
+.eo-section__head { display: grid; gap: 4px; }
+.eo-section__title {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: var(--fs-h3);
+  color: var(--office-limestone);
+  margin: 0;
+  display: flex; align-items: baseline; gap: var(--s-2);
+}
+.eo-section__count {
+  font-family: var(--mono);
+  font-size: var(--fs-body-sm);
+  color: var(--office-brass-hi);
+}
+.eo-section__note { font-family: var(--sans); font-size: var(--fs-meta); color: var(--office-linen); margin: 0; letter-spacing: 0.02em; }
+.eo-section__empty { font-family: var(--serif); font-style: italic; color: var(--office-linen); opacity: 0.7; margin: 0; }
+.eo-section__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.eo-section__all {
   font-family: var(--sans); font-weight: 600; font-size: var(--fs-meta);
-  letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--umber); margin-bottom: 2px;
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--office-brass); text-decoration: none; justify-self: start;
 }
-.subs__fields dd { margin: 0; color: var(--ink); font-family: var(--serif); }
-.subs__muted { color: var(--plaster); }
-.subs__card a { color: var(--oxblood); }
+.eo-section__all:hover { color: var(--office-brass-hi); }
+
+/* Briefing row (also a template for compact lists) */
+.eo-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--s-2);
+  align-items: center;
+  padding: var(--s-2);
+  text-decoration: none;
+  color: inherit;
+  border: 1px solid transparent;
+  transition: background var(--motion-quick) var(--ease-settle), border-color var(--motion-quick) var(--ease-settle);
+}
+.eo-item:hover,
+.eo-item:focus-visible { background: var(--office-panel-2); border-color: rgba(211,176,114,0.2); outline: none; }
+.eo-item__monogram,
+.eo-card__monogram,
+.eo-crest {
+  font-family: var(--serif);
+  font-weight: 300;
+  color: var(--office-oak);
+  background: linear-gradient(160deg, var(--office-panel-2), var(--office-panel));
+  border: 1px solid rgba(201,162,107,0.28);
+  display: grid; place-items: center;
+}
+.eo-item__monogram { width: 38px; height: 38px; font-size: 0.95rem; }
+.eo-item__body { display: grid; gap: 1px; min-width: 0; }
+.eo-item__name { font-family: var(--serif); font-size: var(--fs-body); color: var(--office-limestone); }
+.eo-item__summary { font-family: var(--serif); font-style: italic; font-size: var(--fs-body-sm); color: var(--office-linen); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eo-item__meta { font-family: var(--mono); font-size: var(--fs-meta); color: var(--office-linen); opacity: 0.75; letter-spacing: 0.06em; }
+
+/* =============================================================================
+   REVIEW — the refined queue.
+   ============================================================================= */
+.eo-review__head { margin-bottom: var(--s-4); display: grid; gap: var(--s-1); }
+.eo-filters { display: flex; flex-wrap: wrap; gap: var(--s-1); align-items: center; margin-bottom: var(--s-2); }
+.eo-filters:last-of-type { margin-bottom: var(--s-5); }
+.eo-filters__label { color: var(--office-linen); margin-right: var(--s-2); }
+.eo-filter {
+  font-family: var(--sans);
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--office-linen);
+  text-decoration: none;
+  padding: 7px 13px;
+  min-height: 34px;
+  display: inline-flex; align-items: center;
+  border: 1px solid rgba(236,228,214,0.14);
+  transition: color var(--motion-quick) var(--ease-settle), border-color var(--motion-quick) var(--ease-settle), background var(--motion-quick) var(--ease-settle);
+}
+.eo-filter:hover { color: var(--office-limestone); border-color: var(--office-brass); }
+.eo-filter.is-active { color: var(--office-floor); background: var(--office-brass-hi); border-color: var(--office-brass-hi); }
+
+.eo-list { display: grid; gap: var(--s-2); padding-bottom: var(--s-6); }
+.eo-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--s-3);
+  background: var(--office-panel);
+  border: var(--office-line-soft);
+  border-left: 2px solid var(--office-oak);
+  padding: var(--s-3) var(--s-4);
+  transition: border-color var(--motion-quick) var(--ease-settle), box-shadow var(--motion-quick) var(--ease-settle), transform var(--motion-quick) var(--ease-settle);
+}
+.eo-card:hover { border-left-color: var(--office-brass-hi); box-shadow: var(--office-glow); }
+.eo-card__monogram { width: 52px; height: 52px; font-size: 1.15rem; }
+.eo-card__main { display: grid; gap: var(--s-2); min-width: 0; }
+.eo-card__head { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-3); justify-content: space-between; align-items: start; }
+.eo-card__name { margin: 0; font-family: var(--serif); font-weight: 300; font-size: var(--fs-h3); }
+.eo-card__open { color: var(--office-limestone); text-decoration: none; }
+.eo-card__open:hover { color: var(--office-brass-hi); }
+.eo-card__meta { font-family: var(--mono); font-size: var(--fs-meta); color: var(--office-linen); opacity: 0.8; letter-spacing: 0.06em; margin: 3px 0 0; }
+.eo-card__summary { font-family: var(--serif); font-style: italic; color: var(--office-linen); margin: 0; }
+.eo-card__foot { display: flex; }
+.eo-card__review { font-family: var(--sans); font-weight: 600; font-size: var(--fs-meta); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--office-brass); text-decoration: none; }
+.eo-card__review:hover { color: var(--office-brass-hi); }
+
+/* =============================================================================
+   STATUS CONTROL — an elegant disclosure menu replacing the raw <select>.
+   Native <details> gives keyboard + Esc handling for free. Any→any transition
+   preserved (the backend still authorises the change).
+   ============================================================================= */
+.ostatus { position: relative; }
+.ostatus__current {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.ostatus__current::-webkit-details-marker { display: none; }
+.ostatus__caret { color: var(--office-linen); font-size: 0.7rem; transition: transform var(--motion-quick) var(--ease-settle); }
+.ostatus[open] .ostatus__caret { transform: rotate(180deg); }
+.ostatus__current:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.ostatus__menu {
+  position: absolute;
+  right: 0;
+  z-index: var(--z-nav);
+  margin-top: var(--s-1);
+  min-width: 208px;
+  background: var(--office-panel-2);
+  border: var(--office-line);
+  box-shadow: var(--office-plate);
+  padding: var(--s-1);
+  display: grid;
+  gap: 2px;
+}
+.ostatus__menulabel {
+  font-family: var(--sans); font-weight: 600; font-size: var(--fs-meta);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--office-linen); margin: 4px 8px 6px;
+}
+.ostatus__opt {
+  display: flex; align-items: center;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  padding: 7px 8px;
+  cursor: pointer;
+  text-align: left;
+}
+.ostatus__opt:hover,
+.ostatus__opt:focus-visible { background: var(--office-panel); outline: none; }
+.ostatus__opt[aria-current='true'] { background: rgba(211,176,114,0.1); }
+
+/* =============================================================================
+   DETAIL — the full editorial reading experience.
+   ============================================================================= */
+.eo-detail { display: grid; gap: var(--s-4); max-width: var(--w-max); }
+.eo-back {
+  font-family: var(--sans); font-weight: 600; font-size: var(--fs-label);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--office-brass); text-decoration: none; justify-self: start;
+}
+.eo-back:hover { color: var(--office-brass-hi); }
+
+.eo-detail__header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--s-3) var(--s-4);
+  align-items: center;
+  padding-bottom: var(--s-4);
+  border-bottom: var(--office-line);
+}
+.eo-crest { width: 76px; height: 76px; font-size: 1.7rem; }
+.eo-detail__ident { display: grid; gap: 4px; min-width: 0; }
+.eo-detail__name { font-size: var(--fs-h1); }
+.eo-detail__meta { font-family: var(--sans); font-size: var(--fs-body-sm); color: var(--office-linen); margin: 2px 0 0; }
+.eo-detail__status { align-self: start; }
+
+/* Editorial Status — workflow progress (branch + terminal aware) */
+.eo-flow { display: grid; gap: var(--s-3); }
+.eo-flow__line { font-family: var(--serif); font-style: italic; font-size: var(--fs-body); color: var(--office-limestone); margin: 0; }
+.eo-flow__path { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-1) var(--s-3); }
+.eo-flow__step {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--office-linen); opacity: 0.5;
+}
+/* Connector between positive-path steps (skipped before branch/terminal nodes). */
+.eo-flow__step + .eo-flow__step:not(.eo-flow__step--branch):not(.eo-flow__step--terminal)::before {
+  content: ''; width: 18px; height: 1px; background: rgba(236,228,214,0.18); margin-right: 8px;
+}
+.eo-flow__dot { width: 8px; height: 8px; border: 1px solid var(--office-linen); border-radius: 50%; flex: none; }
+.eo-flow__step.is-done { opacity: 1; color: var(--office-brass); }
+.eo-flow__step.is-done .eo-flow__dot { background: var(--office-brass); border-color: var(--office-brass); }
+.eo-flow__step.is-current { color: var(--office-brass-hi); opacity: 1; }
+.eo-flow__step.is-current .eo-flow__dot { background: var(--office-brass-hi); border-color: var(--office-brass-hi); box-shadow: 0 0 0 4px rgba(211,176,114,0.15); }
+/* changes_requested — a branch that returns to review */
+.eo-flow__step--branch { color: var(--office-terra); opacity: 1; }
+.eo-flow__step--branch .eo-flow__dot { background: var(--office-terra); border-color: var(--office-terra); box-shadow: 0 0 0 4px rgba(192,107,68,0.16); }
+.eo-flow__aside { text-transform: none; letter-spacing: 0.02em; color: var(--office-terra); opacity: 0.85; margin-left: 6px; }
+/* not_accepted — a terminal outcome */
+.eo-flow__step--terminal { color: var(--office-terra); opacity: 1; }
+.eo-flow__step--terminal .eo-flow__dot { background: transparent; border-color: var(--office-terra); position: relative; }
+.eo-flow__step--terminal .eo-flow__dot::after {
+  content: ''; position: absolute; inset: 1px; background: var(--office-terra);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); opacity: 0.9; border-radius: 50%;
+}
+
+.eo-detail__grid { display: grid; grid-template-columns: 1fr; gap: var(--s-4); }
+@media (min-width: 900px) {
+  .eo-detail__grid { grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); align-items: start; }
+}
+.eo-detail__col { display: grid; gap: var(--s-4); min-width: 0; }
+
+.eo-panel {
+  background: var(--office-panel);
+  border: var(--office-line-soft);
+  padding: var(--s-4);
+}
+.eo-subhead {
+  font-family: var(--sans); font-weight: 600; font-size: var(--fs-label);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--office-oak); margin: 0 0 var(--s-3);
+}
+
+.eo-responses { display: grid; gap: var(--s-3); margin: 0; }
+.eo-field { display: grid; gap: 4px; margin: 0; }
+.eo-field dt {
+  font-family: var(--sans); font-weight: 600; font-size: var(--fs-meta);
+  letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--office-linen);
+}
+.eo-field dd { margin: 0; font-family: var(--serif); font-size: var(--fs-body); color: var(--office-limestone); line-height: var(--leading-body); }
+.eo-listen { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-2); }
+.eo-listen__label {
+  font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--office-linen); border: 1px solid rgba(236,228,214,0.14); padding: 2px 8px;
+}
+
+/* Correspondence + audit */
+.eo-thread { display: grid; gap: var(--s-4); }
+@media (min-width: 640px) { .eo-thread { grid-template-columns: 1fr 1fr; } }
+.eo-thread__col { background: var(--office-panel); border: var(--office-line-soft); padding: var(--s-4); }
+.eo-msgs, .eo-events { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); }
+.eo-msg { border-left: 2px solid var(--office-brass); padding-left: var(--s-2); }
+.eo-msg__meta { font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.06em; color: var(--office-linen); opacity: 0.8; margin: 0 0 3px; }
+.eo-msg__body { font-family: var(--serif); font-size: var(--fs-body-sm); color: var(--office-limestone); margin: 0; }
+.eo-msg__err { font-family: var(--mono); font-size: var(--fs-meta); color: var(--office-terra); margin: 3px 0 0; }
+.eo-event { display: grid; gap: 1px; padding-bottom: var(--s-1); border-bottom: var(--office-line-soft); }
+.eo-event:last-child { border-bottom: 0; }
+.eo-event__when { font-family: var(--mono); font-size: var(--fs-meta); color: var(--office-oak); letter-spacing: 0.06em; }
+.eo-event__what { font-family: var(--serif); font-size: var(--fs-body-sm); color: var(--office-linen); }
 
 /* Internal note */
-.subs__note { border-top: var(--hairline); padding-top: var(--s-3); display: grid; gap: var(--s-1); }
-.subs__notelabel {
-  font-family: var(--sans); font-weight: 600; font-size: var(--fs-meta);
-  letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--umber);
+.eo-notes { display: grid; gap: var(--s-2); }
+.eo-notes__hint { font-family: var(--sans); font-weight: 400; text-transform: none; letter-spacing: 0.01em; color: var(--office-linen); opacity: 0.7; }
+.eo-notes__row { display: grid; gap: var(--s-2); }
+.eo-notes__input {
+  font-family: var(--serif); font-size: var(--fs-body-sm); color: var(--office-limestone);
+  background: var(--office-panel-2); border: var(--office-line-soft); padding: 11px var(--s-2); min-height: 44px;
 }
-.subs__notehint { font-weight: 400; text-transform: none; letter-spacing: 0.02em; color: var(--plaster); }
-.subs__noterow { display: flex; gap: var(--s-2); flex-wrap: wrap; }
-.subs__noteinput {
-  flex: 1; min-width: 12ch;
-  font-family: var(--serif); font-size: var(--fs-body-sm); color: var(--ink);
-  background: var(--surface-plate-2); border: var(--hairline); border-radius: var(--radius);
-  padding: 10px var(--s-2); min-height: 40px;
+.eo-notes__input::placeholder { color: var(--office-linen); opacity: 0.6; }
+.eo-notes__input:focus-visible { outline: none; box-shadow: var(--focus-ring); border-color: var(--office-brass); }
+.eo-notes__save {
+  font-family: var(--sans); font-weight: 600; font-size: var(--fs-label);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--office-floor); background: var(--office-brass-hi);
+  border: 0; padding: 11px var(--s-3); min-height: 44px; cursor: pointer;
+  transition: background var(--motion-quick) var(--ease-settle);
 }
-.subs__noteinput:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.subs__notesaved { font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.08em; color: var(--brass); }
+.eo-notes__save:hover { background: var(--office-oak); }
+.eo-notes__save:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.eo-notes__saved { font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.06em; color: var(--office-brass-hi); min-height: 1em; }
+.eo-notes__aside { font-family: var(--sans); font-size: var(--fs-meta); color: var(--office-linen); opacity: 0.7; margin: 0; }
 
-/* Correspondence + history thread */
-.subs__thread { border-top: var(--hairline); padding-top: var(--s-2); }
-.subs__reveal {
-  font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.06em; text-transform: uppercase;
-  color: var(--oxblood); background: none; border: 0; padding: 0; cursor: pointer;
+/* =============================================================================
+   STATES
+   ============================================================================= */
+.eo-state {
+  display: grid; gap: var(--s-2); padding: var(--s-6) var(--s-5);
+  border: var(--office-line-soft); background: var(--office-panel);
+  text-align: center; place-items: center;
 }
-.subs__reveal:hover { text-decoration: underline; }
-.subs__threadbody { margin-top: var(--s-3); display: grid; gap: var(--s-2); }
-.subs__subhead { font-size: var(--fs-body-sm); font-weight: 600; color: var(--umber); margin: var(--s-2) 0 0; font-family: var(--sans); text-transform: uppercase; letter-spacing: var(--tracking-label); }
-.subs__msgs, .subs__events { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); }
-.subs__msg { border-left: 2px solid var(--brass); padding-left: var(--s-2); }
-.subs__msg p { margin: 0 0 2px; color: var(--ink); font-family: var(--serif); font-size: var(--fs-body-sm); }
-.subs__err { color: var(--terracotta) !important; }
-.subs__events li { color: var(--umber); }
+.eo-state--loading { background: transparent; border-style: dashed; }
+.eo-state__title { font-family: var(--serif); font-weight: 300; font-size: var(--fs-h3); color: var(--office-limestone); margin: 0; }
+.eo-state__lede { font-family: var(--serif); font-style: italic; color: var(--office-linen); margin: 0; max-width: 48ch; }
+.eo-state--error { border-color: var(--office-terra); }
+.eo-noscript { padding-block: var(--s-4); }
+
+/* =============================================================================
+   RESPONSIVE — the editorial floor holds together on a phone.
+   ============================================================================= */
+@media (max-width: 640px) {
+  .eo-card { grid-template-columns: 1fr; }
+  .eo-card__lead { display: none; }               /* the monogram is repeated in Detail */
+  .eo-detail__header { grid-template-columns: auto 1fr; }
+  .eo-detail__status { grid-column: 1 / -1; }
+  .ostatus__menu { right: auto; left: 0; }
+}
+
+/* =============================================================================
+   REDUCED MOTION
+   ============================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  .office-app { animation: none; }
+  .eo-card, .eo-item, .eo-filter, .eo-nav__link, .ostatus__caret, .eo-notes__save { transition: none; }
+}
