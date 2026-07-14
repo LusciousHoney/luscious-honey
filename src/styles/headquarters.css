@@ -1,0 +1,546 @@
+/* =============================================================================
+   EXECUTIVE TEAM HEADQUARTERS — Milestone 2 presentation.
+
+   The private founder residence. Bright first-of-summer morning, Palm Springs /
+   Laguna architectural calm: limestone, white oak, creamy plaster, linen, brass
+   in trace. NOT the dark back-of-house of the other private workspaces.
+
+   Reuses the LOCKED design tokens (tokens.css) and shared primitives; everything
+   Headquarters-specific is namespaced under `.hq*` / `.hq-page` so it can never
+   collide with the public house or the other private workspaces. All colour and
+   spacing come from tokens or the small HQ-scoped material layer below.
+
+   Ambient FOUNDATION only: a time-of-day light state ([data-tod]) and the
+   once-a-day arrival overlay. No audio, no live weather, no wing workflows.
+   ============================================================================= */
+
+/* --- HQ-scoped material + light tokens (do not leak to other surfaces) ---- */
+.hq-page {
+  /* Limestone / plaster room surfaces (warm, light — the residence is bright) */
+  --hq-limestone:   #F1EADD;
+  --hq-limestone-2: #E7DDCB;
+  --hq-travertine:  #EDE4D2;   /* warm stone floor, banded light with limestone-2 */
+  --hq-plaster:     #FBF7F0;   /* creamy plaster — the wall a work surface sits on */
+  --hq-plaster-2:   #F5EEE1;   /* plaster in soft shadow, for material depth */
+  --hq-oak:         #C6A06A;   /* white-oak / brushed-brass accent, warm family */
+  --hq-brass-hair:  rgba(176, 138, 79, 0.55); /* restrained brushed-brass hairline */
+  --hq-ink:         var(--ink);
+
+  /* Material depth — soft, warm, low-angle shadows (Palm Springs light, never
+     hard or grey). Cards rest on the plaster; nothing floats on a black shadow. */
+  --hq-shadow-card:
+    0 1px 0 rgba(255, 252, 245, 0.6) inset,
+    0 22px 44px -30px rgba(74, 52, 40, 0.30);
+  --hq-shadow-lift:
+    0 1px 0 rgba(255, 252, 245, 0.7) inset,
+    0 30px 60px -32px rgba(74, 52, 40, 0.36);
+
+  /* Morning light — the daily default. Time of day only re-aims and re-tints
+     this glow; it never changes text contrast, control visibility, or access. */
+  --hq-sun:      rgba(214, 178, 112, 0.58);  /* warm sun bloom */
+  --hq-sun-2:    rgba(233, 214, 176, 0.5);   /* secondary fill light, for depth */
+  --hq-sun-x:    16%;   /* low eastern light enters from the upper-left */
+  --hq-sun-y:    10%;
+  --hq-sky:      #EAE9E2;                     /* daylight beyond the glass */
+  --hq-horizon:  rgba(233, 214, 176, 0.55);  /* warm glow where glass meets floor */
+  --hq-canopy:   rgba(74, 52, 40, 0.10);      /* soft foliage shadow (umber) */
+  --hq-green:    rgba(78, 96, 66, 0.11);      /* living greenery, a plant's soft cast */
+  --hq-seated-dim: 0;                          /* 0 in scene → dims when seated */
+
+  /* --- Scene-asset seam (rendering infrastructure) -----------------------
+     The Headquarters environment can be drawn two ways behind the identical
+     interface: the CSS gradients above (today's default) OR future architectural
+     artwork. These four slots reserve one image per time of day. They are `none`
+     until a later milestone assigns `url(...)`, so today the CSS environment
+     renders unchanged. To introduce artwork later, define these four tokens and
+     lift `--hq-scene-tint` (0 → e.g. 0.5) — no JS, navigation, or markup changes.
+     Per-room override is possible by re-declaring `--hq-scene-*` on a room node. */
+  --hq-scene-morning:   none;
+  --hq-scene-afternoon: none;
+  --hq-scene-golden:    none;
+  --hq-scene-evening:   none;
+  --hq-scene-art:  var(--hq-scene-morning);   /* the active image (morning default) */
+  --hq-scene-tint: 0;                          /* light-over-art strength; 0 = CSS mode */
+
+  color: var(--hq-ink);
+  background: var(--hq-limestone);
+  min-height: 100vh;
+}
+
+/* Keep the shared masthead + colophon legible on the light room. */
+.hq-page .site-header,
+.hq-page .hq,
+.hq-page .colophon { position: relative; z-index: 1; }
+.hq-page .site-header .wordmark,
+.hq-page .colophon .wordmark { color: var(--hq-ink); }
+.hq-page .site-header .label,
+.hq-page .colophon .meta { color: var(--umber); }
+.hq-page .colophon { border-top: var(--hairline); background: transparent; }
+.hq-page .skip-link { color: var(--hq-ink); }
+
+/* --- Time-of-day light states (atmosphere only) -------------------------- */
+.hq-page[data-tod='afternoon'] {
+  --hq-sun: rgba(226, 207, 170, 0.44);
+  --hq-sun-2: rgba(236, 222, 190, 0.42);
+  --hq-sun-x: 50%; --hq-sun-y: 0%;            /* high, even light */
+  --hq-sky: #ECEBE5;
+  --hq-horizon: rgba(226, 210, 176, 0.45);
+  --hq-scene-art: var(--hq-scene-afternoon);
+}
+.hq-page[data-tod='evening'] {
+  --hq-sun: rgba(204, 140, 82, 0.55);         /* golden hour amber, warm + inviting */
+  --hq-sun-2: rgba(224, 176, 120, 0.5);
+  --hq-sun-x: 86%; --hq-sun-y: 74%;           /* low, from the west */
+  --hq-sky: #ECDFCC;
+  --hq-horizon: rgba(214, 150, 94, 0.55);
+  --hq-limestone: #F0E6D4;                     /* warmed, still bright */
+  --hq-travertine: #EBDECA;
+  --hq-scene-art: var(--hq-scene-golden);      /* tod 'evening' = golden hour art */
+}
+.hq-page[data-tod='late'] {
+  --hq-sun: rgba(214, 178, 112, 0.44);        /* lamplight, not daylight */
+  --hq-sun-2: rgba(224, 200, 158, 0.4);
+  --hq-sun-x: 28%; --hq-sun-y: 86%;
+  --hq-sky: #E6E0D5;
+  --hq-horizon: rgba(214, 186, 140, 0.42);
+  --hq-limestone: #EEE5D6;                     /* still light — contrast preserved */
+  --hq-scene-art: var(--hq-scene-evening);     /* tod 'late' = evening/night art */
+}
+
+/* =============================================================================
+   ATMOSPHERE — the light, the sky beyond the glass, the floor, the foliage.
+   Fixed behind everything, decorative, hidden from assistive tech. The room
+   reads completely without it. Dims when the founder is Seated (focused work).
+   ============================================================================= */
+.hq-atmos {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+/* The view above the sightline: daylight beyond a floor-to-ceiling glass wall.
+   A near-invisible vertical rhythm suggests the glazing mullions; a warm band at
+   the base is the sun landing where the glass meets the floor. */
+.hq-atmos__sky {
+  position: absolute;
+  inset: 0 0 55% 0;
+  background:
+    repeating-linear-gradient(90deg,
+      transparent 0 calc((100% / 6) - 1px),
+      rgba(74, 52, 40, 0.028) calc((100% / 6) - 1px) calc(100% / 6)),
+    linear-gradient(180deg,
+      var(--hq-sky) 0%,
+      var(--hq-limestone) 74%,
+      var(--hq-horizon) 100%);
+  transition: background var(--motion-room) var(--ease-camera);
+}
+/* The floor toward the room: warm travertine, banded like large stone tiles,
+   with a soft reflected-light sheen just inside the sightline and the corners
+   gently grounded for depth. */
+.hq-atmos__floor {
+  position: absolute;
+  inset: 45% 0 0 0;
+  background:
+    radial-gradient(120% 60% at 50% -6%, var(--hq-horizon) 0%, transparent 46%),
+    radial-gradient(80% 70% at 50% 118%, rgba(74, 52, 40, 0.05) 0%, transparent 60%),
+    linear-gradient(180deg, var(--hq-limestone) 0%, var(--hq-travertine) 42%, var(--hq-limestone-2) 100%);
+  transition: background var(--motion-room) var(--ease-camera);
+}
+/* The sun: a bright key bloom plus a soft secondary fill, so the light has
+   depth rather than a single flat wash. Re-aimed and re-tinted per time of day. */
+.hq-atmos__sun {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(90vh 90vh at var(--hq-sun-x) var(--hq-sun-y), var(--hq-sun) 0%, transparent 55%),
+    radial-gradient(150vh 130vh at calc(var(--hq-sun-x) + 22%) calc(var(--hq-sun-y) + 10%), var(--hq-sun-2) 0%, transparent 62%);
+  transition: background var(--motion-room) var(--ease-camera);
+}
+/* Living greenery: a plant's soft shadow drifting across the floor — a warm
+   umber core with a green cast, the residence's foliage catching the morning. */
+.hq-atmos__foliage {
+  position: absolute;
+  inset: 38% -12% -12% 52%;
+  background:
+    radial-gradient(48% 52% at 66% 36%, var(--hq-green) 0%, transparent 72%),
+    radial-gradient(60% 60% at 58% 44%, var(--hq-canopy) 0%, transparent 70%);
+  filter: blur(26px);
+  animation: hq-canopy 42s var(--ease-dissolve) infinite alternate;
+}
+@keyframes hq-canopy {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(-3%, 1.5%, 0) scale(1.06); }
+}
+/* --- Scene-artwork plane (rendering seam; inert until assets exist) --------
+   Sits ABOVE the CSS environment (z-index) so a future per-time-of-day image
+   covers it when present. `background-image: none` today → the CSS gradients
+   below show through untouched. Explicit z-index means DOM order of the base
+   layers is irrelevant and unchanged. Decorative; never interactive. */
+.hq-atmos__art {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background-image: var(--hq-scene-art);
+  background-size: cover;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  transition: opacity var(--motion-room) var(--ease-camera);
+}
+/* Time-of-day light OVER the artwork. Zero-opacity in CSS mode (the base `__sun`
+   already lights the gradients), so it is invisible today; a future milestone
+   lifts `--hq-scene-tint` to lay the same warm light across the artwork. */
+.hq-atmos__tint {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  opacity: var(--hq-scene-tint);
+  background: radial-gradient(120vh 120vh at var(--hq-sun-x) var(--hq-sun-y),
+    var(--hq-sun) 0%, transparent 60%);
+  transition: opacity var(--motion-room) var(--ease-camera),
+              background var(--motion-room) var(--ease-camera);
+}
+
+/* Focused-work dim: a warm scrim that lifts over the atmosphere when Seated.
+   z-index keeps it above BOTH the CSS environment and the artwork/tint planes. */
+.hq-atmos::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: var(--hq-limestone);
+  opacity: var(--hq-seated-dim);
+  transition: opacity var(--motion-settle) var(--ease-settle);
+}
+.hq-page[data-hq-mode='seated'] { --hq-seated-dim: 0.5; }
+
+/* =============================================================================
+   APP SHELL
+   ============================================================================= */
+.hq {
+  min-height: 64vh;
+  padding-block: var(--s-5) var(--s-8);
+  background: transparent;
+}
+.hq-app { outline: none; animation: hq-fade-in var(--motion-quick) var(--ease-settle) both; }
+@keyframes hq-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.hq-view__inner { display: grid; gap: var(--s-6); }
+
+/* --- shared editorial type ----------------------------------------------- */
+.hq-eyebrow {
+  color: var(--umber);
+}
+.hq-title {
+  font-family: var(--serif);
+  font-weight: 200;
+  font-size: var(--fs-display);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.01em;
+  margin: var(--s-2) 0 0;
+  color: var(--hq-ink);
+  max-width: 18ch;
+}
+.hq-title--seated { font-size: var(--fs-h1); max-width: none; }
+.hq-lede {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: var(--fs-body);
+  color: var(--umber);
+  margin: var(--s-3) 0 0;
+  max-width: 46ch;
+}
+
+/* =============================================================================
+   SCENE — the Executive Office. Cinematic on desktop; generous negative space,
+   light leading from the upper-left, the room's intention as the hero.
+   ============================================================================= */
+.hq-view--scene .hq-hero {
+  padding-block: var(--s-7) var(--s-3);
+  min-height: 48vh;
+  display: grid;
+  align-content: center;
+}
+
+/* The wings as thresholds — secondary to the room, never a dominating grid. */
+.hq-wings { margin-top: var(--s-2); }
+.hq-wings__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--s-2);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+}
+.hq-wing__link {
+  display: grid;
+  gap: var(--s-1);
+  align-content: start;
+  padding: var(--s-4);
+  min-height: 148px;
+  text-decoration: none;
+  color: inherit;
+  /* A brushed-brass hairline across the head of the plate, then creamy plaster
+     lit softly from the upper-left — a material panel, not a UI card. */
+  background:
+    linear-gradient(var(--hq-brass-hair), var(--hq-brass-hair)) top left / 100% 1.5px no-repeat,
+    linear-gradient(152deg, var(--hq-plaster) 0%, var(--hq-plaster-2) 100%);
+  border: var(--hairline);
+  border-radius: var(--radius);
+  box-shadow: var(--hq-shadow-card);
+  transition:
+    transform var(--motion-settle) var(--ease-settle),
+    box-shadow var(--motion-settle) var(--ease-settle),
+    border-color var(--motion-quick) var(--ease-settle);
+}
+.hq-wing__link:hover,
+.hq-wing__link:focus-visible {
+  transform: translateY(-4px);
+  border-color: var(--brass);
+  box-shadow: var(--hq-shadow-lift);
+  outline: none;
+}
+.hq-wing__link:focus-visible { box-shadow: var(--focus-ring), var(--hq-shadow-lift); }
+.hq-wing__name {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: var(--fs-h3);
+  color: var(--hq-ink);
+}
+.hq-wing__blurb {
+  font-family: var(--serif);
+  font-style: italic;
+  color: var(--umber);
+}
+.hq-wing__badge { margin-top: var(--s-1); color: var(--brass); font-size: var(--fs-meta); }
+/* Reserved wings read as quietly held — present, not yet furnished. */
+.hq-wing[data-status='reserved'] .hq-wing__link { opacity: 0.66; }
+.hq-wing[data-status='reserved'] .hq-wing__badge { color: var(--umber); }
+
+/* =============================================================================
+   SEATED — inside a wing. The surface rises on a plate; the room dims behind it.
+   ============================================================================= */
+.hq-view--seated .hq-view__inner { gap: var(--s-4); max-width: var(--w-max); }
+
+.hq-seated__bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  align-items: baseline;
+  justify-content: space-between;
+}
+.hq-back {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: var(--fs-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--brass);
+  text-decoration: none;
+}
+.hq-back:hover,
+.hq-back:focus-visible { color: var(--terracotta); }
+
+.hq-seated__head { display: grid; gap: var(--s-1); }
+
+.hq-surface {
+  padding: var(--s-6);
+  border: var(--hairline);
+  border-radius: var(--radius);
+  background: linear-gradient(152deg, var(--hq-plaster) 0%, var(--hq-plaster-2) 100%);
+  box-shadow: var(--hq-shadow-card);
+  animation: hq-rise var(--motion-settle) var(--ease-settle) both;
+}
+.hq-surface__note {
+  font-family: var(--serif);
+  font-style: italic;
+  color: var(--umber);
+  margin: 0;
+}
+@keyframes hq-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* --- room rail (direct navigation; visually secondary) ------------------- */
+.hq-rail__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1) var(--s-3);
+}
+.hq-rail__link {
+  font-family: var(--sans);
+  font-size: var(--fs-label);
+  letter-spacing: 0.04em;
+  color: var(--umber);
+  text-decoration: none;
+  padding-bottom: 2px;
+  border-bottom: 1px solid transparent;
+}
+.hq-rail__link:hover,
+.hq-rail__link:focus-visible { color: var(--hq-ink); border-bottom-color: var(--brass); outline: none; }
+.hq-rail__link[aria-current='page'] { color: var(--hq-ink); border-bottom-color: var(--brass); }
+.hq-rail__link[data-status='reserved'] { opacity: 0.6; }
+
+/* =============================================================================
+   STATES — loading · empty · error · access-denied.
+   ============================================================================= */
+.hq-state {
+  display: grid;
+  gap: var(--s-2);
+  padding: var(--s-5);
+  border: var(--hairline);
+  background: var(--hq-plaster);
+}
+.hq-state--loading { border-style: dashed; background: transparent; }
+.hq-state__title {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: var(--fs-h3);
+  color: var(--hq-ink);
+  margin: 0;
+}
+.hq-state__lede {
+  font-family: var(--serif);
+  font-style: italic;
+  color: var(--umber);
+  margin: 0;
+  max-width: 52ch;
+}
+.hq-state--error { border-color: var(--terracotta); }
+.hq-state--denied { border-color: var(--brass); }
+.hq-noscript { padding-block: var(--s-4); }
+/* Pre-boot loading state sits inside .hq before the app mounts. */
+.hq-state--loading .hq-state__lede { font-style: italic; }
+
+/* =============================================================================
+   MORNING ARRIVAL — the once-a-day light-up. Warm, brief, always skippable.
+   ============================================================================= */
+.hq-arrival {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: grid;
+  place-items: center;
+  padding: var(--s-4);
+  text-align: center;
+  cursor: pointer;
+  /* Standing in the entry as morning sun crosses a glass wall onto a stone floor:
+     a key bloom, a soft fill, the faint rhythm of the glazing, and the warm floor
+     grounding the room. Architectural, not a loading screen. */
+  background:
+    radial-gradient(96vh 96vh at 22% 14%, rgba(214, 178, 112, 0.72) 0%, transparent 55%),
+    radial-gradient(150vh 130vh at 44% 26%, rgba(233, 214, 176, 0.55) 0%, transparent 60%),
+    repeating-linear-gradient(90deg,
+      transparent 0 calc((100% / 7) - 1px),
+      rgba(74, 52, 40, 0.022) calc((100% / 7) - 1px) calc(100% / 7)),
+    linear-gradient(180deg, #F7EFE0 0%, #F1E7D6 62%, #ECE0CC 100%);
+  opacity: 0;
+  transition: opacity var(--motion-room) var(--ease-settle);
+}
+.hq-arrival.is-in { opacity: 1; }
+.hq-arrival.is-leaving { opacity: 0; }
+.hq-arrival__inner {
+  display: grid;
+  gap: var(--s-2);
+  justify-items: center;
+  transform: translateY(8px);
+  transition: transform var(--motion-settle) var(--ease-settle);
+}
+.hq-arrival.is-in .hq-arrival__inner { transform: translateY(0); }
+.hq-arrival__wordmark {
+  font-family: var(--sans);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  font-size: var(--fs-label);
+  color: var(--umber);
+}
+.hq-arrival__greeting {
+  font-family: var(--serif);
+  font-weight: 200;
+  font-size: var(--fs-display);
+  line-height: var(--leading-tight);
+  color: var(--ink);
+  margin: 0;
+}
+.hq-arrival__line {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: var(--fs-body);
+  color: var(--umber);
+  margin: 0;
+  max-width: 34ch;
+}
+.hq-arrival__enter {
+  margin-top: var(--s-3);
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: var(--fs-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--brass);
+  border-radius: var(--radius);
+  padding: 12px 28px;
+  min-height: 44px;
+  cursor: pointer;
+  transition: background var(--motion-quick) var(--ease-settle), color var(--motion-quick) var(--ease-settle);
+}
+.hq-arrival__enter:hover,
+.hq-arrival__enter:focus-visible { background: var(--brass); color: var(--alabaster); outline: none; }
+.hq-arrival__enter:focus-visible { box-shadow: var(--focus-ring); }
+
+/* =============================================================================
+   MOBILE — the Indexed Headquarters. Below the editorial breakpoint the scene
+   is not compressed: it becomes a plain, legible vertical INDEX of the wings.
+   The primary work is always immediately available (Build Bible §8.5, §16).
+   ============================================================================= */
+@media (max-width: 720px) {
+  .hq { padding-block: var(--s-4) var(--s-6); }
+  .hq-view__inner { gap: var(--s-4); }
+  .hq-view--scene .hq-hero { min-height: 0; padding-block: var(--s-4) 0; }
+  .hq-title { font-size: var(--fs-h1); max-width: none; }
+
+  .hq-wings__list { grid-template-columns: 1fr; gap: var(--s-2); }
+  .hq-wing__link {
+    min-height: 0;
+    padding: var(--s-3);
+    grid-template-columns: 1fr auto;
+    grid-template-areas: 'name badge' 'blurb blurb';
+    align-items: baseline;
+    transform: none;                            /* a list, not a stage */
+  }
+  .hq-wing__link:hover,
+  .hq-wing__link:focus-visible { transform: none; box-shadow: none; border-color: var(--brass); }
+  .hq-wing__name  { grid-area: name; }
+  .hq-wing__blurb { grid-area: blurb; }
+  .hq-wing__badge { grid-area: badge; margin: 0; }
+
+  .hq-seated__bar { flex-direction: column; gap: var(--s-2); }
+  /* The foliage drift is imperceptible on a phone and costs battery — rest it. */
+  .hq-atmos__foliage { animation: none; }
+}
+
+/* =============================================================================
+   REDUCED MOTION — honour the founder's system preference. A complete still
+   experience: no arrival is played (main.ts skips it), no drift, no lift.
+   ============================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  .hq-app,
+  .hq-surface { animation: none; }
+  .hq-atmos__foliage { animation: none; }
+  .hq-atmos__sun,
+  .hq-atmos__art,
+  .hq-atmos__tint,
+  .hq-atmos::after { transition: none; }
+  .hq-wing__link,
+  .hq-wing__link:hover,
+  .hq-wing__link:focus-visible { transition: none; transform: none; }
+  .hq-arrival,
+  .hq-arrival__inner { transition: none; }
+}

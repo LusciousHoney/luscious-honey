@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test tests/logic.test.ts tests/governance.test.ts tests/office.test.ts tests/access.test.mjs tests/guestbook.test.mjs",
+    "test": "node --test tests/logic.test.ts tests/governance.test.ts tests/office.test.ts tests/access.test.mjs tests/guestbook.test.mjs tests/headquarters.test.ts",
     "check:prod": "node scripts/check-prod-safety.mjs",
     "verify": "npm run build && npm test && npm run check:prod",
     "deploy": "npm run verify && wrangler pages deploy",
