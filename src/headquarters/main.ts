@@ -32,6 +32,10 @@ import {
   type SubmissionDetail, type SubmissionStatus,
 } from './adapters.ts';
 import { operationsFlow, type OperationsFlow } from './operations.ts';
+import {
+  creativeStudio, REFERENCE_VOLUMES, DIRECTION_INSCRIPTION,
+  type OpenManuscript, type CollectionVolume,
+} from './creative.ts';
 
 /* --- small helpers ------------------------------------------------------- */
 
@@ -443,6 +447,174 @@ function operationsBoard(flow: OperationsFlow): HTMLElement {
 
   return el('div', { class: 'hq-board__inner', role: 'group', 'aria-label': 'Operations board' },
     head, stages, foot);
+}
+
+/* =============================================================================
+   CREATIVE DIRECTOR — the library where the making lives (Milestone 5).
+
+   Route: #/creative. A private editorial LIBRARY — the residence's warmest, most
+   interior room — never a design studio, mood board, or dashboard. It expresses
+   creative stewardship: the shape of what the House makes, held as a reading room
+   rather than a queue.
+
+   Two living objects, both from EXISTING data via the pure `creativeStudio`
+   helper: the ONE open manuscript (the piece last in motion, from the briefing's
+   `recent`) and the Collection (the made body of work, from published
+   submissions). Around them, environmental furniture — a restrained reference
+   library and one engraved line — that reads completely before any data arrives.
+
+   Reads only; no decision controls, no writes, no new endpoint. It never routes
+   into the Editorial Office: the founder stays inside the residence (per founder
+   decision — a graceful in-residence placeholder holds the writing room's future
+   seat). The Editorial Office remains the operational review workspace elsewhere.
+   ============================================================================= */
+function renderCreative(root: HTMLElement, room: Room): void {
+  setMode('seated');
+
+  // The two living objects arrive asynchronously; the room reads completely
+  // before they do (the reference library and the inscription are furniture).
+  const manuscript = el('div', { class: 'hq-manuscript', 'aria-label': 'The open manuscript', 'aria-busy': 'true' },
+    el('p', { class: 'hq-manuscript__eyebrow label' }, 'On the table'),
+    el('p', { class: 'hq-manuscript__resting' }, 'Turning to the page you left…'));
+  const collection = el('div', { class: 'hq-collection', 'aria-label': 'The Collection', 'aria-busy': 'true' },
+    el('p', { class: 'hq-collection__eyebrow label' }, 'The Collection'),
+    el('p', { class: 'hq-state__lede' }, 'Reading the spines…'));
+
+  const view = el(
+    'section',
+    { class: 'hq-view hq-view--seated hq-view--creative', 'aria-label': room.name },
+    el(
+      'div',
+      { class: 'hq-view__inner container' },
+      el(
+        'div',
+        { class: 'hq-seated__bar' },
+        el('a', { class: 'hq-back', href: getRoom(HOME_ROOM)!.route }, '← Return to the Executive Office'),
+        renderRail(room.id),
+      ),
+      el(
+        'header',
+        { class: 'hq-seated__head' },
+        el('p', { class: 'hq-eyebrow label' }, room.name),
+        el('h1', { class: 'hq-title hq-title--seated' }, room.name),
+        el('p', { class: 'hq-lede' }, 'A private library where the making lives. The work is alive and waiting — kept warm for whenever you return to it.'),
+      ),
+      el(
+        'div',
+        { class: 'hq-library' },
+        manuscript,
+        el('div', { class: 'hq-library__lower' }, collection, renderReferenceShelf()),
+        renderInscription(),
+      ),
+    ),
+  );
+
+  root.replaceChildren(view);
+  void mountLibrary(manuscript, collection);
+}
+
+/**
+ * Fill the two living objects from the existing spine. The manuscript reads the
+ * Daily Briefing; the Collection reads the published works. Honest states — the
+ * table resting, the shelf waiting, offline — never fabricated pages. Each object
+ * degrades on its own, so an offline shelf never blanks the open manuscript.
+ */
+async function mountLibrary(manuscriptHost: HTMLElement, collectionHost: HTMLElement): Promise<void> {
+  const [bRes, pRes] = await Promise.all([fetchBriefing(), fetchInbox('published')]);
+
+  // --- The open manuscript (from the briefing) ---
+  manuscriptHost.setAttribute('aria-busy', 'false');
+  if (!bRes.ok) {
+    manuscriptHost.replaceChildren(deskState(
+      bRes.offline ? 'The reading light is off' : 'The page couldn’t be found',
+      bRes.offline ? 'Your work is safe — try again in a moment.' : bRes.error,
+    ));
+  } else {
+    const { manuscript } = creativeStudio(bRes.data, null);
+    manuscriptHost.replaceChildren(...manuscriptContent(manuscript));
+  }
+
+  // --- The Collection (from the published works) ---
+  collectionHost.setAttribute('aria-busy', 'false');
+  if (!pRes.ok) {
+    collectionHost.replaceChildren(deskState(
+      pRes.offline ? 'The Collection is offline' : 'The Collection couldn’t load',
+      pRes.offline ? 'Your work is safe — try again in a moment.' : pRes.error,
+    ));
+  } else {
+    const { collection, collectionTotal } = creativeStudio(null, pRes.data.submissions);
+    collectionHost.replaceChildren(...collectionContent(collection, collectionTotal));
+  }
+}
+
+/** The open manuscript — one piece, lying open as though the founder just stepped
+    away. Read-only; it never leaves the residence. When nothing is in motion, the
+    table rests, honestly and still warm. */
+function manuscriptContent(m: OpenManuscript | null): Node[] {
+  if (!m) {
+    return [
+      el('p', { class: 'hq-manuscript__eyebrow label' }, 'The table'),
+      el('p', { class: 'hq-manuscript__resting' },
+        'No page lies open just now. The table is clear, the reading light still warm — begin whenever you like.'),
+    ];
+  }
+  const nodes: Node[] = [
+    el('p', { class: 'hq-manuscript__eyebrow label' }, 'Left open'),
+    el('h2', { class: 'hq-manuscript__title' }, m.name),
+  ];
+  if (m.summary) nodes.push(el('p', { class: 'hq-manuscript__summary' }, m.summary));
+  // A graceful in-residence placeholder: the residence holds the page. It never
+  // routes out to the Editorial Office — the founder stays home. When a writing
+  // room is built inside Headquarters, this line becomes its threshold.
+  nodes.push(el('p', { class: 'hq-manuscript__hold' },
+    'The page waits on the table, kept exactly as you left it. The writing room opens here soon.'));
+  return nodes;
+}
+
+/** The Collection — the House's made works as bound volumes on a shelf. Curated,
+    newest-first, spacious. Honest when the shelf is still bare. */
+function collectionContent(volumes: CollectionVolume[], total: number): Node[] {
+  const head = el('div', { class: 'hq-collection__head' },
+    el('p', { class: 'hq-collection__eyebrow label' }, 'The Collection'));
+  if (total > 0) {
+    head.append(el('p', { class: 'hq-collection__meta' },
+      total === 1 ? 'One bound work' : `${total} bound works${total > volumes.length ? ` · ${volumes.length} shown` : ''}`));
+  }
+
+  if (volumes.length === 0) {
+    return [head, el('p', { class: 'hq-collection__empty' },
+      'Nothing is bound here yet. As the House publishes its first works, they take their place on the shelf.')];
+  }
+
+  const shelf = el('ul', { class: 'hq-collection__shelf' });
+  for (const v of volumes) {
+    const vol = el('li', { class: 'hq-volume' },
+      el('span', { class: 'hq-volume__title' }, v.name));
+    if (v.summary) vol.append(el('span', { class: 'hq-volume__note' }, v.summary));
+    shelf.append(vol);
+  }
+  return [head, shelf];
+}
+
+/** The reference library — a restrained run of bound volumes as ARCHITECTURE, not
+    interface. Decorative furniture (like the scene's plants), so it is hidden from
+    assistive technology and carries no controls. */
+function renderReferenceShelf(): HTMLElement {
+  const shelf = el('aside', { class: 'hq-reference', 'aria-hidden': 'true' });
+  const row = el('ul', { class: 'hq-reference__row' });
+  for (const v of REFERENCE_VOLUMES) {
+    row.append(el('li', { class: 'hq-reference__vol', 'data-kind': v.kind },
+      el('span', { class: 'hq-reference__spine' }, v.title)));
+  }
+  shelf.append(row, el('span', { class: 'hq-reference__ledge' }));
+  return shelf;
+}
+
+/** The direction plate — one line engraved into the oak, discovered rather than
+    announced. Given a role so it is read as the room's quiet inscription. */
+function renderInscription(): HTMLElement {
+  return el('p', { class: 'hq-inscription', role: 'note', 'aria-label': 'Engraved above the shelves' },
+    DIRECTION_INSCRIPTION);
 }
 
 /** ERROR — an unrecognised route. Offers the way home rather than a dead end. */
@@ -857,6 +1029,9 @@ function route(): void {
     // purpose — the flow view over the spine. Every other live department keeps
     // the generic seated placeholder until its own milestone.
     renderOperations(root, room);
+  } else if (room.id === 'creative') {
+    // The Creative Director room — the library where the making lives.
+    renderCreative(root, room);
   } else {
     renderSeated(root, room);
   }
@@ -883,5 +1058,5 @@ if (document.readyState === 'loading') {
 }
 
 // Re-exported for tests and future milestones (kept off the module's happy path).
-export { renderScene, renderSeated, renderOperations, renderError, renderAccessDenied };
+export { renderScene, renderSeated, renderOperations, renderCreative, renderError, renderAccessDenied };
 export type { Room, RoomId };
