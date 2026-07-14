@@ -1135,6 +1135,54 @@
 }
 
 /* =============================================================================
+   MILESTONE 7 — the Growth Studio. "A sunlit publishing salon overlooking the
+   horizon." The horizon (the shared residence) is the hero; growth is measured in
+   RELATIONSHIPS, not metrics. Composed like every other wing in the residence's
+   own editorial language — creamy plaster, a brushed-brass hairline, serif type,
+   generous negative space. No dashboard, no numbers, no illustration. Additive
+   presentation only; the frozen backdrop is untouched.
+   ============================================================================= */
+.hq-corr { display: grid; gap: var(--s-4); }
+.hq-corr__eyebrow { color: var(--umber); margin: 0; }
+
+/* The correspondence — each relationship a calm plaster card, generously spaced.
+   A salon table of ongoing conversations, never a grid of tiles or counters. */
+.hq-corr__list {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: var(--s-3);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+}
+.hq-corr__card {
+  display: grid; gap: var(--s-1); align-content: start;
+  padding: var(--s-4) var(--s-5);
+  background:
+    linear-gradient(var(--hq-brass-hair), var(--hq-brass-hair)) top left / 100% 1.5px no-repeat,
+    linear-gradient(152deg, var(--hq-plaster) 0%, var(--hq-plaster-2) 100%);
+  border: var(--hairline);
+  border-radius: var(--radius);
+  box-shadow: var(--hq-shadow-card);
+  animation: hq-rise var(--motion-settle) var(--ease-settle) both;
+}
+.hq-corr__name {
+  font-family: var(--serif); font-weight: 300; font-size: var(--fs-h3);
+  color: var(--hq-ink); margin: 0;
+}
+.hq-corr__note {
+  font-family: var(--serif); font-style: italic; font-size: var(--fs-body-sm);
+  color: var(--umber); margin: 0; line-height: 1.45; max-width: 40ch;
+}
+
+/* The horizon — the room's closing line, set toward the open right like a view. */
+.hq-corr__horizon {
+  justify-self: end; text-align: right; max-width: 46ch; margin: var(--s-2) 0 0;
+  font-family: var(--serif); font-style: italic; font-size: var(--fs-body);
+  color: var(--umber);
+}
+@media (max-width: 720px) {
+  .hq-corr__horizon { justify-self: start; text-align: left; }
+}
+
+/* =============================================================================
    MOBILE — the Indexed Headquarters. Below the editorial breakpoint the scene
    is not compressed: it becomes a plain, legible vertical INDEX of the wings.
    The primary work is always immediately available (Build Bible §8.5, §16).
@@ -1174,7 +1222,8 @@
   .hq-surface,
   .hq-board,
   .hq-manuscript,
-  .hq-narration { animation: none; }
+  .hq-narration,
+  .hq-corr__card { animation: none; }
   .hq-atmos__foliage { animation: none; }
   .hq-atmos__sun,
   .hq-atmos__art,

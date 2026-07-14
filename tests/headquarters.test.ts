@@ -33,9 +33,9 @@ test('every room has a hash route matching its id, and unique ids', () => {
   for (const r of ROOMS) assert.equal(r.route, `#/${r.id}`);
 });
 
-test('reserved departments are Growth and Business only', () => {
+test('the Business Office is the only reserved department (Growth is now live)', () => {
   const reserved = ROOMS.filter((r) => r.status === 'reserved').map((r) => r.id);
-  assert.deepEqual(reserved.sort(), ['business', 'growth']);
+  assert.deepEqual(reserved.sort(), ['business']);
 });
 
 test('the Production wing is named Production Suite (residential canon)', () => {

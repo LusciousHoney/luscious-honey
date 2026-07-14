@@ -40,6 +40,7 @@ import {
   productionSprint, RECORDING_NOTE, REVIEW_NOTE,
   type ProductionSprint,
 } from './production.ts';
+import { RELATIONSHIPS, SALON_LEDE, HORIZON_NOTE } from './growth.ts';
 
 /* --- small helpers ------------------------------------------------------- */
 
@@ -755,6 +756,61 @@ function sprintContent(sprint: ProductionSprint): Node[] {
   return [head, el('div', { class: 'hq-sprint__sheet' }, lanes)];
 }
 
+/* =============================================================================
+   GROWTH STUDIO — a sunlit publishing salon overlooking the horizon (Milestone 7).
+
+   Route: #/growth. The residence's most outward-looking room, answering "Where is
+   the House finding resonance?" — in RELATIONSHIPS, never metrics. The horizon (the
+   shared residence) is the hero; the content is the correspondence the House keeps
+   with the world, presented in the residence's editorial language. No workflow
+   data, no fetch, no numbers, no dashboard — purely architectural + editorial.
+   ============================================================================= */
+function renderGrowth(root: HTMLElement, room: Room): void {
+  setMode('seated');
+
+  // The correspondence: each relationship as a calm plaster card — a standing
+  // conversation, never a statistic. Curated and spacious, a salon not a grid.
+  const cards = el('ul', { class: 'hq-corr__list' });
+  for (const r of RELATIONSHIPS) {
+    cards.append(el('li', { class: 'hq-corr__card' },
+      el('p', { class: 'hq-corr__name' }, r.name),
+      el('p', { class: 'hq-corr__note' }, r.note)));
+  }
+
+  const salon = el(
+    'section',
+    { class: 'hq-corr', role: 'group', 'aria-label': 'The House’s conversations with the world' },
+    el('p', { class: 'hq-corr__eyebrow label' }, 'Ongoing conversations'),
+    cards,
+    el('p', { class: 'hq-corr__horizon' }, HORIZON_NOTE),
+  );
+
+  const view = el(
+    'section',
+    { class: 'hq-view hq-view--seated hq-view--growth', 'aria-label': room.name },
+    el(
+      'div',
+      { class: 'hq-view__inner container' },
+      el(
+        'div',
+        { class: 'hq-seated__bar' },
+        el('a', { class: 'hq-back', href: getRoom(HOME_ROOM)!.route }, '← Return to the Executive Office'),
+        renderRail(room.id),
+      ),
+      el(
+        'header',
+        { class: 'hq-seated__head' },
+        el('p', { class: 'hq-eyebrow label' }, room.name),
+        el('h1', { class: 'hq-title hq-title--seated' }, room.name),
+        el('p', { class: 'hq-lede' }, SALON_LEDE),
+      ),
+      salon,
+    ),
+  );
+
+  root.replaceChildren(view);
+}
+
 /** ERROR — an unrecognised route. Offers the way home rather than a dead end. */
 function renderError(root: HTMLElement): void {
   setMode('seated');
@@ -1173,6 +1229,9 @@ function route(): void {
   } else if (room.id === 'production') {
     // The Production Suite — a glass studio for momentum without noise.
     renderProduction(root, room);
+  } else if (room.id === 'growth') {
+    // The Growth Studio — a sunlit publishing salon overlooking the horizon.
+    renderGrowth(root, room);
   } else {
     renderSeated(root, room);
   }
@@ -1199,5 +1258,5 @@ if (document.readyState === 'loading') {
 }
 
 // Re-exported for tests and future milestones (kept off the module's happy path).
-export { renderScene, renderSeated, renderOperations, renderCreative, renderProduction, renderError, renderAccessDenied };
+export { renderScene, renderSeated, renderOperations, renderCreative, renderProduction, renderGrowth, renderError, renderAccessDenied };
 export type { Room, RoomId };
