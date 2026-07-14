@@ -26,6 +26,11 @@ import '../styles/headquarters.css';
 import { ROOMS, HOME_ROOM, getRoom, isRoomId, type Room, type RoomId } from './rooms.ts';
 import { loadLastRoom, saveLastRoom, shouldPlayArrival, markArrivalSeen } from './memory.ts';
 import { timeOfDay, greeting } from './time.ts';
+import {
+  fetchBriefing, fetchInbox, fetchItem, advanceStatus, addNote,
+  inlineActions, STATUS_LABELS,
+  type SubmissionDetail, type SubmissionStatus,
+} from './adapters.ts';
 
 /* --- small helpers ------------------------------------------------------- */
 
@@ -175,6 +180,13 @@ function renderScene(root: HTMLElement): void {
     wings.append(item);
   }
 
+  // The Daily Briefing — a single quiet plaster-document note, orientation only.
+  // Filled asynchronously; the room reads completely before it arrives.
+  const briefing = el('aside', { class: 'hq-briefing', 'aria-label': 'Today at the desk', 'aria-busy': 'true' },
+    el('p', { class: 'hq-briefing__eyebrow label' }, 'Today'),
+    el('p', { class: 'hq-briefing__line' }, 'Reading the desk…'),
+  );
+
   const scene = el(
     'section',
     { class: 'hq-view hq-view--scene', 'aria-label': 'Executive Office' },
@@ -191,6 +203,7 @@ function renderScene(root: HTMLElement): void {
           { class: 'hq-lede' },
           'Morning light across the limestone, the terrace open to clean air, the writing table waiting. Every wing of the residence opens from here.',
         ),
+        briefing,
       ),
       el(
         'nav',
@@ -201,6 +214,45 @@ function renderScene(root: HTMLElement): void {
   );
 
   root.replaceChildren(scene);
+  void mountBriefing(briefing);
+}
+
+/**
+ * Fill the Daily Briefing from the submissions spine. Restraint by design: one
+ * decision-relevant line (what awaits the founder), the oldest waiting item, and
+ * one path into the Desk. Honest states — clear / offline / a quiet nudge — never
+ * a grid of KPI cards. Reads only; the Desk is where work happens.
+ */
+async function mountBriefing(host: HTMLElement): Promise<void> {
+  const res = await fetchBriefing();
+  host.setAttribute('aria-busy', 'false');
+  host.replaceChildren();
+  host.append(el('p', { class: 'hq-briefing__eyebrow label' }, 'Today'));
+
+  if (!res.ok) {
+    host.append(el('p', { class: 'hq-briefing__line hq-briefing__line--quiet' },
+      res.offline ? 'The desk is offline — your work is safe; try again shortly.' : 'The briefing is resting.'));
+    return;
+  }
+
+  const b = res.data;
+  const awaiting = b.awaitingReview;
+  const headline =
+    awaiting === 0 ? 'The desk is clear.'
+    : awaiting === 1 ? 'One submission awaits your review.'
+    : `${awaiting} submissions await your review.`;
+  host.append(el('p', { class: 'hq-briefing__line' }, headline));
+
+  if (b.oldestAwaiting) {
+    const o = b.oldestAwaiting;
+    const wait = o.waitingDays && o.waitingDays > 0 ? `, ${o.waitingDays} day${o.waitingDays === 1 ? '' : 's'}` : '';
+    host.append(el('p', { class: 'hq-briefing__meta' }, `Longest wait: ${o.name}${wait}`));
+  } else if (b.open > 0) {
+    host.append(el('p', { class: 'hq-briefing__meta' }, `${b.open} in motion · nothing needs a decision right now.`));
+  }
+
+  host.append(el('a', { class: 'hq-briefing__enter', href: `${getRoom(HOME_ROOM)!.route}/desk` },
+    awaiting > 0 ? 'Go to the Founder’s Desk →' : 'Open the Founder’s Desk →'));
 }
 
 /**
@@ -311,6 +363,260 @@ function renderAccessDenied(root: HTMLElement): void {
   );
 }
 
+/* =============================================================================
+   THE DESK — the Executive Office seated work state (the Founder’s Desk).
+   Route: #/executive/desk. One queue for every submission, over the existing
+   submissions spine. A few audited decisions happen here; the Editorial Office
+   remains the complete review workspace. HQ owns no data.
+   ============================================================================= */
+
+// Founder-oriented groupings over the existing workflow states (the data model
+// and API are unchanged; grouping is a presentation concern). The Editorial
+// Office remains the detailed, per-status workflow environment.
+type DeskGroup = 'review' | 'waiting' | 'done' | 'all';
+interface GroupDef {
+  id: DeskGroup;
+  label: string;
+  statuses: SubmissionStatus[] | null; // null = everything
+  empty: { title: string; lede: string };
+}
+const DESK_GROUPS: GroupDef[] = [
+  { id: 'review', label: 'Needs My Review', statuses: ['sent_for_review', 'under_review'],
+    empty: { title: 'Nothing needs you right now', lede: 'When a submission is waiting on your decision, it will rest here.' } },
+  { id: 'waiting', label: 'Waiting on Others', statuses: ['changes_requested', 'approved', 'scheduled'],
+    empty: { title: 'Nothing in waiting', lede: 'Submissions back with a creator, or moving toward publication, will appear here.' } },
+  { id: 'done', label: 'Completed', statuses: ['published', 'not_accepted'],
+    empty: { title: 'Nothing completed yet', lede: 'Published and closed submissions gather here in time.' } },
+  { id: 'all', label: 'Everything', statuses: null,
+    empty: { title: 'The desk is clear', lede: 'No submissions yet. When one arrives, it will be waiting here.' } },
+];
+function groupDef(id: DeskGroup): GroupDef { return DESK_GROUPS.find((g) => g.id === id) || DESK_GROUPS[0]; }
+
+let deskFilter: DeskGroup = 'review';
+let deskSelectedId: number | null = null;
+
+function renderDesk(root: HTMLElement): void {
+  setMode('seated');
+
+  const filters = el('div', { class: 'hq-deskbar__filters', role: 'group', 'aria-label': 'Show' });
+  for (const g of DESK_GROUPS) {
+    const chip = el('button', {
+      class: 'hq-chip', type: 'button', 'data-filter': g.id,
+      'aria-pressed': deskFilter === g.id ? 'true' : 'false',
+    }, g.label);
+    chip.addEventListener('click', () => { deskFilter = g.id; deskSelectedId = null; renderDesk(root); });
+    filters.append(chip);
+  }
+
+  const list = el('div', { class: 'hq-inbox', id: 'hq-inbox', 'aria-live': 'polite', 'aria-busy': 'true' },
+    el('p', { class: 'hq-state__lede' }, 'Opening the inbox…'));
+  const detail = el('div', { class: 'hq-detail', id: 'hq-detail' },
+    el('p', { class: 'hq-detail__empty' }, 'Choose a submission to read it.'));
+
+  const desk = el(
+    'section',
+    { class: 'hq-view hq-view--seated hq-view--desk', 'aria-label': 'Founder’s Desk' },
+    el(
+      'div',
+      { class: 'hq-view__inner container' },
+      el(
+        'div',
+        { class: 'hq-seated__bar' },
+        el('a', { class: 'hq-back', href: getRoom(HOME_ROOM)!.route }, '← Return to the Executive Office'),
+        renderRail(HOME_ROOM),
+      ),
+      el(
+        'header',
+        { class: 'hq-seated__head' },
+        el('p', { class: 'hq-eyebrow label' }, 'Executive Office'),
+        el('h1', { class: 'hq-title hq-title--seated' }, 'Founder’s Desk'),
+        el('p', { class: 'hq-lede' }, 'Every submission, gathered in one place. Make the few decisions that are yours to make; the Editorial Office keeps the full review.'),
+      ),
+      el('div', { class: 'hq-deskbar' }, filters),
+      el('div', { class: 'hq-desk' }, list, detail),
+    ),
+  );
+
+  root.replaceChildren(desk);
+  window.scrollTo({ top: 0 });
+  void loadInbox(root);
+  if (deskSelectedId != null) void loadDetail(root, deskSelectedId);
+}
+
+async function loadInbox(root: HTMLElement): Promise<void> {
+  const host = root.querySelector('#hq-inbox') as HTMLElement | null;
+  if (!host) return;
+  // Fetch every submission and group client-side — the founder groupings are a
+  // presentation layer over the existing statuses; the API is unchanged.
+  const res = await fetchInbox();
+  host.setAttribute('aria-busy', 'false');
+
+  if (!res.ok) {
+    host.replaceChildren(deskState(
+      res.offline ? 'The desk is offline' : 'The desk couldn’t load',
+      res.offline ? 'Your work is safe — try again in a moment.' : res.error,
+    ));
+    return;
+  }
+  const def = groupDef(deskFilter);
+  const items = (res.data.submissions || []).filter((s) => def.statuses === null || def.statuses.includes(s.status));
+  if (items.length === 0) {
+    host.replaceChildren(deskState(def.empty.title, def.empty.lede));
+    return;
+  }
+
+  const ul = el('ul', { class: 'hq-inbox__list' });
+  for (const s of items) {
+    const row = el('button', {
+      class: 'hq-inbox__row', type: 'button', 'data-id': String(s.id),
+      ...(s.id === deskSelectedId ? { 'aria-current': 'true' } : {}),
+    },
+      el('span', { class: 'hq-inbox__name' }, s.name),
+      el('span', { class: 'hq-inbox__meta' }, `${typeLabel(s.type)} · ${fmtAge(s.created_at)}`),
+      el('span', { class: 'hq-inbox__summary' }, s.summary || ''),
+      statusPill(s.status),
+    );
+    row.addEventListener('click', () => { deskSelectedId = s.id; markSelected(root, s.id); void loadDetail(root, s.id); });
+    ul.append(el('li', {}, row));
+  }
+  host.replaceChildren(ul);
+}
+
+function markSelected(root: HTMLElement, id: number): void {
+  root.querySelectorAll('.hq-inbox__row').forEach((r) => {
+    if (r.getAttribute('data-id') === String(id)) r.setAttribute('aria-current', 'true');
+    else r.removeAttribute('aria-current');
+  });
+}
+
+async function loadDetail(root: HTMLElement, id: number): Promise<void> {
+  const host = root.querySelector('#hq-detail') as HTMLElement | null;
+  if (!host) return;
+  host.replaceChildren(el('p', { class: 'hq-detail__empty' }, 'Opening…'));
+  const res = await fetchItem(id);
+  if (!res.ok) {
+    host.replaceChildren(deskState(
+      res.offline ? 'Offline' : 'Couldn’t open this submission',
+      res.offline ? 'Your work is safe. Try again shortly.' : res.error,
+    ));
+    return;
+  }
+  renderDetail(root, host, res.data.submission);
+}
+
+function renderDetail(root: HTMLElement, host: HTMLElement, s: SubmissionDetail): void {
+  const head = el('div', { class: 'hq-detail__head' },
+    el('div', { class: 'hq-detail__title' },
+      el('h2', {}, s.name), statusPill(s.status)),
+    el('p', { class: 'hq-detail__sub' }, `${typeLabel(s.type)} · ${s.email} · arrived ${fmtAge(s.created_at)}`),
+  );
+  if (s.summary) head.append(el('p', { class: 'hq-detail__summary' }, s.summary));
+
+  // Valid inline decisions ONLY — derived from the shared transition rules for
+  // this item's CURRENT status. The submissions API re-validates on the server.
+  const actions = el('div', { class: 'hq-detail__actions', role: 'group', 'aria-label': 'Decisions' });
+  const available = inlineActions(s.status);
+  if (available.length === 0) {
+    actions.append(el('p', { class: 'hq-detail__resolved' }, 'Nothing to decide here — the Editorial Office holds the full review.'));
+  } else {
+    for (const a of available) {
+      const btn = el('button', { class: 'hq-action', type: 'button', 'data-to': a.status }, a.label);
+      btn.addEventListener('click', () => { void doAdvance(root, host, s.id, a.status, btn); });
+      actions.append(btn);
+    }
+  }
+
+  // Internal note (audited through the existing API; never emailed, never public).
+  const noteField = el('textarea', { class: 'hq-note__field', rows: '2', 'aria-label': 'Internal note', placeholder: 'Add a private note…' }) as HTMLTextAreaElement;
+  const noteBtn = el('button', { class: 'hq-action hq-action--ghost', type: 'button' }, 'Add note');
+  noteBtn.addEventListener('click', () => { void doNote(root, host, s.id, noteField, noteBtn); });
+  const note = el('div', { class: 'hq-note' }, noteField, noteBtn);
+
+  // The correspondence + audit trail (read-only), newest at the bottom.
+  const thread = el('div', { class: 'hq-thread' }, el('p', { class: 'hq-thread__label label' }, 'History'));
+  const entries = [
+    ...s.messages.map((m) => ({ at: m.created_at, who: m.author || 'system', text: noteText(m), kind: 'note' })),
+    ...s.events.map((e) => ({ at: e.created_at, who: e.actor, text: eventText(e), kind: 'event' })),
+  ].sort((a, b) => a.at.localeCompare(b.at));
+  for (const e of entries) {
+    thread.append(el('div', { class: `hq-thread__row hq-thread__row--${e.kind}` },
+      el('span', { class: 'hq-thread__meta' }, `${fmtAge(e.at)} · ${e.who}`),
+      el('span', { class: 'hq-thread__text' }, e.text)));
+  }
+
+  host.replaceChildren(head, actions, note, thread);
+}
+
+async function doAdvance(root: HTMLElement, host: HTMLElement, id: number, status: SubmissionStatus, btn: HTMLButtonElement): Promise<void> {
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const res = await advanceStatus(id, status);
+  if (!res.ok) {
+    btn.disabled = false; btn.textContent = 'Try again';
+    host.prepend(el('p', { class: 'hq-detail__error' }, res.offline ? 'Offline — not saved.' : res.error));
+    return;
+  }
+  // The spine is authoritative — re-read the item and the list to reflect it.
+  await loadDetail(root, id);
+  void loadInbox(root);
+}
+
+async function doNote(root: HTMLElement, host: HTMLElement, id: number, field: HTMLTextAreaElement, btn: HTMLButtonElement): Promise<void> {
+  const body = field.value.trim();
+  if (!body) { field.focus(); return; }
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const res = await addNote(id, body);
+  if (!res.ok) {
+    btn.disabled = false; btn.textContent = 'Try again';
+    host.prepend(el('p', { class: 'hq-detail__error' }, res.offline ? 'Offline — not saved.' : res.error));
+    return;
+  }
+  await loadDetail(root, id);
+}
+
+/* --- desk helpers -------------------------------------------------------- */
+
+function deskState(title: string, lede: string): HTMLElement {
+  return el('div', { class: 'hq-state hq-state--empty', role: 'note' },
+    el('p', { class: 'hq-state__title' }, title),
+    el('p', { class: 'hq-state__lede' }, lede));
+}
+
+function statusPill(status: string): HTMLElement {
+  return el('span', { class: 'hq-pill', 'data-status': status }, STATUS_LABELS[status] || status);
+}
+
+function typeLabel(type: string): string {
+  return type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function noteText(m: { body: string; kind: string }): string {
+  return m.kind === 'internal_note' ? `Note: ${m.body}` : m.body;
+}
+
+function eventText(e: { action: string; from_status: string | null; to_status: string | null; detail: string | null }): string {
+  if (e.action === 'status_changed') {
+    return `Moved ${e.from_status ? (STATUS_LABELS[e.from_status] || e.from_status) + ' → ' : ''}${STATUS_LABELS[e.to_status || ''] || e.to_status}`;
+  }
+  if (e.action === 'created') return 'Submitted';
+  if (e.action === 'message_added') return e.detail === 'acknowledgment' ? 'Acknowledgment sent' : 'Note added';
+  return e.action;
+}
+
+// Compact relative age from a D1 'YYYY-MM-DD HH:MM:SS' (UTC) timestamp.
+function fmtAge(ts: string): string {
+  if (!ts) return '';
+  const iso = ts.includes('T') ? ts : ts.replace(' ', 'T') + 'Z';
+  const ms = Date.now() - Date.parse(iso);
+  if (Number.isNaN(ms)) return '';
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
 /* --- Morning Arrival ceremony -------------------------------------------- */
 
 /**
@@ -379,6 +685,11 @@ function currentSegment(): string {
   return location.hash.replace(/^#\/?/, '').split('/')[0] ?? '';
 }
 
+/** The second segment, e.g. '#/executive/desk' → 'desk'. */
+function subSegment(): string {
+  return location.hash.replace(/^#\/?/, '').split('/')[1] ?? '';
+}
+
 function route(): void {
   const root = document.getElementById('hq-app');
   if (!root) return;
@@ -404,8 +715,13 @@ function route(): void {
 
   const room = getRoom(seg)!;
   saveLastRoom(room.id); // remember where we are, for the next return
-  if (room.kind === 'atrium') renderScene(root);
-  else renderSeated(root, room);
+  if (room.kind === 'atrium') {
+    // The Executive Office has a seated work state: the Founder’s Desk.
+    if (room.id === HOME_ROOM && subSegment() === 'desk') renderDesk(root);
+    else renderScene(root);
+  } else {
+    renderSeated(root, room);
+  }
 
   // Minimal navigation transition only: return focus to the top of the surface.
   window.scrollTo({ top: 0 });

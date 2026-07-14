@@ -554,6 +554,141 @@
 .hq-arrival__enter:focus-visible { box-shadow: var(--focus-ring); }
 
 /* =============================================================================
+   MILESTONE 3 — the Daily Briefing (orientation) + the Desk (One Inbox).
+   Presentation only; reads/writes go through the existing submissions spine.
+   ============================================================================= */
+
+/* --- Daily Briefing: one quiet plaster note in the scene ----------------- */
+.hq-briefing {
+  margin-top: var(--s-4);
+  max-width: 44ch;
+  display: grid;
+  gap: 4px;
+  padding: var(--s-3) var(--s-4);
+  background: linear-gradient(152deg, var(--hq-plaster) 0%, var(--hq-plaster-2) 100%);
+  border: var(--hairline);
+  border-left: 2px solid var(--brass);
+  box-shadow: var(--hq-shadow-card);
+}
+.hq-briefing__eyebrow { color: var(--umber); margin: 0; }
+.hq-briefing__line {
+  font-family: var(--serif); font-weight: 300; font-size: var(--fs-h3);
+  color: var(--hq-ink); margin: 2px 0 0; line-height: 1.2;
+}
+.hq-briefing__line--quiet { font-size: var(--fs-body); font-style: italic; color: var(--umber); }
+.hq-briefing__meta { font-family: var(--serif); font-style: italic; color: var(--umber); margin: 0; }
+.hq-briefing__enter {
+  justify-self: start; margin-top: var(--s-1);
+  font-family: var(--sans); font-weight: 600; font-size: var(--fs-label);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--brass); text-decoration: none;
+}
+.hq-briefing__enter:hover,
+.hq-briefing__enter:focus-visible { color: var(--terracotta); }
+
+/* --- The Desk: filter bar ------------------------------------------------ */
+.hq-deskbar { margin-top: var(--s-2); }
+.hq-deskbar__filters { display: flex; flex-wrap: wrap; gap: var(--s-1); }
+.hq-chip {
+  font-family: var(--sans); font-size: var(--fs-meta); font-weight: 500;
+  letter-spacing: 0.03em; color: var(--umber);
+  background: transparent; border: var(--hairline); border-radius: var(--radius);
+  padding: 5px 12px; cursor: pointer;
+  transition: color var(--motion-quick) var(--ease-settle), border-color var(--motion-quick) var(--ease-settle);
+}
+.hq-chip:hover,
+.hq-chip:focus-visible { color: var(--hq-ink); border-color: var(--brass); outline: none; }
+.hq-chip[aria-pressed='true'] { color: var(--hq-ink); border-color: var(--brass); background: rgba(var(--ink-rgb), 0.03); }
+
+/* --- The Desk: inbox | detail two-column --------------------------------- */
+.hq-desk {
+  margin-top: var(--s-3);
+  display: grid;
+  gap: var(--s-3);
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  align-items: start;
+}
+.hq-inbox, .hq-detail {
+  background: linear-gradient(152deg, var(--hq-plaster) 0%, var(--hq-plaster-2) 100%);
+  border: var(--hairline);
+  box-shadow: var(--hq-shadow-card);
+  padding: var(--s-3);
+  min-height: 160px;
+}
+.hq-inbox__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.hq-inbox__row {
+  width: 100%; text-align: left; cursor: pointer;
+  display: grid; grid-template-columns: 1fr auto; gap: 2px var(--s-2); align-items: baseline;
+  padding: var(--s-2); background: transparent; border: 0;
+  border-bottom: var(--hairline);
+  transition: background var(--motion-quick) var(--ease-settle);
+}
+.hq-inbox__row:hover,
+.hq-inbox__row:focus-visible { background: rgba(var(--ink-rgb), 0.035); outline: none; }
+.hq-inbox__row[aria-current='true'] { background: rgba(var(--ink-rgb), 0.05); box-shadow: inset 2px 0 0 var(--brass); }
+.hq-inbox__name { font-family: var(--serif); font-size: var(--fs-body); color: var(--hq-ink); }
+.hq-inbox__meta { font-family: var(--sans); font-size: var(--fs-meta); color: var(--umber); }
+.hq-inbox__summary { grid-column: 1 / -1; font-family: var(--serif); font-style: italic; font-size: var(--fs-body-sm); color: var(--umber); }
+
+/* --- status pill (tonal, calm — not a KPI badge) ------------------------- */
+.hq-pill {
+  font-family: var(--sans); font-size: var(--fs-meta); font-weight: 600;
+  letter-spacing: 0.04em; color: var(--umber);
+  border: var(--hairline); border-radius: 999px; padding: 2px 10px; white-space: nowrap;
+}
+.hq-pill[data-status='sent_for_review'],
+.hq-pill[data-status='under_review'] { color: var(--oxblood); border-color: rgba(122, 59, 52, 0.4); }
+.hq-pill[data-status='approved'],
+.hq-pill[data-status='published'] { color: #3f5142; border-color: rgba(63, 81, 66, 0.4); }
+
+/* --- submission detail --------------------------------------------------- */
+.hq-detail__empty { font-family: var(--serif); font-style: italic; color: var(--umber); margin: 0; }
+.hq-detail__head { display: grid; gap: 4px; padding-bottom: var(--s-2); border-bottom: var(--hairline); }
+.hq-detail__title { display: flex; align-items: baseline; gap: var(--s-2); flex-wrap: wrap; }
+.hq-detail__title h2 { font-family: var(--serif); font-weight: 300; font-size: var(--fs-h2); color: var(--hq-ink); margin: 0; }
+.hq-detail__sub { font-family: var(--sans); font-size: var(--fs-meta); color: var(--umber); margin: 0; }
+.hq-detail__summary { font-family: var(--serif); font-style: italic; color: var(--umber); margin: var(--s-1) 0 0; }
+.hq-detail__actions { display: flex; flex-wrap: wrap; gap: var(--s-1); margin-top: var(--s-3); }
+.hq-detail__resolved { font-family: var(--serif); font-style: italic; color: var(--umber); margin: var(--s-2) 0 0; }
+.hq-detail__error { color: var(--oxblood); font-size: var(--fs-body-sm); margin: 0 0 var(--s-2); }
+
+.hq-action {
+  font-family: var(--sans); font-weight: 600; font-size: var(--fs-label);
+  letter-spacing: 0.02em; color: var(--alabaster); background: var(--umber);
+  border: 1px solid var(--umber); border-radius: var(--radius);
+  padding: 9px 16px; min-height: 40px; cursor: pointer;
+  transition: background var(--motion-quick) var(--ease-settle), color var(--motion-quick) var(--ease-settle);
+}
+.hq-action:hover,
+.hq-action:focus-visible { background: var(--ink); border-color: var(--ink); outline: none; }
+.hq-action:focus-visible { box-shadow: var(--focus-ring); }
+.hq-action[disabled] { opacity: 0.6; cursor: default; }
+.hq-action--ghost { color: var(--hq-ink); background: transparent; border-color: var(--brass); }
+.hq-action--ghost:hover,
+.hq-action--ghost:focus-visible { background: rgba(var(--ink-rgb), 0.04); color: var(--hq-ink); border-color: var(--brass); }
+
+.hq-note { display: grid; gap: var(--s-1); margin-top: var(--s-3); }
+.hq-note__field {
+  font-family: var(--serif); font-size: var(--fs-body-sm); color: var(--hq-ink);
+  background: var(--alabaster); border: var(--hairline); border-radius: var(--radius);
+  padding: var(--s-2); resize: vertical; width: 100%;
+}
+.hq-note__field:focus-visible { outline: none; border-color: var(--brass); box-shadow: var(--focus-ring); }
+.hq-note .hq-action { justify-self: start; }
+
+.hq-thread { margin-top: var(--s-4); display: grid; gap: var(--s-1); }
+.hq-thread__label { color: var(--umber); }
+.hq-thread__row { display: grid; gap: 2px; padding: var(--s-1) 0; border-top: var(--hairline); }
+.hq-thread__meta { font-family: var(--sans); font-size: var(--fs-meta); color: var(--umber); }
+.hq-thread__text { font-family: var(--serif); font-size: var(--fs-body-sm); color: var(--hq-ink); }
+.hq-thread__row--event .hq-thread__text { font-style: italic; color: var(--umber); }
+
+/* Desk stacks on narrow viewports (detail below the inbox). */
+@media (max-width: 900px) {
+  .hq-desk { grid-template-columns: 1fr; }
+}
+
+/* =============================================================================
    MOBILE — the Indexed Headquarters. Below the editorial breakpoint the scene
    is not compressed: it becomes a plain, legible vertical INDEX of the wings.
    The primary work is always immediately available (Build Bible §8.5, §16).
@@ -602,4 +737,7 @@
   .hq-wing__link:focus-visible { transition: none; transform: none; }
   .hq-arrival,
   .hq-arrival__inner { transition: none; }
+  .hq-chip,
+  .hq-inbox__row,
+  .hq-action { transition: none; }
 }
