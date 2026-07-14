@@ -41,6 +41,7 @@ import {
   type ProductionSprint,
 } from './production.ts';
 import { RELATIONSHIPS, SALON_LEDE, HORIZON_NOTE } from './growth.ts';
+import { SAFEGUARDS, STUDY_LEDE, CONTINUITY_NOTE } from './business.ts';
 
 /* --- small helpers ------------------------------------------------------- */
 
@@ -811,6 +812,62 @@ function renderGrowth(root: HTMLElement, room: Room): void {
   root.replaceChildren(view);
 }
 
+/* =============================================================================
+   BUSINESS OFFICE — a private counsel's study where what's built is kept safe
+   (Milestone 8 — the wing that completes the residence).
+
+   Route: #/business. The residence's most rooted, permanent room, answering "How
+   do we preserve what the House has built?" — protection before administration.
+   The hero is THE ARCHIVE: a wall of archival records naming the subjects the
+   House protects. No workflow data, no fetch, no numbers, no records, no
+   dashboard, no current-priority task — the architecture carries the meaning.
+   ============================================================================= */
+function renderBusiness(root: HTMLElement, room: Room): void {
+  setMode('seated');
+
+  // The Archive — the subjects the House keeps and protects, each a calm walnut
+  // record. Archival subjects only; never a record, a figure, or a status.
+  const records = el('ul', { class: 'hq-arch__list' });
+  for (const s of SAFEGUARDS) {
+    records.append(el('li', { class: 'hq-arch__record' },
+      el('p', { class: 'hq-arch__name' }, s.name),
+      el('p', { class: 'hq-arch__note' }, s.note)));
+  }
+
+  const archive = el(
+    'section',
+    { class: 'hq-arch', role: 'group', 'aria-label': 'The archive — what the House keeps safe' },
+    el('p', { class: 'hq-arch__eyebrow label' }, 'The archive'),
+    records,
+    el('p', { class: 'hq-arch__continuity' }, CONTINUITY_NOTE),
+  );
+
+  const view = el(
+    'section',
+    { class: 'hq-view hq-view--seated hq-view--business', 'aria-label': room.name },
+    el(
+      'div',
+      { class: 'hq-view__inner container' },
+      el(
+        'div',
+        { class: 'hq-seated__bar' },
+        el('a', { class: 'hq-back', href: getRoom(HOME_ROOM)!.route }, '← Return to the Executive Office'),
+        renderRail(room.id),
+      ),
+      el(
+        'header',
+        { class: 'hq-seated__head' },
+        el('p', { class: 'hq-eyebrow label' }, room.name),
+        el('h1', { class: 'hq-title hq-title--seated' }, room.name),
+        el('p', { class: 'hq-lede' }, STUDY_LEDE),
+      ),
+      archive,
+    ),
+  );
+
+  root.replaceChildren(view);
+}
+
 /** ERROR — an unrecognised route. Offers the way home rather than a dead end. */
 function renderError(root: HTMLElement): void {
   setMode('seated');
@@ -1232,6 +1289,9 @@ function route(): void {
   } else if (room.id === 'growth') {
     // The Growth Studio — a sunlit publishing salon overlooking the horizon.
     renderGrowth(root, room);
+  } else if (room.id === 'business') {
+    // The Business Office — a private counsel's study where what's built is kept safe.
+    renderBusiness(root, room);
   } else {
     renderSeated(root, room);
   }
@@ -1258,5 +1318,5 @@ if (document.readyState === 'loading') {
 }
 
 // Re-exported for tests and future milestones (kept off the module's happy path).
-export { renderScene, renderSeated, renderOperations, renderCreative, renderProduction, renderGrowth, renderError, renderAccessDenied };
+export { renderScene, renderSeated, renderOperations, renderCreative, renderProduction, renderGrowth, renderBusiness, renderError, renderAccessDenied };
 export type { Room, RoomId };

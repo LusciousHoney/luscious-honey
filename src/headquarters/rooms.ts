@@ -111,10 +111,10 @@ export const ROOMS: Room[] = [
   {
     id: 'business',
     name: 'Business Office',
-    blurb: 'The House’s affairs and standing — in preparation.',
+    blurb: 'Where what the House has built is kept safe — protection and permanence.',
     route: '#/business',
     kind: 'department',
-    status: 'reserved',
+    status: 'live',
   },
 ];
 
