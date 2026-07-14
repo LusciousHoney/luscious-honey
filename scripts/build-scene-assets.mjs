@@ -8,14 +8,27 @@
 
      node scripts/build-scene-assets.mjs "/path/to/LHC Office 2.png"
 
-   Requires `sharp` (present in node_modules). Not part of the app runtime.
+   Requires `sharp` (a devDependency). Not part of the app runtime.
    ============================================================================= */
 import sharp from 'sharp';
 import { mkdirSync, statSync, copyFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const SRC = process.argv[2] || '/Users/melodyrash/Downloads/LHC Office 2.png';
-if (!existsSync(SRC)) { console.error('Source not found:', SRC); process.exit(1); }
+// The source render must be supplied explicitly — no baked-in path. Missing
+// argument → concise usage + non-zero exit, before any work is attempted.
+const srcArg = process.argv[2];
+if (!srcArg) {
+  console.error('Usage: node scripts/build-scene-assets.mjs <source-image>');
+  console.error('  <source-image>  path to the Executive Office master render (e.g. a PNG).');
+  process.exit(1);
+}
+
+// Resolve relative to the current working directory, then confirm it exists.
+const SRC = resolve(srcArg);
+if (!existsSync(SRC)) {
+  console.error('Source not found:', SRC);
+  process.exit(1);
+}
 
 const OUT = resolve('public/headquarters/scene');
 const MASTER = resolve('art-masters');
