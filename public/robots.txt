@@ -8,3 +8,6 @@ Disallow: /editorial-office
 # The Production Studio (and the Voice Notes Studio within it) is private and
 # gated by Cloudflare Access; keep it out of any index as defence-in-depth.
 Disallow: /production-studio
+# The Executive Team Headquarters is private and gated by Cloudflare Access;
+# keep it out of any index as defence-in-depth.
+Disallow: /headquarters

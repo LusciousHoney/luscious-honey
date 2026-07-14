@@ -22,10 +22,11 @@
 
 import { verifyAccessRequest } from './_lib/access.js'
 
-// The private institutional areas, both gated by the SAME Cloudflare Access
-// infrastructure. Production Studio (creative production tools) and Editorial
-// Office (editorial operations) are separate surfaces sharing one gate.
-const PREFIXES = ['/production-studio', '/editorial-office']
+// The private institutional areas, all gated by the SAME Cloudflare Access
+// infrastructure. Production Studio (creative production tools), Editorial
+// Office (editorial operations), and the Executive Team Headquarters (the
+// founder's private headquarters) are separate surfaces sharing one gate.
+const PREFIXES = ['/production-studio', '/editorial-office', '/headquarters']
 
 /**
  * Boundary-safe prefix test. Protects each prefix exactly — e.g.

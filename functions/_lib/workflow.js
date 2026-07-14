@@ -1,40 +1,30 @@
 /**
- * Canonical editorial workflow — the single status model for ALL submission
- * types (Artist Features today; Author Features, Creator Spotlights, etc.
- * tomorrow). The future Editorial Office UI consumes these values; it does not
- * define its own.
+ * Canonical editorial workflow (server view).
  *
- * This is intentionally a flat, any-to-any set for V1: the editor may move a
- * submission to any status. (A stricter transition graph can be layered on
- * later without changing storage.)
+ * The status values, labels, and transition metadata now live in the
+ * environment-neutral contract at shared/workflow.js — the SINGLE source of
+ * truth shared by the Functions and the Headquarters client. This module simply
+ * re-exports that contract so existing server imports (functions/api/submissions.js,
+ * functions/_lib/submissions.js) keep working unchanged, and adds nothing of its
+ * own. The submissions API remains authoritative: it re-validates every status.
+ *
+ * The status model stays flat/any-to-any for the Editorial Office (the complete
+ * review workspace); the founder's *inline* decisions in the Headquarters are the
+ * narrower `INLINE_TRANSITIONS` subset, also defined in the shared contract.
  */
 
-export const STATUSES = [
-  'draft',
-  'sent_for_review',
-  'under_review',
-  'changes_requested',
-  'approved',
-  'scheduled',
-  'published',
-  'not_accepted',
-]
-
-// Where a fresh PUBLIC submission enters the workflow.
-export const INITIAL_PUBLIC_STATUS = 'sent_for_review'
-
-// Human labels for surfaces that render the workflow.
-export const STATUS_LABELS = {
-  draft: 'Draft',
-  sent_for_review: 'Sent for Review',
-  under_review: 'Under Review',
-  changes_requested: 'Changes Requested',
-  approved: 'Approved',
-  scheduled: 'Scheduled',
-  published: 'Published',
-  not_accepted: 'Not Accepted',
-}
-
-export function isStatus(value) {
-  return STATUSES.includes(value)
-}
+export {
+  STATUSES,
+  INITIAL_PUBLIC_STATUS,
+  STATUS_LABELS,
+  isStatus,
+  AWAITING_REVIEW,
+  FINAL_STATUSES,
+  isAwaitingReview,
+  isResolved,
+  isOpen,
+  INLINE_TRANSITIONS,
+  ACTION_LABELS,
+  isInlineTransition,
+  inlineActions,
+} from '../../shared/workflow.js'

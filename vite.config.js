@@ -70,6 +70,7 @@ export default defineConfig({
         // public/production-studio/voice-notes/.
         productionStudio: resolve(__dirname, 'production-studio/index.html'), // /production-studio/  Studio hub (private)
         editorialOffice: resolve(__dirname, 'editorial-office/index.html'), // /editorial-office/  Editorial Office · Submission Review (private, Access-gated)
+        headquarters: resolve(__dirname, 'headquarters/index.html'), // /headquarters/  Executive Team Headquarters shell (private, Access-gated)
         notFound: resolve(__dirname, '404.html'),          // /404       Not-found page (templated so build applies data-env)
       },
     },

@@ -39,10 +39,11 @@ npm run deploy      # = npm run verify (build + tests + fixture-safety) && wrang
 
 ## Private surfaces — Cloudflare Access (REQUIRED before deploy)
 
-Two private areas — the **Production Studio** (`/production-studio/`) and the
-**Editorial Office** (`/editorial-office/`) — are part of the production build so
-they live at real URLs. That means each is **published to `dist/` and would be
-publicly reachable unless it is gated.** Both share the same Access infrastructure.
+Three private areas — the **Production Studio** (`/production-studio/`), the
+**Editorial Office** (`/editorial-office/`), and the **Executive Team
+Headquarters** (`/headquarters/`) — are part of the production build so they live
+at real URLs. That means each is **published to `dist/` and would be publicly
+reachable unless it is gated.** All three share the same Access infrastructure.
 
 (The **Interview Workbench** — the founder-interview authoring tool at
 `interview-workbench.html` — is **not** a Vite build input, so it never ships to
@@ -84,10 +85,11 @@ the steps below is **blocked, not exposed** — it fails closed.
      domain `luscioushoneycollective.com` path `/production-studio` (prefix match
      covers the hub, the Voice Notes Studio, and all its assets) → Policy: Allow
      `melody@melodyrash.com` (+ contributors).
-   **Repeat step 2 for the Editorial Office:** create (or extend) a Cloudflare
-   Access application covering the `/editorial-office` prefix on the same custom
-   domain, with the same Allow policy. Both `/production-studio*` and
-   `/editorial-office*` are gated by the same `functions/_middleware.js` and the
+   **Repeat step 2 for the Editorial Office and the Headquarters:** create (or
+   extend) a Cloudflare Access application covering the `/editorial-office` prefix
+   and one covering the `/headquarters` prefix on the same custom domain, with the
+   same Allow policy. `/production-studio*`, `/editorial-office*`, and
+   `/headquarters*` are all gated by the same `functions/_middleware.js` and the
    same `ACCESS_TEAM_DOMAIN` / `ACCESS_AUD`.
 3. **Preview-coverage decision (choose one):**
    - **(a) Cover previews with Access** — add the project's preview domain
@@ -99,10 +101,10 @@ the steps below is **blocked, not exposed** — it fails closed.
      present there), so previews return 403 to everyone. Test locally instead.
    Either choice keeps previews non-public; (b) is the safe default.
 
-Defence-in-depth also present: both pages carry
+Defence-in-depth also present: all three private pages carry
 `<meta name="robots" content="noindex, nofollow">` and `robots.txt` disallows
-`/production-studio`. **These are not security controls** — the middleware +
-Access are the gate.
+`/production-studio`, `/editorial-office`, and `/headquarters`. **These are not
+security controls** — the middleware + Access are the gate.
 
 > If Access is not in place, treat `/production-studio*` as public and do **not**
 > deploy the Studio.

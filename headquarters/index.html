@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en" data-env="development">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Executive Team Headquarters — Luscious Honey Collective (private)</title>
+    <meta name="description" content="The private Executive Team Headquarters of Luscious Honey Collective." />
+    <!-- Private, founder-only. Never indexed; the real gate is Cloudflare
+         Access on /headquarters* — see docs/DEPLOY.md. -->
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="color-scheme" content="light" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,200;0,6..72,300;1,6..72,200;1,6..72,300&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="hq-page" data-tod="morning" data-hq-mode="scene">
+    <a class="skip-link" href="#main">Skip to the Headquarters</a>
+
+    <div class="container">
+      <header class="site-header">
+        <span class="wordmark">Luscious&nbsp;Honey <b>Collective</b></span>
+        <span class="label" aria-hidden="true">Headquarters · private</span>
+      </header>
+    </div>
+
+    <main id="main" class="hq" data-hq-view="scene">
+      <!-- The Headquarters mounts here. Everything below is the pre-boot loading
+           state: a plain, honest document beneath the scene, per Sprint 04
+           (Accessibility) — if JavaScript never runs, the founder still sees a
+           labelled Headquarters and a way back to the corridor. -->
+      <div id="hq-app" class="hq-app" aria-live="polite">
+        <div class="hq-state hq-state--loading" role="status">
+          <p class="label">Executive Team Headquarters</p>
+          <p class="hq-state__lede">Entering the Headquarters…</p>
+        </div>
+      </div>
+
+      <noscript>
+        <div class="container hq-noscript">
+          <p class="label">Executive Team Headquarters</p>
+          <p>This private Headquarters needs JavaScript to render its rooms.
+             <a href="/">Return to the corridor</a>.</p>
+        </div>
+      </noscript>
+    </main>
+
+    <footer class="colophon">
+      <div class="container">
+        <p class="wordmark">Luscious Honey Collective</p>
+        <p class="meta">A house for storytellers · MMXXVI</p>
+      </div>
+    </footer>
+
+    <script type="module" src="/src/headquarters/main.ts"></script>
+  </body>
+</html>

@@ -101,6 +101,10 @@ test('isProtectedPath: protected root, nested, and assets match', () => {
     '/editorial-office/',
     '/editorial-office/submission-review',
     '/EDITORIAL-OFFICE/', // case-insensitive
+    '/headquarters',       // third private area, same gate
+    '/headquarters/',
+    '/headquarters/executive',
+    '/HEADQUARTERS/',      // case-insensitive
   ]) {
     assert.equal(isProtectedPath(p), true, `expected protected: ${p}`)
   }
@@ -118,6 +122,8 @@ test('isProtectedPath: public + lookalike routes are NOT matched', () => {
     '/not/production-studio',     // prefix not at path start
     '/editorial-office-notes',    // boundary: hyphen, not a slash
     '/editorial-officex',         // boundary: extra char
+    '/headquarters-news',         // boundary: hyphen, not a slash
+    '/headquartersx',             // boundary: extra char
     '/artist-features',           // the PUBLIC intake page is never gated
   ]) {
     assert.equal(isProtectedPath(p), false, `expected public: ${p}`)
@@ -164,6 +170,16 @@ test('protected nested asset, no token → 403', async () => {
     const res = await run(p)
     assert.equal(res.status, 403, `expected 403 for ${p}`)
   }
+})
+
+test('Headquarters root, configured but no token → 403 (fails closed)', async () => {
+  const res = await run('/headquarters/')
+  assert.equal(res.status, 403)
+})
+
+test('Headquarters nested route, no token → 403', async () => {
+  const res = await run('/headquarters/executive')
+  assert.equal(res.status, 403)
 })
 
 // ── 5) Invalid / expired / wrong-aud tokens → deny ──────────────────────────
