@@ -65,22 +65,55 @@ function setTimeOfDay(): void {
  * completely without it (Build Bible §14: decorative imagery hidden; core usable
  * with scene art missing). It lives behind the app and dims when Seated.
  */
+// The Executive Office scene render, as responsive derivatives (AVIF → WebP →
+// JPEG). A dedicated portrait crop is art-directed in below 900px; the landscape
+// frame is width-responsive above it. Decorative (alt="", aria-hidden), deferred
+// (decoding async, low priority), and it never reserves layout — it fills the
+// fixed `.hq-atmos__art` box, so a slow or failed load causes no shift and the
+// CSS environment simply shows through underneath. Assets: public/headquarters/scene/.
+const SCENE = '/headquarters/scene';
+const SCENE_PICTURE = `
+  <picture>
+    <source media="(max-width: 900px)" type="image/avif" srcset="${SCENE}/exec-mobile.avif">
+    <source media="(max-width: 900px)" type="image/webp" srcset="${SCENE}/exec-mobile.webp">
+    <source media="(max-width: 900px)" srcset="${SCENE}/exec-mobile.jpg">
+    <source type="image/avif" srcset="${SCENE}/exec-1024.avif 1024w, ${SCENE}/exec-1400.avif 1400w" sizes="100vw">
+    <source type="image/webp" srcset="${SCENE}/exec-1024.webp 1024w, ${SCENE}/exec-1400.webp 1400w" sizes="100vw">
+    <img class="hq-atmos__art-img" alt="" aria-hidden="true" loading="lazy" decoding="async" fetchpriority="low"
+         src="${SCENE}/exec-1400.jpg"
+         srcset="${SCENE}/exec-1024.jpg 1024w, ${SCENE}/exec-1400.jpg 1400w" sizes="100vw">
+  </picture>`;
+
 function ensureAtmosphere(): void {
   if (document.querySelector('.hq-atmos')) return;
   const atmos = el('div', { class: 'hq-atmos', 'aria-hidden': 'true' });
+
+  // The scene-artwork layer now carries the approved Executive Office render.
+  // `data-hq-art` on <body> gates the artwork treatment (tint + text legibility):
+  //   'on'     → the image decoded successfully; the room is the photograph.
+  //   'failed' → the image errored; stay on the CSS environment (graceful).
+  // Until either fires, the CSS environment renders — the residence is usable
+  // before (and without) the artwork.
+  const art = el('div', { class: 'hq-atmos__art' });
+  art.innerHTML = SCENE_PICTURE;
+  const img = art.querySelector('img');
+  if (img) {
+    const reveal = () => { document.body.setAttribute('data-hq-art', 'on'); img.classList.add('is-loaded'); };
+    if (img.complete && img.naturalWidth > 0) reveal();
+    else {
+      img.addEventListener('load', reveal, { once: true });
+      img.addEventListener('error', () => document.body.setAttribute('data-hq-art', 'failed'), { once: true });
+    }
+  }
+
   atmos.append(
-    // The CSS-rendered environment (the default today): sky, light, floor, foliage.
+    // The CSS-rendered environment (the fallback beneath the artwork).
     el('div', { class: 'hq-atmos__sky' }),
     el('div', { class: 'hq-atmos__sun' }),
     el('div', { class: 'hq-atmos__floor' }),
     el('div', { class: 'hq-atmos__foliage' }),
-    // Rendering seam for FUTURE architectural artwork. Both layers are inert
-    // until a later milestone defines the scene-asset tokens in CSS: `__art`
-    // holds the per-time-of-day scene image (none today → the CSS environment
-    // above shows through), and `__tint` carries the time-of-day light *over*
-    // the artwork. No navigation, interaction, or state depends on them; they
-    // are purely decorative and covered by the `.hq-atmos` aria-hidden.
-    el('div', { class: 'hq-atmos__art' }),
+    // The architectural artwork, then the time-of-day light laid over it.
+    art,
     el('div', { class: 'hq-atmos__tint' }),
   );
   document.body.prepend(atmos);

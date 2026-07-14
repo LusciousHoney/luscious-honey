@@ -201,6 +201,64 @@
               background var(--motion-room) var(--ease-camera);
 }
 
+/* The approved Executive Office render fills the artwork layer. It fades in only
+   once decoded; before/without it the CSS environment shows through (no layout
+   shift — the image fills the fixed layer box). */
+.hq-atmos__art-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 38%;        /* landscape (desktop/tablet): hold the view + desk */
+  opacity: 0;
+  transition: opacity var(--motion-room) var(--ease-camera);
+}
+.hq-atmos__art-img.is-loaded { opacity: 1; }
+@media (max-width: 900px) {
+  /* The portrait crop is already composed; centre it. */
+  .hq-atmos__art-img { object-position: 50% 50%; }
+}
+
+/* --- Artwork treatment (only when the render has decoded) ------------------
+   Time-of-day rides OVER the photograph as a restrained WARM wash — never a
+   darkening. Morning is the canonical state (barely touched); golden hour and
+   evening warm it; none of it reduces legibility. */
+.hq-page[data-hq-art='on']                       { --hq-scene-tint: 0.06; }
+.hq-page[data-hq-art='on'][data-tod='afternoon'] { --hq-scene-tint: 0.12; }
+.hq-page[data-hq-art='on'][data-tod='evening']   { --hq-scene-tint: 0.38; }
+.hq-page[data-hq-art='on'][data-tod='late']      { --hq-scene-tint: 0.30; }
+
+/* A restrained, warm light lift behind the hero text ONLY — keeps the dark
+   editorial type legible over the photograph without washing the room. Applied
+   only in artwork mode; the CSS-environment scene is unaffected. */
+.hq-page[data-hq-art='on'] .hq-view--scene .hq-hero { position: relative; z-index: 0; }
+.hq-page[data-hq-art='on'] .hq-view--scene .hq-hero::before {
+  content: '';
+  position: absolute;
+  inset: -10% 0 -14% 0;            /* vertical bleed only — never past the viewport */
+  z-index: -1;
+  /* Warm light across the text COLUMN (left), clearing to the open room (right).
+     Guarantees the dark editorial type stays legible over the photograph. */
+  background:
+    linear-gradient(103deg,
+      rgba(247, 243, 236, 0.92) 0%,
+      rgba(247, 243, 236, 0.70) 34%,
+      rgba(247, 243, 236, 0.28) 58%,
+      rgba(247, 243, 236, 0) 78%);
+  pointer-events: none;
+}
+/* Portrait viewports: the hero type is full-width, so lift the whole block
+   top-down instead of just the left column (still soft, still warm). */
+@media (max-width: 900px) {
+  .hq-page[data-hq-art='on'] .hq-view--scene .hq-hero::before {
+    background: linear-gradient(180deg,
+      rgba(247, 243, 236, 0.90) 0%,
+      rgba(247, 243, 236, 0.76) 58%,
+      rgba(247, 243, 236, 0.46) 100%);
+  }
+}
+
 /* Focused-work dim: a warm scrim that lifts over the atmosphere when Seated.
    z-index keeps it above BOTH the CSS environment and the artwork/tint planes. */
 .hq-atmos::after {
@@ -536,6 +594,7 @@
   .hq-atmos__foliage { animation: none; }
   .hq-atmos__sun,
   .hq-atmos__art,
+  .hq-atmos__art-img,
   .hq-atmos__tint,
   .hq-atmos::after { transition: none; }
   .hq-wing__link,

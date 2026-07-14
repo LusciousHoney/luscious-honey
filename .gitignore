@@ -24,3 +24,7 @@ public/production-studio/voice-notes/images/*
 
 # TK Tribute — keep the archival WAV master local; never commit (Cloudflare 25 MiB cap)
 public/tribute/tk/*.wav
+
+# Headquarters scene MASTERS — preserved locally for provenance, never bundled.
+# Only the optimized derivatives in public/headquarters/scene/ ship.
+art-masters/
