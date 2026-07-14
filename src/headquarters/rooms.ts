@@ -103,10 +103,10 @@ export const ROOMS: Room[] = [
   {
     id: 'growth',
     name: 'Growth Studio',
-    blurb: 'Reach and audience — in preparation.',
+    blurb: 'Where the House finds resonance — its conversations with the world.',
     route: '#/growth',
     kind: 'department',
-    status: 'reserved',
+    status: 'live',
   },
   {
     id: 'business',
