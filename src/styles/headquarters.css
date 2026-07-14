@@ -829,6 +829,214 @@
 }
 
 /* =============================================================================
+   MILESTONE 5 — the Creative Director. "The library where the making lives": the
+   residence's warmest, most interior room — a private editorial library, never a
+   design studio, mood board, or dashboard. Same constitution as the other wings
+   (§III), spoken in a warmer, quieter voice: this wing leans WHITE OAK and WARM
+   WALNUT, with warm reading light POOLED over the work and deep shelves in soft
+   shadow. Additive presentation only; the shared frozen backdrop, atmosphere, and
+   artwork pipeline are untouched. Distinct from the bright Executive atrium and
+   the cool-limestone Operations casework by being interior, shadowed, and warm.
+   ============================================================================= */
+.hq-view--creative {
+  /* Oak / walnut / aged-paper family — warmer and deeper than the plaster rooms.
+     A trace of brass only. The room is still the bright residence, never dim or
+     heavy; "shadow" here is soft warmth, not darkness. */
+  --hq-oak:        #C9A876;                    /* white oak in warm light */
+  --hq-oak-deep:   #A9814E;                    /* oak in soft shelf shadow */
+  --hq-walnut:     #6E4E34;                    /* warm walnut, the deepest note */
+  --hq-paper:      #FCF7EE;                    /* elegant warm cream (never yellowed) */
+  --hq-paper-2:    #F2EADB;                    /* the page in soft shadow */
+  --hq-paper-under:#E9DFCC;                    /* the leaves stacked beneath the top page */
+  --hq-paper-edge: rgba(110, 78, 52, 0.16);    /* the warm hairline of a page edge */
+  --hq-read-pool:  rgba(214, 178, 112, 0.30);  /* the pooled warm reading light */
+}
+
+/* The room as a reading library: a warm light pooled behind the work, so the
+   founder's eye is drawn to the open page. A room-scoped glow only — it never
+   touches the frozen atmosphere layer. */
+.hq-library {
+  position: relative;
+  display: grid;
+  gap: var(--s-6);
+}
+.hq-library::before {
+  content: '';
+  position: absolute;
+  inset: -6% -8% 30% -8%;
+  z-index: 0;
+  background: radial-gradient(60% 70% at 30% 22%, var(--hq-read-pool) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hq-library > * { position: relative; z-index: 1; }
+.hq-library__lower {
+  display: grid;
+  gap: var(--s-6);
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  align-items: start;
+}
+
+/* --- The open manuscript (primary object) --------------------------------
+   A single page lying open on oak, as though the founder just stepped away. Aged
+   paper with a warm edge and the faintest centre gutter of an open leaf — never a
+   card, never a control. Only ever ONE. */
+.hq-manuscript {
+  position: relative;
+  padding: var(--s-7) var(--s-6);
+  /* An open leaf: a soft gutter VALLEY down the centre where the two pages meet,
+     with a hairline at its base, over elegant warm cream. Strengthened so the
+     book reads as physically real, as though just set down. */
+  background:
+    linear-gradient(90deg,
+      transparent 42%,
+      rgba(110, 78, 52, 0.05) 47%,
+      rgba(110, 78, 52, 0.17) 50%,
+      rgba(110, 78, 52, 0.05) 53%,
+      transparent 58%) no-repeat,
+    linear-gradient(90deg, transparent calc(50% - 0.6px), rgba(110, 78, 52, 0.32) 50%, transparent calc(50% + 0.6px)) no-repeat,
+    linear-gradient(158deg, var(--hq-paper) 0%, var(--hq-paper-2) 100%);
+  border: 1px solid var(--hq-paper-edge);
+  border-radius: 6px;
+  /* The top leaf resting on a few sheets beneath it — subtle physical thickness,
+     not an antique tome. Two hairline sheet edges, then a soft grounding shadow. */
+  box-shadow:
+    0 1px 0 rgba(255, 252, 245, 0.85) inset,
+    0 3px 0 var(--hq-paper-2),
+    0 6px 0 var(--hq-paper-under),
+    0 30px 56px -40px rgba(110, 78, 52, 0.42);
+  animation: hq-rise var(--motion-settle) var(--ease-settle) both;
+}
+.hq-manuscript__eyebrow { color: var(--hq-oak-deep); margin: 0 0 var(--s-2); }
+.hq-manuscript__title {
+  font-family: var(--serif); font-weight: 300; font-size: var(--fs-h1);
+  line-height: var(--leading-tight); letter-spacing: -0.01em;
+  color: var(--hq-ink); margin: 0; max-width: 22ch;
+}
+.hq-manuscript__summary {
+  font-family: var(--serif); font-size: var(--fs-body); line-height: 1.6;
+  color: var(--hq-ink); margin: var(--s-3) 0 0; max-width: 60ch;
+}
+.hq-manuscript__hold {
+  font-family: var(--serif); font-style: italic; font-size: var(--fs-body-sm);
+  color: var(--umber); margin: var(--s-4) 0 0; max-width: 52ch;
+}
+.hq-manuscript__resting {
+  font-family: var(--serif); font-style: italic; font-size: var(--fs-body);
+  color: var(--umber); margin: 0; max-width: 52ch;
+}
+
+/* --- The Collection (the made body of work, as bound spines) --------------- */
+.hq-collection__head {
+  display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-3);
+  align-items: baseline; justify-content: space-between; margin-bottom: var(--s-3);
+}
+.hq-collection__eyebrow { color: var(--hq-oak-deep); margin: 0; }
+.hq-collection__meta { font-family: var(--serif); font-style: italic; font-size: var(--fs-body-sm); color: var(--umber); margin: 0; }
+.hq-collection__empty {
+  font-family: var(--serif); font-style: italic; color: var(--umber); margin: 0; max-width: 52ch;
+}
+/* The made works STAND on the shelf as bound books — varied heights, a couple
+   leaning, titles running down the spines. A curated private library, never a
+   grid of cards or a list of selectable rows. Non-interactive; furniture. */
+.hq-collection__shelf {
+  list-style: none; margin: 0; padding: 0 var(--s-1);
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s-3);
+  min-height: 196px;
+  border-bottom: 3px solid var(--hq-oak-deep);          /* the oak shelf ledge */
+  box-shadow: 0 4px 10px -8px rgba(110, 78, 52, 0.45);  /* the ledge's soft cast */
+}
+.hq-volume {
+  flex: 0 0 auto;
+  width: 46px; height: 176px;
+  overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--s-2) 0;
+  border-radius: 3px 3px 0 0;                    /* the rounded head of a book */
+  /* A cloth-and-oak binding, darkened at the joints to hint the raised bands. */
+  background:
+    linear-gradient(90deg, rgba(0,0,0,0.12), transparent 22%, transparent 78%, rgba(0,0,0,0.14)),
+    linear-gradient(180deg, var(--hq-oak-deep) 0%, var(--hq-walnut) 100%);
+  box-shadow: inset 0 0 0 1px rgba(110, 78, 52, 0.35), 0 12px 20px -14px rgba(110, 78, 52, 0.55);
+}
+/* Varied heights and a gentle lean, so the shelf reads lived-in, not uniform. */
+.hq-volume:nth-child(2) { height: 158px; }
+.hq-volume:nth-child(3) { height: 184px; }
+.hq-volume:nth-child(4) { height: 150px; transform: rotate(-4deg); transform-origin: bottom right; }
+.hq-volume:nth-child(5) { height: 170px; }
+.hq-volume:nth-child(6) { height: 160px; }
+/* Every third volume is bound in linen-pale cloth — a real shelf is not one tone. */
+.hq-volume:nth-child(3n) {
+  background:
+    linear-gradient(90deg, rgba(0,0,0,0.06), transparent 22%, transparent 78%, rgba(0,0,0,0.08)),
+    linear-gradient(180deg, #E7DCC6 0%, #D8CAAD 100%);
+}
+.hq-volume__title {
+  font-family: var(--serif); font-weight: 500; font-size: 12px; letter-spacing: 0.01em;
+  color: var(--hq-paper);                               /* cream, on the dark bindings */
+  writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg);
+  white-space: nowrap;
+}
+.hq-volume:nth-child(3n) .hq-volume__title { color: var(--hq-walnut); }  /* ink on the pale cloth */
+/* The editorial summary stays available to assistive tech; the shelf shows spines. */
+.hq-volume__note {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* --- The reference library (environmental furniture, aria-hidden) ----------
+   Built-in furniture that recedes: smaller and softer than the Collection, so it
+   never competes with the manuscript or the made works. */
+.hq-reference { position: relative; align-self: end; opacity: 0.86; }
+.hq-reference__row {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; align-items: flex-end; gap: 5px;
+  min-height: 108px;
+}
+/* Each volume a slim bound spine, standing (one leaning) on the reference ledge —
+   varied heights and warm tones so the shelf reads as lived-in, not uniform. */
+.hq-reference__vol {
+  flex: 0 0 auto; width: 30px; height: 96px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 2px 2px 0 0;
+  box-shadow: inset 0 0 0 1px rgba(110, 78, 52, 0.18), 0 10px 18px -14px rgba(110, 78, 52, 0.5);
+}
+.hq-reference__vol[data-kind='bible']     { height: 104px; background: linear-gradient(180deg, var(--hq-walnut), #5b3f2a); }
+.hq-reference__vol[data-kind='notebook']  { height: 88px;  background: linear-gradient(180deg, var(--hq-oak), var(--hq-oak-deep)); }
+.hq-reference__vol[data-kind='binder']    { height: 100px; background: linear-gradient(180deg, #8a6a48, var(--hq-walnut)); }
+.hq-reference__vol[data-kind='reference'] { height: 82px;  background: linear-gradient(180deg, #C2A06E, var(--hq-oak-deep)); }
+.hq-reference__vol:last-child { transform: rotate(4deg); transform-origin: bottom left; }
+.hq-reference__spine {
+  font-family: var(--sans); font-size: 9px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: rgba(251, 244, 230, 0.86);
+  writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap;
+}
+.hq-reference__ledge { display: block; height: 2px; background: var(--hq-oak-deep); }
+
+/* --- The direction plate — engraved into the oak, discovered not announced ---
+   Not a printed quote: an inscription cut low into the architecture. Wide,
+   letter-pressed capitals in a hushed tone, so it is found rather than read. */
+.hq-inscription {
+  justify-self: center;
+  max-width: 40ch;
+  margin: var(--s-6) 0 var(--s-2);
+  font-family: var(--serif); font-style: normal; font-weight: 400;
+  font-size: var(--fs-meta); letter-spacing: 0.22em; text-transform: uppercase;
+  color: rgba(110, 78, 52, 0.5);                 /* incised low into the oak */
+  text-align: center;
+  /* Letter-pressed: the glyph sits below the surface, catching light on its lower lip. */
+  text-shadow: 0 1px 0 rgba(255, 252, 245, 0.9);
+}
+
+/* The library stacks on narrow viewports: the manuscript stays the hero, the
+   Collection and the reference shelf fall beneath it in one column. */
+@media (max-width: 900px) {
+  .hq-library__lower { grid-template-columns: 1fr; gap: var(--s-5); }
+  .hq-reference { align-self: start; }
+  .hq-reference__row { min-height: 0; }
+}
+
+/* =============================================================================
    MOBILE — the Indexed Headquarters. Below the editorial breakpoint the scene
    is not compressed: it becomes a plain, legible vertical INDEX of the wings.
    The primary work is always immediately available (Build Bible §8.5, §16).
@@ -866,7 +1074,8 @@
 @media (prefers-reduced-motion: reduce) {
   .hq-app,
   .hq-surface,
-  .hq-board { animation: none; }
+  .hq-board,
+  .hq-manuscript { animation: none; }
   .hq-atmos__foliage { animation: none; }
   .hq-atmos__sun,
   .hq-atmos__art,
