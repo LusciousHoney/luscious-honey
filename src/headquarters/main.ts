@@ -36,6 +36,10 @@ import {
   creativeStudio, REFERENCE_VOLUMES, DIRECTION_INSCRIPTION,
   type OpenManuscript, type CollectionVolume,
 } from './creative.ts';
+import {
+  productionSprint, RECORDING_NOTE, REVIEW_NOTE,
+  type ProductionSprint,
+} from './production.ts';
 
 /* --- small helpers ------------------------------------------------------- */
 
@@ -617,6 +621,140 @@ function renderInscription(): HTMLElement {
     DIRECTION_INSCRIPTION);
 }
 
+/* =============================================================================
+   PRODUCTION SUITE — a glass studio for momentum without noise (Milestone 6).
+
+   Route: #/production. The residence's most open, light-filled room, built around
+   ONE architectural object: the Narration Desk — a floating oak desk with quietly
+   alive displays, headphones, a tablet stand, and the warm brass recording lamp
+   that stays quiet and ready and never simulates recording. Everything else
+   supports it: a glass review room (environmental) and a vellum studio sprint
+   (In Production · Preparing · Recently Finished) over the finishing tail of the
+   existing spine. Reads only; no capture, no editing, no decision controls, and
+   no doorway out — the founder stays inside the residence.
+   ============================================================================= */
+function renderProduction(root: HTMLElement, room: Room): void {
+  setMode('seated');
+
+  // The sprint arrives asynchronously; the room reads completely before it (the
+  // Narration Desk and review room are furniture, present from the first frame).
+  const sprint = el('section', { class: 'hq-sprint', 'aria-label': 'In the studio', 'aria-busy': 'true' },
+    el('p', { class: 'hq-sprint__eyebrow label' }, 'In the studio'),
+    el('p', { class: 'hq-state__lede' }, 'Looking in on the studio…'));
+
+  const view = el(
+    'section',
+    { class: 'hq-view hq-view--seated hq-view--production', 'aria-label': room.name },
+    el(
+      'div',
+      { class: 'hq-view__inner container' },
+      el(
+        'div',
+        { class: 'hq-seated__bar' },
+        el('a', { class: 'hq-back', href: getRoom(HOME_ROOM)!.route }, '← Return to the Executive Office'),
+        renderRail(room.id),
+      ),
+      el(
+        'header',
+        { class: 'hq-seated__head' },
+        el('p', { class: 'hq-eyebrow label' }, room.name),
+        el('h1', { class: 'hq-title hq-title--seated' }, room.name),
+        el('p', { class: 'hq-lede' }, 'A glass studio for momentum without noise. Capable, and in motion — where cleared work is narrated, shaped, and finished.'),
+      ),
+      el(
+        'div',
+        { class: 'hq-studio' },
+        buildNarrationDesk(),
+        el('div', { class: 'hq-studio__lower' }, sprint, buildReviewRoom()),
+      ),
+    ),
+  );
+
+  root.replaceChildren(view);
+  void mountSprint(sprint);
+}
+
+/**
+ * THE NARRATION DESK — presented in the Headquarters editorial language, NOT as a
+ * drawn scene. The room itself is the residence (the same architecture, glass,
+ * light and materials that furnish every other wing); this is the quiet plaster
+ * plate — brushed-brass hairline, generous negative space — that names where
+ * narration and recording happen and holds the honest in-residence note. No
+ * illustrated equipment: the room communicates purpose through its own
+ * architecture, exactly as the Executive Office and Creative Director do.
+ */
+function buildNarrationDesk(): HTMLElement {
+  return el('section', { class: 'hq-narration', role: 'group', 'aria-label': 'The Narration Desk' },
+    el('p', { class: 'hq-narration__eyebrow label' }, 'The Narration Desk'),
+    el('p', { class: 'hq-narration__line' }, RECORDING_NOTE));
+}
+
+/** THE REVIEW ROOM — environmental only, in the residence's own language: a quiet
+    plaster note that simply says finished work is reviewed here. No dashboard,
+    no controls, no data, no illustration. */
+function buildReviewRoom(): HTMLElement {
+  return el('aside', { class: 'hq-review', 'aria-label': 'The review room' },
+    el('p', { class: 'hq-review__eyebrow label' }, 'The review room'),
+    el('p', { class: 'hq-review__note' }, REVIEW_NOTE));
+}
+
+/**
+ * Fill the studio sprint from the finishing tail of the spine. Three lanes over
+ * the existing statuses — In Production (scheduled), Preparing (approved),
+ * Recently Finished (published) — as a curated vellum sheet, not a backlog.
+ * Honest states: the studio quiet, or offline. Reads only.
+ */
+async function mountSprint(host: HTMLElement): Promise<void> {
+  const [scheduled, approved, published] = await Promise.all([
+    fetchInbox('scheduled'), fetchInbox('approved'), fetchInbox('published'),
+  ]);
+  host.setAttribute('aria-busy', 'false');
+
+  // Offline only if EVERY lane failed to load (a partial read still tells a story).
+  if (!scheduled.ok && !approved.ok && !published.ok) {
+    host.replaceChildren(deskState(
+      scheduled.offline ? 'The studio is offline' : 'The studio couldn’t load',
+      scheduled.offline ? 'Your work is safe — try again in a moment.' : scheduled.error,
+    ));
+    return;
+  }
+
+  const sprint = productionSprint({
+    scheduled: scheduled.ok ? scheduled.data.submissions : null,
+    approved:  approved.ok  ? approved.data.submissions  : null,
+    published: published.ok ? published.data.submissions : null,
+  });
+
+  host.replaceChildren(...sprintContent(sprint));
+}
+
+function sprintContent(sprint: ProductionSprint): Node[] {
+  const head = el('p', { class: 'hq-sprint__eyebrow label' }, 'In the studio');
+
+  if (sprint.total === 0) {
+    return [head, el('p', { class: 'hq-sprint__quiet' },
+      'The studio is quiet. When work is cleared for production, it gathers here to be finished.')];
+  }
+
+  const lanes = el('ol', { class: 'hq-sprint__lanes' });
+  for (const lane of sprint.lanes) {
+    const col = el('li', { class: 'hq-sprint__lane', 'data-lane': lane.id },
+      el('p', { class: 'hq-sprint__lane-label' }, lane.label));
+    if (lane.items.length === 0) {
+      col.append(el('p', { class: 'hq-sprint__lane-empty' }, lane.empty));
+    } else {
+      const ul = el('ul', { class: 'hq-sprint__pieces' });
+      for (const it of lane.items) ul.append(el('li', { class: 'hq-sprint__piece' }, it.name));
+      col.append(ul);
+      if (lane.total > lane.items.length) {
+        col.append(el('p', { class: 'hq-sprint__more' }, `and ${lane.total - lane.items.length} more`));
+      }
+    }
+    lanes.append(col);
+  }
+  return [head, el('div', { class: 'hq-sprint__sheet' }, lanes)];
+}
+
 /** ERROR — an unrecognised route. Offers the way home rather than a dead end. */
 function renderError(root: HTMLElement): void {
   setMode('seated');
@@ -1032,6 +1170,9 @@ function route(): void {
   } else if (room.id === 'creative') {
     // The Creative Director room — the library where the making lives.
     renderCreative(root, room);
+  } else if (room.id === 'production') {
+    // The Production Suite — a glass studio for momentum without noise.
+    renderProduction(root, room);
   } else {
     renderSeated(root, room);
   }
@@ -1058,5 +1199,5 @@ if (document.readyState === 'loading') {
 }
 
 // Re-exported for tests and future milestones (kept off the module's happy path).
-export { renderScene, renderSeated, renderOperations, renderCreative, renderError, renderAccessDenied };
+export { renderScene, renderSeated, renderOperations, renderCreative, renderProduction, renderError, renderAccessDenied };
 export type { Room, RoomId };

@@ -1037,6 +1037,104 @@
 }
 
 /* =============================================================================
+   MILESTONE 6 — the Production Suite. "A glass studio for momentum without
+   noise." The ROOM is the hero: the same residence — its architecture, glass,
+   morning light, greenery and materials — that furnishes every other wing, shown
+   through the shared (frozen) environment. There is NO illustrated scene and no
+   drawn equipment; the Production Suite is composed, like the Executive Office
+   and the Creative Director, from the residence's own editorial material
+   language: plaster plates, a brushed-brass hairline, serif type, and generous
+   negative space. Purely additive presentation; the frozen backdrop is untouched.
+   ============================================================================= */
+.hq-view--production {
+  --hq-vellum:   #F7F2E7;   /* the studio sprint working sheet */
+  --hq-vellum-2: #EFE7D6;
+}
+
+.hq-studio { display: grid; gap: var(--s-5); }
+.hq-studio__lower {
+  display: grid; gap: var(--s-5);
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  align-items: start;
+}
+
+/* --- The Narration Desk: a plaster plate in the residence's language -------
+   Not a drawing — a quiet, museum-styled plate that names where narration and
+   recording happen and carries the honest in-residence note. Same materials and
+   detailing (creamy plaster, a brushed-brass hairline, a soft warm shadow) as the
+   Executive Office plates, so it reads unmistakably as another room of the house. */
+.hq-narration {
+  padding: var(--s-7) var(--s-6);
+  background:
+    linear-gradient(var(--hq-brass-hair), var(--hq-brass-hair)) top left / 100% 1.5px no-repeat,
+    linear-gradient(152deg, var(--hq-plaster) 0%, var(--hq-plaster-2) 100%);
+  border: var(--hairline);
+  border-radius: var(--radius);
+  box-shadow: var(--hq-shadow-card);
+  animation: hq-rise var(--motion-settle) var(--ease-settle) both;
+}
+.hq-narration__eyebrow { color: var(--umber); margin: 0 0 var(--s-3); }
+.hq-narration__line {
+  font-family: var(--serif); font-weight: 300; font-size: var(--fs-h2);
+  line-height: var(--leading-tight); letter-spacing: -0.01em;
+  color: var(--hq-ink); margin: 0; max-width: 30ch;
+}
+
+/* --- The review room: a quiet plaster note (environmental only) ------------ */
+.hq-review {
+  align-self: start;
+  padding: var(--s-5) var(--s-5);
+  background: linear-gradient(152deg, var(--hq-plaster) 0%, var(--hq-plaster-2) 100%);
+  border: var(--hairline);
+  border-left: 2px solid var(--brass);
+  border-radius: var(--radius);
+  box-shadow: var(--hq-shadow-card);
+}
+.hq-review__eyebrow { color: var(--umber); margin: 0 0 var(--s-2); }
+.hq-review__note {
+  font-family: var(--serif); font-style: italic; font-size: var(--fs-body);
+  color: var(--umber); margin: 0; max-width: 40ch;
+}
+
+/* =============================================================================
+   THE STUDIO SPRINT — the finishing tail on a vellum sheet. A publishing house's
+   working sheet, not project software: three quiet columns of named pieces.
+   ============================================================================= */
+.hq-sprint__eyebrow { color: var(--umber); margin: 0 0 var(--s-3); }
+.hq-sprint__quiet { font-family: var(--serif); font-style: italic; color: var(--umber); margin: 0; max-width: 52ch; }
+.hq-sprint__sheet {
+  padding: var(--s-5) var(--s-5) var(--s-4);
+  background: linear-gradient(160deg, var(--hq-vellum) 0%, var(--hq-vellum-2) 100%);
+  border: 1px solid rgba(110, 78, 52, 0.14);
+  border-radius: 8px;
+  box-shadow: 0 1px 0 rgba(255, 252, 245, 0.8) inset, 0 20px 40px -34px rgba(74, 52, 40, 0.34);
+}
+.hq-sprint__lanes {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: var(--s-4);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.hq-sprint__lane { display: grid; gap: var(--s-2); align-content: start; }
+.hq-sprint__lane + .hq-sprint__lane { border-left: 1px solid rgba(110, 78, 52, 0.14); padding-left: var(--s-4); }
+.hq-sprint__lane-label {
+  font-family: var(--sans); font-weight: 600; font-size: var(--fs-label);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--umber); margin: 0;
+}
+.hq-sprint__pieces { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-1); }
+.hq-sprint__piece { font-family: var(--serif); font-size: var(--fs-body); color: var(--hq-ink); }
+.hq-sprint__lane-empty,
+.hq-sprint__more { font-family: var(--serif); font-style: italic; font-size: var(--fs-body-sm); color: var(--umber); margin: 0; }
+
+/* The studio stacks on narrow viewports; nothing overflows. */
+@media (max-width: 900px) {
+  .hq-studio__lower { grid-template-columns: 1fr; gap: var(--s-5); }
+  .hq-sprint__lanes { grid-template-columns: 1fr; gap: var(--s-4); }
+  .hq-sprint__lane + .hq-sprint__lane { border-left: 0; padding-left: 0; border-top: 1px solid rgba(110, 78, 52, 0.14); padding-top: var(--s-4); }
+  .hq-narration { padding: var(--s-6) var(--s-5); }
+}
+
+/* =============================================================================
    MOBILE — the Indexed Headquarters. Below the editorial breakpoint the scene
    is not compressed: it becomes a plain, legible vertical INDEX of the wings.
    The primary work is always immediately available (Build Bible §8.5, §16).
@@ -1075,7 +1173,8 @@
   .hq-app,
   .hq-surface,
   .hq-board,
-  .hq-manuscript { animation: none; }
+  .hq-manuscript,
+  .hq-narration { animation: none; }
   .hq-atmos__foliage { animation: none; }
   .hq-atmos__sun,
   .hq-atmos__art,
