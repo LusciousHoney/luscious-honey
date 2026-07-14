@@ -689,6 +689,146 @@
 }
 
 /* =============================================================================
+   MILESTONE 4 — the Operations Office. A DIFFERENT room from the Executive
+   Office: the flow view, not a decision surface. The shared residence backdrop
+   is untouched (the frozen atmosphere/artwork pipeline stays exactly as-is);
+   this room is differentiated only by CONTENT and a per-room MATERIAL ACCENT.
+
+   The operations board is treated as a COMMISSIONED MILLWORK OBJECT — a piece of
+   white-oak-and-plaster casework built into the wall, not a UI panel. It reads as
+   a shallow recessed niche whose pipeline is incised into it as bays separated by
+   fine routed reveals; the numbers are editorial figures, the labels are set in
+   the residence's serif, and a single hand-inlaid brass mark notes where the work
+   is gathering. Nothing here should read as a card, a tile, or a dashboard. A
+   dedicated Operations render can later drop into the reserved per-room scene seam
+   with no change here. Purely additive presentation; no frozen selector is touched.
+   ============================================================================= */
+.hq-view--operations {
+  /* Warm millwork palette — white oak, limestone, a trace of brass. A whisper
+     cooler than the Executive Office plaster, but still the bright residence,
+     never a console. The reveals are the routed grooves of the casework: a dark
+     recess line lit along one edge, the way carved oak catches the morning. */
+  --hq-op-board:    #F0EADD;                     /* limestone-and-oak board face */
+  --hq-op-board-2:  #E8E0CF;                     /* the face in soft shadow */
+  --hq-op-reveal:   rgba(74, 52, 40, 0.16);      /* the incised groove (warm recess) */
+  --hq-op-lit:      rgba(255, 252, 245, 0.72);   /* the groove's lit edge */
+  --hq-op-inlay:    var(--brass);                /* the hand-inlaid brass mark */
+}
+
+/* The board as built-in casework: no border, no raised card — a shallow niche
+   recessed into the wall, lit along its top inner edge and grounded by the
+   faintest drop. Soft, generous, permanent. Rises once, like the seated surface. */
+.hq-board {
+  padding: var(--s-7) var(--s-6) var(--s-6);
+  border-radius: 14px;
+  background: linear-gradient(176deg, var(--hq-op-board) 0%, var(--hq-op-board-2) 100%);
+  box-shadow:
+    inset 0 1px 0 var(--hq-op-lit),                     /* the lit top lip of the recess */
+    inset 0 0 0 1px rgba(74, 52, 40, 0.05),             /* the softest reveal all around */
+    inset 0 -18px 30px -26px rgba(74, 52, 40, 0.22),    /* the niche's lower shadow */
+    0 24px 50px -40px rgba(74, 52, 40, 0.28);           /* a whisper of ground, not a lift */
+  animation: hq-rise var(--motion-settle) var(--ease-settle) both;
+}
+.hq-board__inner { display: grid; gap: var(--s-6); }
+
+/* Head: the day's title, set as an editorial masthead line rather than a toolbar. */
+.hq-board__head {
+  display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-4);
+  align-items: baseline; justify-content: space-between;
+}
+.hq-board__eyebrow { color: var(--umber); margin: 0; }
+.hq-board__summary {
+  font-family: var(--serif); font-weight: 300; font-style: italic;
+  font-size: var(--fs-body); color: var(--umber); margin: 0; line-height: 1.3;
+}
+
+/* The pipeline, incised into the board as ordered BAYS reading left → right. The
+   bays share one continuous surface — no card, no fill, no box. A fine routed
+   reveal (a dark recess with a lit edge) separates each bay from the next, the
+   way panels meet in oak casework. */
+.hq-board__stages {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: 0;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.hq-board__stage {
+  position: relative;
+  display: grid; gap: var(--s-1); align-content: start;
+  padding: var(--s-2) var(--s-4);
+}
+.hq-board__stage:first-child { padding-left: 0; }
+.hq-board__stage:last-child  { padding-right: 0; }
+/* The routed reveal between bays: a hairline recess with a lit edge beside it,
+   inset from the top and bottom so it reads as carved millwork, not a table rule. */
+.hq-board__stage + .hq-board__stage::before {
+  content: '';
+  position: absolute; left: 0; top: 0.35rem; bottom: 0.35rem;
+  width: 2px;
+  background: linear-gradient(90deg, var(--hq-op-reveal) 0 1px, var(--hq-op-lit) 1px 2px);
+}
+/* The count — an editorial figure cut into the board, light and generous. */
+.hq-board__count {
+  font-family: var(--serif); font-weight: 200; font-size: var(--fs-display);
+  line-height: 0.95; letter-spacing: -0.01em; color: var(--hq-ink);
+}
+/* Where the work is gathering, a single hand-inlaid brass mark beneath the figure
+   — a millworker's note, not a highlight. Observational only; nothing is a control. */
+.hq-board__stage[data-busiest='true'] .hq-board__count::after {
+  content: ''; display: block;
+  width: 1.4rem; height: 2px; margin-top: 0.45rem;
+  background: var(--hq-op-inlay);
+  border-radius: 1px;
+}
+/* Labels in the residence's serif — sentence case, editorial, never a UI caption. */
+.hq-board__label {
+  font-family: var(--serif); font-weight: 400; font-size: var(--fs-body);
+  letter-spacing: 0; text-transform: none; color: var(--hq-ink); margin-top: var(--s-1);
+}
+.hq-board__note {
+  font-family: var(--serif); font-style: italic; font-size: var(--fs-body-sm);
+  color: var(--umber); line-height: 1.35;
+}
+
+/* Foot: the one line worth naming, then the single way through to the Desk —
+   parted from the bays by a fine incised reveal, not a boxed footer. */
+.hq-board__foot {
+  display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4);
+  align-items: baseline; justify-content: space-between;
+  margin-top: var(--s-2); padding-top: var(--s-5);
+  border-top: 1px solid var(--hq-op-reveal);
+  box-shadow: 0 -1px 0 var(--hq-op-lit);            /* the reveal's lit lower edge */
+}
+.hq-board__wait { font-family: var(--serif); font-style: italic; font-size: var(--fs-body); color: var(--hq-ink); margin: 0; }
+.hq-board__wait--calm { color: var(--umber); }
+.hq-board__route {
+  font-family: var(--sans); font-weight: 600; font-size: var(--fs-label);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--brass); text-decoration: none; white-space: nowrap;
+}
+.hq-board__route:hover,
+.hq-board__route:focus-visible { color: var(--terracotta); }
+.hq-board__route--quiet { color: var(--umber); }
+.hq-board__route--quiet:hover,
+.hq-board__route--quiet:focus-visible { color: var(--brass); }
+
+/* Below the editorial breakpoint the casework stands upright: the bays stack into
+   a single column, the routed reveals turning from vertical to horizontal seams.
+   Nothing overflows; the board simply becomes a taller, narrower fixture. */
+@media (max-width: 900px) {
+  .hq-board { padding: var(--s-6) var(--s-5); }
+  .hq-board__stages { grid-template-columns: 1fr; gap: 0; }
+  .hq-board__stage { padding: var(--s-4) 0; }
+  .hq-board__stage:first-child { padding-top: 0; }
+  .hq-board__stage:last-child  { padding-bottom: 0; }
+  /* The reveal lies down between stacked bays — a horizontal routed seam. */
+  .hq-board__stage + .hq-board__stage::before {
+    left: 0.35rem; right: 0.35rem; top: 0; bottom: auto; width: auto; height: 2px;
+    background: linear-gradient(180deg, var(--hq-op-reveal) 0 1px, var(--hq-op-lit) 1px 2px);
+  }
+  .hq-board__count { font-size: var(--fs-display); }
+}
+
+/* =============================================================================
    MOBILE — the Indexed Headquarters. Below the editorial breakpoint the scene
    is not compressed: it becomes a plain, legible vertical INDEX of the wings.
    The primary work is always immediately available (Build Bible §8.5, §16).
@@ -725,7 +865,8 @@
    ============================================================================= */
 @media (prefers-reduced-motion: reduce) {
   .hq-app,
-  .hq-surface { animation: none; }
+  .hq-surface,
+  .hq-board { animation: none; }
   .hq-atmos__foliage { animation: none; }
   .hq-atmos__sun,
   .hq-atmos__art,
