@@ -25,7 +25,7 @@ import '../styles/headquarters.css';
 
 import { ROOMS, HOME_ROOM, getRoom, isRoomId, type Room, type RoomId } from './rooms.ts';
 import { loadLastRoom, saveLastRoom, shouldPlayArrival, markArrivalSeen } from './memory.ts';
-import { timeOfDay, greeting } from './time.ts';
+import { timeOfDay, greeting, dayKey } from './time.ts';
 import {
   fetchBriefing, fetchInbox, fetchItem, advanceStatus, addNote,
   inlineActions, STATUS_LABELS,
@@ -34,8 +34,14 @@ import {
 import { operationsFlow, type OperationsFlow } from './operations.ts';
 import {
   creativeStudio, REFERENCE_VOLUMES, DIRECTION_INSCRIPTION,
-  type OpenManuscript, type CollectionVolume,
+  type OpenManuscript,
 } from './creative.ts';
+import { archiveTree, archiveFilters } from './archive.ts';
+import {
+  CALENDAR_CATEGORIES, categoriesForRoom, eventsForRoom, upcoming, groupByDay,
+  makeEvent, loadEvents, saveEvents,
+} from './calendar.ts';
+import { DICTATION_DESTINATIONS, makeDraft } from './dictation.ts';
 import {
   productionSprint, RECORDING_NOTE, REVIEW_NOTE,
   type ProductionSprint,
@@ -482,9 +488,9 @@ function renderCreative(root: HTMLElement, room: Room): void {
   const manuscript = el('div', { class: 'hq-manuscript', 'aria-label': 'The open manuscript', 'aria-busy': 'true' },
     el('p', { class: 'hq-manuscript__eyebrow label' }, 'On the table'),
     el('p', { class: 'hq-manuscript__resting' }, 'Turning to the page you left…'));
-  const collection = el('div', { class: 'hq-collection', 'aria-label': 'The Collection', 'aria-busy': 'true' },
-    el('p', { class: 'hq-collection__eyebrow label' }, 'The Collection'),
-    el('p', { class: 'hq-state__lede' }, 'Reading the spines…'));
+  const archive = el('div', { class: 'hq-archive', 'aria-label': 'The Archive', 'aria-busy': 'true' },
+    el('p', { class: 'hq-archive__eyebrow label' }, 'The Archive'),
+    el('p', { class: 'hq-state__lede' }, 'Opening the archive…'));
 
   const view = el(
     'section',
@@ -509,14 +515,14 @@ function renderCreative(root: HTMLElement, room: Room): void {
         'div',
         { class: 'hq-library' },
         manuscript,
-        el('div', { class: 'hq-library__lower' }, collection, renderReferenceShelf()),
-        renderInscription(),
+        archive,
+        el('div', { class: 'hq-library__lower' }, renderReferenceShelf(), renderInscription()),
       ),
     ),
   );
 
   root.replaceChildren(view);
-  void mountLibrary(manuscript, collection);
+  void mountLibrary(manuscript, archive);
 }
 
 /**
@@ -525,7 +531,7 @@ function renderCreative(root: HTMLElement, room: Room): void {
  * table resting, the shelf waiting, offline — never fabricated pages. Each object
  * degrades on its own, so an offline shelf never blanks the open manuscript.
  */
-async function mountLibrary(manuscriptHost: HTMLElement, collectionHost: HTMLElement): Promise<void> {
+async function mountLibrary(manuscriptHost: HTMLElement, archiveHost: HTMLElement): Promise<void> {
   const [bRes, pRes] = await Promise.all([fetchBriefing(), fetchInbox('published')]);
 
   // --- The open manuscript (from the briefing) ---
@@ -540,17 +546,116 @@ async function mountLibrary(manuscriptHost: HTMLElement, collectionHost: HTMLEle
     manuscriptHost.replaceChildren(...manuscriptContent(manuscript));
   }
 
-  // --- The Collection (from the published works) ---
-  collectionHost.setAttribute('aria-busy', 'false');
+  // --- The Archive (from the published works) ---
+  archiveHost.setAttribute('aria-busy', 'false');
   if (!pRes.ok) {
-    collectionHost.replaceChildren(deskState(
-      pRes.offline ? 'The Collection is offline' : 'The Collection couldn’t load',
+    archiveHost.replaceChildren(deskState(
+      pRes.offline ? 'The Archive is offline' : 'The Archive couldn’t load',
       pRes.offline ? 'Your work is safe — try again in a moment.' : pRes.error,
     ));
   } else {
-    const { collection, collectionTotal } = creativeStudio(null, pRes.data.submissions);
-    collectionHost.replaceChildren(...collectionContent(collection, collectionTotal));
+    mountArchive(archiveHost, pRes.data.submissions);
   }
+}
+
+/* --- The Archive: a searchable, filterable, hierarchical library ------------
+   Replaces the bookshelf. A large search field, honest facet filters, a
+   breadcrumb, and native <details> accordions (multiple open at once, touch- and
+   keyboard-friendly). Larger typography; reads the same published works. */
+function mountArchive(host: HTMLElement, published: import('./adapters.ts').Submission[]): void {
+  let query = '';
+  let filter: string | null = null;
+  const filters = archiveFilters(published);
+
+  const search = el('input', {
+    class: 'hq-archive__search', type: 'search', enterkeyhint: 'search',
+    'aria-label': 'Search the archive', placeholder: 'Search the archive…', autocomplete: 'off',
+  }) as HTMLInputElement;
+
+  const chips = el('div', { class: 'hq-archive__filters', role: 'group', 'aria-label': 'Filter the archive' });
+  const results = el('div', { class: 'hq-archive__results', 'aria-live': 'polite' });
+
+  const renderChips = (): void => {
+    chips.replaceChildren();
+    const all = el('button', { class: 'hq-chip hq-archive__chip', type: 'button',
+      'aria-pressed': filter === null ? 'true' : 'false' }, 'All');
+    all.addEventListener('click', () => { filter = null; draw(); });
+    chips.append(all);
+    for (const f of filters) {
+      const c = el('button', { class: 'hq-chip hq-archive__chip', type: 'button',
+        'aria-pressed': filter === f ? 'true' : 'false' }, f);
+      c.addEventListener('click', () => { filter = filter === f ? null : f; draw(); });
+      chips.append(c);
+    }
+  };
+
+  const draw = (): void => {
+    const tree = archiveTree(published, query, filter);
+    renderChips();
+
+    // Breadcrumb — Archive › [filter] › “query”
+    const crumbs: string[] = ['Archive'];
+    if (filter) crumbs.push(filter);
+    if (query.trim()) crumbs.push(`“${query.trim()}”`);
+    const crumb = el('p', { class: 'hq-archive__crumb' }, crumbs.join('  ›  '));
+    const count = el('p', { class: 'hq-archive__count' },
+      tree.total === tree.grandTotal
+        ? `${tree.grandTotal} work${tree.grandTotal === 1 ? '' : 's'}`
+        : `${tree.total} of ${tree.grandTotal}`);
+
+    results.replaceChildren(crumb, count);
+
+    if (tree.grandTotal === 0) {
+      results.append(el('p', { class: 'hq-archive__empty' },
+        'The archive is waiting for its first bound work. As the House publishes, the shelves fill here.'));
+      return;
+    }
+    if (tree.total === 0) {
+      results.append(el('p', { class: 'hq-archive__empty' }, 'Nothing in the archive matches yet — try another word.'));
+      return;
+    }
+
+    for (const cat of tree.categories) {
+      const catBox = el('details', { class: 'hq-archive__cat', open: 'true' });
+      catBox.append(el('summary', { class: 'hq-archive__cat-sum' },
+        el('span', { class: 'hq-archive__cat-name' }, cat.label),
+        el('span', { class: 'hq-archive__cat-n' }, String(cat.total))));
+      for (const g of cat.groups) {
+        const grp = el('details', { class: 'hq-archive__grp', open: 'true' });
+        grp.append(el('summary', { class: 'hq-archive__grp-sum' },
+          el('span', { class: 'hq-archive__grp-name' }, g.label),
+          el('span', { class: 'hq-archive__grp-n' }, String(g.total))));
+        const list = el('ul', { class: 'hq-archive__entries' });
+        for (const e of g.entries) {
+          const item = el('li', { class: 'hq-archive__entry' },
+            el('p', { class: 'hq-archive__entry-title' }, e.name));
+          if (e.summary) item.append(el('p', { class: 'hq-archive__entry-desc' }, e.summary));
+          list.append(item);
+        }
+        grp.append(list);
+        catBox.append(grp);
+      }
+      results.append(catBox);
+    }
+  };
+
+  let t = 0;
+  search.addEventListener('input', () => {
+    query = search.value;
+    window.clearTimeout(t);
+    t = window.setTimeout(draw, 120);
+  });
+
+  host.replaceChildren(
+    el('div', { class: 'hq-archive__head' },
+      el('p', { class: 'hq-archive__eyebrow label' }, 'The Archive'),
+      el('div', { class: 'hq-archive__searchwrap' },
+        el('span', { class: 'hq-archive__search-ico', 'aria-hidden': 'true' }, '⌕'),
+        search)),
+    chips,
+    results,
+  );
+  draw();
 }
 
 /** The open manuscript — one piece, lying open as though the founder just stepped
@@ -575,31 +680,6 @@ function manuscriptContent(m: OpenManuscript | null): Node[] {
   nodes.push(el('p', { class: 'hq-manuscript__hold' },
     'The page waits on the table, kept exactly as you left it. The writing room opens here soon.'));
   return nodes;
-}
-
-/** The Collection — the House's made works as bound volumes on a shelf. Curated,
-    newest-first, spacious. Honest when the shelf is still bare. */
-function collectionContent(volumes: CollectionVolume[], total: number): Node[] {
-  const head = el('div', { class: 'hq-collection__head' },
-    el('p', { class: 'hq-collection__eyebrow label' }, 'The Collection'));
-  if (total > 0) {
-    head.append(el('p', { class: 'hq-collection__meta' },
-      total === 1 ? 'One bound work' : `${total} bound works${total > volumes.length ? ` · ${volumes.length} shown` : ''}`));
-  }
-
-  if (volumes.length === 0) {
-    return [head, el('p', { class: 'hq-collection__empty' },
-      'Nothing is bound here yet. As the House publishes its first works, they take their place on the shelf.')];
-  }
-
-  const shelf = el('ul', { class: 'hq-collection__shelf' });
-  for (const v of volumes) {
-    const vol = el('li', { class: 'hq-volume' },
-      el('span', { class: 'hq-volume__title' }, v.name));
-    if (v.summary) vol.append(el('span', { class: 'hq-volume__note' }, v.summary));
-    shelf.append(vol);
-  }
-  return [head, shelf];
 }
 
 /** The reference library — a restrained run of bound volumes as ARCHITECTURE, not
@@ -1302,9 +1382,278 @@ function route(): void {
   root.focus({ preventScroll: true });
 }
 
+/* =============================================================================
+   HEADQUARTERS SHARED SERVICES — Dictation + Calendar (Usability sprint).
+   One quiet launcher, available in every room; two calm overlays. Native to the
+   residence, touch-first. NO speech API and NO backend: transcripts and scheduled
+   events are the founder's own and persist client-side (localStorage), architected
+   so a real Web Speech / Google Calendar integration drops in without UI change.
+   ============================================================================= */
+const DRAFTS_KEY = 'lhc.hq.dictation.v1';
+
+function currentRoomId(): RoomId {
+  const seg = currentSegment();
+  return isRoomId(seg) ? seg : HOME_ROOM;
+}
+
+let hqModal: HTMLElement | null = null;
+function closeHqModal(): void {
+  hqModal?.remove(); hqModal = null;
+  document.removeEventListener('keydown', hqModalKey);
+}
+function hqModalKey(e: KeyboardEvent): void { if (e.key === 'Escape') closeHqModal(); }
+function openHqModal(panel: HTMLElement, label: string): void {
+  closeHqModal();
+  const scrim = el('div', { class: 'hq-modal', role: 'dialog', 'aria-modal': 'true', 'aria-label': label });
+  scrim.addEventListener('click', (e) => { if (e.target === scrim) closeHqModal(); });
+  const close = el('button', { class: 'hq-modal__close', type: 'button', 'aria-label': 'Close' }, '×');
+  close.addEventListener('click', closeHqModal);
+  scrim.append(el('div', { class: 'hq-modal__sheet' }, close, panel));
+  document.body.append(scrim);
+  hqModal = scrim;
+  document.addEventListener('keydown', hqModalKey);
+  requestAnimationFrame(() => scrim.classList.add('is-in'));
+}
+
+const MIC_SVG = `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M6 11a6 6 0 0 0 12 0"/><path d="M12 17v4"/></svg>`;
+
+/** DICTATION — tap the mic, write the transcript, choose a destination, save.
+    The mic arms the field (no fake listening — there is no speech API yet). */
+function dictationPanel(): HTMLElement {
+  const status = el('p', { class: 'hq-dict__status' },
+    'Tap the microphone, then speak — or write your note below.');
+  const mic = el('button', { class: 'hq-dict__mic', type: 'button', 'aria-pressed': 'false', 'aria-label': 'Dictate' });
+  mic.innerHTML = MIC_SVG;
+  const field = el('textarea', { class: 'hq-dict__field', rows: '4',
+    'aria-label': 'Transcript', placeholder: 'Your note…' }) as HTMLTextAreaElement;
+  mic.addEventListener('click', () => {
+    const armed = mic.getAttribute('aria-pressed') === 'true';
+    mic.setAttribute('aria-pressed', armed ? 'false' : 'true');
+    status.textContent = armed ? 'Tap the microphone, then speak — or write your note below.'
+      : 'Go ahead — dictate naturally. (Type it here for now; voice arrives soon.)';
+    field.focus();
+  });
+
+  const dest = el('select', { class: 'hq-dict__dest', 'aria-label': 'Destination' }) as HTMLSelectElement;
+  for (const d of DICTATION_DESTINATIONS) dest.append(el('option', { value: d.id }, `${d.label} — ${d.hint}`));
+
+  const save = el('button', { class: 'hq-action hq-dict__save', type: 'button' }, 'Save');
+  const wrap = el('section', { class: 'hq-dict', 'aria-label': 'Dictation' },
+    el('p', { class: 'hq-modal__eyebrow label' }, 'Dictation'),
+    el('div', { class: 'hq-dict__miczone' }, mic, status),
+    field,
+    el('div', { class: 'hq-dict__row' },
+      el('label', { class: 'hq-dict__lbl' }, 'Send to'), dest, save));
+
+  save.addEventListener('click', () => {
+    const draft = makeDraft(field.value, dest.value);
+    if (!draft) { field.focus(); return; }
+    if (draft.destination === 'calendar') { openHqModal(calendarPanel(draft.text), 'Headquarters Calendar'); return; }
+    try {
+      const raw = localStorage.getItem(DRAFTS_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      arr.push(draft); localStorage.setItem(DRAFTS_KEY, JSON.stringify(arr));
+    } catch { /* client-only; ignore */ }
+    const label = DICTATION_DESTINATIONS.find((d) => d.id === draft.destination)?.label ?? draft.destination;
+    wrap.replaceChildren(
+      el('p', { class: 'hq-modal__eyebrow label' }, 'Dictation'),
+      el('p', { class: 'hq-dict__done' }, `Saved to ${label}.`),
+      el('p', { class: 'hq-dict__note' }, 'Held in the residence — kept for when this destination’s home is wired.'));
+  });
+  return wrap;
+}
+
+/** CALENDAR — a Headquarters service, home in the Executive Office, with a
+    filtered view for whichever room it is opened from. Schedule → held client-side. */
+function calendarPanel(prefill = ''): HTMLElement {
+  const room = currentRoomId();
+  const home = room === HOME_ROOM;
+  const cats = home ? CALENDAR_CATEGORIES : categoriesForRoom(room);
+  const active = new Set(cats.map((c) => c.id));
+  const wrap = el('section', { class: 'hq-cal', 'aria-label': 'Headquarters Calendar' });
+  const list = el('div', { class: 'hq-cal__list', 'aria-live': 'polite' });
+  const chips = el('div', { class: 'hq-cal__filters', role: 'group', 'aria-label': 'Filter by category' });
+
+  const labelOf = (id: string): string => CALENDAR_CATEGORIES.find((c) => c.id === id)?.label ?? id;
+
+  const drawList = (): void => {
+    const all = loadEvents();
+    const scoped = home ? all : eventsForRoom(all, room);
+    const shown = upcoming(scoped.filter((e) => active.has(e.category)), dayKey(), 40);
+    list.replaceChildren();
+    if (shown.length === 0) {
+      list.append(el('p', { class: 'hq-cal__empty' },
+        'Nothing scheduled yet. Add the first event below — it stays here in the residence.'));
+      return;
+    }
+    for (const day of groupByDay(shown)) {
+      const box = el('div', { class: 'hq-cal__day' }, el('p', { class: 'hq-cal__date' }, day.date));
+      for (const e of day.events) {
+        const ev = el('div', { class: 'hq-cal__event', 'data-cat': e.category },
+          el('span', { class: 'hq-cal__cat' }, labelOf(e.category)),
+          el('span', { class: 'hq-cal__title' }, e.title));
+        if (e.note) ev.append(el('span', { class: 'hq-cal__evnote' }, e.note));
+        box.append(ev);
+      }
+      list.append(box);
+    }
+  };
+
+  const drawChips = (): void => {
+    chips.replaceChildren();
+    for (const c of cats) {
+      const chip = el('button', { class: 'hq-chip hq-cal__chip', type: 'button', 'data-cat': c.id,
+        'aria-pressed': active.has(c.id) ? 'true' : 'false' }, c.label);
+      chip.addEventListener('click', () => {
+        if (active.has(c.id)) active.delete(c.id); else active.add(c.id);
+        chip.setAttribute('aria-pressed', active.has(c.id) ? 'true' : 'false');
+        drawList();
+      });
+      chips.append(chip);
+    }
+  };
+
+  // Scheduling workflow
+  const title = el('input', { class: 'hq-cal__in', type: 'text', 'aria-label': 'Event', placeholder: 'What’s happening?' }) as HTMLInputElement;
+  title.value = prefill;
+  const date = el('input', { class: 'hq-cal__in', type: 'date', 'aria-label': 'Date' }) as HTMLInputElement;
+  date.value = dayKey();
+  const cat = el('select', { class: 'hq-cal__in', 'aria-label': 'Category' }) as HTMLSelectElement;
+  for (const c of cats) cat.append(el('option', { value: c.id }, c.label));
+  const add = el('button', { class: 'hq-action', type: 'button' }, 'Schedule');
+  add.addEventListener('click', () => {
+    const evt = makeEvent({ title: title.value, date: date.value, category: cat.value });
+    if (!evt) { title.focus(); return; }
+    const all = loadEvents(); all.push(evt); saveEvents(all);
+    title.value = ''; active.add(evt.category);
+    drawChips(); drawList();
+  });
+
+  wrap.append(
+    el('p', { class: 'hq-modal__eyebrow label' }, home ? 'Headquarters Calendar · Executive Office' : `Calendar · ${getRoom(room)!.name}`),
+    chips,
+    list,
+    el('div', { class: 'hq-cal__form' },
+      el('p', { class: 'hq-cal__form-eyebrow label' }, 'Schedule'),
+      el('div', { class: 'hq-cal__form-row' }, title),
+      el('div', { class: 'hq-cal__form-row hq-cal__form-row--split' }, date, cat, add)),
+  );
+  drawChips(); drawList();
+  return wrap;
+}
+
+/* --- Global Search (a House service; searches the archive) ----------------- */
+function globalSearchPanel(): HTMLElement {
+  const search = el('input', { class: 'hq-archive__search', type: 'search', enterkeyhint: 'search',
+    'aria-label': 'Search the House', placeholder: 'Search the House…', autocomplete: 'off' }) as HTMLInputElement;
+  const results = el('div', { class: 'hq-gsearch__results', 'aria-live': 'polite' },
+    el('p', { class: 'hq-archive__empty' }, 'Loading the archive…'));
+  let works: import('./adapters.ts').Submission[] | null = null;
+
+  const draw = (): void => {
+    const q = search.value.trim();
+    results.replaceChildren();
+    if (works === null) { results.append(el('p', { class: 'hq-archive__empty' }, 'The archive is offline just now.')); return; }
+    if (!q) { results.append(el('p', { class: 'hq-archive__empty' }, 'Type a word to search the House’s work.')); return; }
+    const tree = archiveTree(works, q, null);
+    if (tree.total === 0) { results.append(el('p', { class: 'hq-archive__empty' }, 'Nothing matches yet — try another word.')); return; }
+    const list = el('ul', { class: 'hq-gsearch__list' });
+    for (const cat of tree.categories) for (const g of cat.groups) for (const e of g.entries) {
+      const a = el('li', { class: 'hq-gsearch__hit' },
+        el('span', { class: 'hq-gsearch__crumb' }, `${cat.label} · ${g.label}`),
+        el('span', { class: 'hq-gsearch__name' }, e.name));
+      if (e.summary) a.append(el('span', { class: 'hq-gsearch__desc' }, e.summary));
+      list.append(a);
+    }
+    results.append(el('p', { class: 'hq-archive__count' }, `${tree.total} result${tree.total === 1 ? '' : 's'}`), list);
+  };
+
+  let t = 0;
+  search.addEventListener('input', () => { window.clearTimeout(t); t = window.setTimeout(draw, 120); });
+  void fetchInbox('published').then((res) => { works = res.ok ? res.data.submissions : null; draw(); });
+
+  return el('section', { class: 'hq-gsearch', 'aria-label': 'Global search' },
+    el('p', { class: 'hq-modal__eyebrow label' }, 'Search the House'),
+    el('div', { class: 'hq-archive__searchwrap' },
+      el('span', { class: 'hq-archive__search-ico', 'aria-hidden': 'true' }, '⌕'), search),
+    results);
+}
+
+/* --- Notifications — an honest placeholder (no counts, no fabricated activity) - */
+function notificationsPanel(): HTMLElement {
+  return el('section', { class: 'hq-notes', 'aria-label': 'Notifications' },
+    el('p', { class: 'hq-modal__eyebrow label' }, 'Notifications'),
+    el('p', { class: 'hq-notes__empty' }, 'Nothing needs you right now.'),
+    el('p', { class: 'hq-notes__note' },
+      'When the House has something to surface, it will appear here — quietly, and never as a red badge. (Not yet connected.)'));
+}
+
+/* --- Room-specific Quick Actions — each routes into a real House service ----- */
+interface QuickAction { label: string; run: () => void; soon?: boolean; }
+function quickActions(room: RoomId): QuickAction[] {
+  const dictate = (): void => openHqModal(dictationPanel(), 'Dictation');
+  const schedule = (): void => openHqModal(calendarPanel(), 'Headquarters Calendar');
+  const search = (): void => openHqModal(globalSearchPanel(), 'Search the House');
+  const go = (route: string) => (): void => { closeHqModal(); location.hash = route; };
+  const common: Record<RoomId, QuickAction[]> = {
+    executive: [{ label: 'New Note', run: dictate }, { label: 'Dictate', run: dictate }, { label: 'Schedule', run: schedule }, { label: 'Search', run: search }],
+    operations: [{ label: 'Dictate Observation', run: dictate }, { label: 'Schedule Follow-up', run: schedule }, { label: 'Open Founder’s Desk', run: go('#/executive/desk') }, { label: 'Search', run: search }],
+    creative: [{ label: 'Dictate', run: dictate }, { label: 'Open Archive', run: go('#/creative') }, { label: 'Schedule Creative Time', run: schedule }, { label: 'Search', run: search }],
+    production: [{ label: 'Dictate Production Note', run: dictate }, { label: 'Schedule Session', run: schedule }, { label: 'Open Calendar', run: schedule }, { label: 'Search', run: search }],
+    growth: [{ label: 'Dictate Idea', run: dictate }, { label: 'Schedule Conversation', run: schedule }, { label: 'Open Calendar', run: schedule }, { label: 'Search', run: search }],
+    business: [{ label: 'Dictate Note', run: dictate }, { label: 'Schedule Follow-up', run: schedule }, { label: 'Open Archive', run: go('#/creative') }, { label: 'Search', run: search }],
+  };
+  return common[room] ?? common.executive;
+}
+function quickActionsPanel(): HTMLElement {
+  const room = currentRoomId();
+  const panel = el('section', { class: 'hq-qa', 'aria-label': 'Quick actions' },
+    el('p', { class: 'hq-modal__eyebrow label' }, `Quick actions · ${getRoom(room)!.name}`));
+  const grid = el('div', { class: 'hq-qa__grid' });
+  for (const a of quickActions(room)) {
+    const btn = el('button', { class: 'hq-qa__btn', type: 'button' }, a.label);
+    if (a.soon) btn.append(el('span', { class: 'hq-qa__soon' }, 'not yet connected'));
+    btn.addEventListener('click', a.run);
+    grid.append(btn);
+  }
+  panel.append(grid);
+  return panel;
+}
+
+/**
+ * THE HOUSE TOOLBAR — one Headquarters-wide bar of House SERVICES, present in
+ * every room and permanently part of the residence (not an app nav bar). Search ·
+ * Dictate · Calendar · Notifications · room Quick Actions. iPad-first with clear
+ * labels; icon-only compact on phone; keyboard-reachable; reduced-motion honoured.
+ */
+function mountHouseToolbar(): void {
+  if (document.querySelector('.hq-bar')) return;
+  const svc = (label: string, glyph: string, open: () => void, aria = label): HTMLButtonElement => {
+    const b = el('button', { class: 'hq-bar__btn', type: 'button', 'aria-label': aria }) as HTMLButtonElement;
+    b.innerHTML = `<span class="hq-bar__ico" aria-hidden="true">${glyph}</span><span class="hq-bar__lbl">${label}</span>`;
+    b.addEventListener('click', open);
+    return b;
+  };
+  const bar = el('nav', { class: 'hq-bar', 'aria-label': 'House services' },
+    svc('Search', ICON_SEARCH, () => openHqModal(globalSearchPanel(), 'Search the House')),
+    svc('Dictate', ICON_MIC, () => openHqModal(dictationPanel(), 'Dictation')),
+    svc('Calendar', ICON_CAL, () => openHqModal(calendarPanel(), 'Headquarters Calendar')),
+    svc('Notifications', ICON_BELL, () => openHqModal(notificationsPanel(), 'Notifications')),
+    svc('Actions', ICON_STAR, () => openHqModal(quickActionsPanel(), 'Quick actions')),
+  );
+  document.body.append(bar);
+}
+
+const ICON_SEARCH = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>`;
+const ICON_MIC = MIC_SVG;
+const ICON_CAL = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 9h17M8 3v4M16 3v4"/></svg>`;
+const ICON_BELL = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>`;
+const ICON_STAR = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 4l2.2 4.9L19.5 9l-4 3.6 1.1 5.4L12 15.8 7.4 18l1.1-5.4-4-3.6 5.3-.1z"/></svg>`;
+
 function boot(): void {
   setTimeOfDay();
   ensureAtmosphere();
+  mountHouseToolbar();
   window.addEventListener('hashchange', route);
   // The Morning Arrival wraps the first render of the day, then the residence
   // resolves to wherever the founder last was.

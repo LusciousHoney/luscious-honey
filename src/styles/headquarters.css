@@ -1293,3 +1293,221 @@
   .hq-inbox__row,
   .hq-action { transition: none; }
 }
+
+/* =============================================================================
+   USABILITY & LIVING SYSTEMS SPRINT — the Archive, the Calendar service, the
+   Dictation component, and an iPad-first touch pass. All in the residence's
+   editorial language; touch-first; no new colours beyond the existing tokens.
+   ============================================================================= */
+
+/* --- Comfortable touch targets everywhere (iPad-first) --------------------- */
+.hq-back, .hq-rail__link, .hq-chip, .hq-action, .hq-bar__btn,
+.hq-archive__chip, .hq-cal__chip, .hq-briefing__enter, .hq-board__route {
+  min-height: 44px; display: inline-flex; align-items: center;
+}
+/* Keep room content clear of the floating toolbar. */
+.hq-view__inner { padding-bottom: 96px; }
+/* Never scroll horizontally (guards the frozen atmosphere's decorative bleed too).
+   `clip` leaves the fixed atmosphere and toolbar untouched. */
+.hq-page { overflow-x: clip; }
+.hq-rail__link { padding: 8px 2px; }
+
+/* =============================================================================
+   THE ARCHIVE — a premium knowledge library (replaces the bookshelf).
+   Large search, honest facet filters, breadcrumb, and native <details> accordions
+   (multiple open at once). Larger typography and description text.
+   ============================================================================= */
+.hq-archive {
+  padding: var(--s-5);
+  background: linear-gradient(152deg, var(--hq-plaster) 0%, var(--hq-plaster-2) 100%);
+  border: var(--hairline); border-radius: var(--radius);
+  box-shadow: var(--hq-shadow-card);
+}
+.hq-archive__head { display: grid; gap: var(--s-3); margin-bottom: var(--s-3); }
+.hq-archive__eyebrow { color: var(--umber); margin: 0; }
+.hq-archive__searchwrap { position: relative; display: flex; align-items: center; }
+.hq-archive__search-ico { position: absolute; left: 16px; font-size: 22px; color: var(--umber); pointer-events: none; }
+.hq-archive__search {
+  width: 100%; min-height: 54px; padding: 12px 16px 12px 46px;
+  font-family: var(--serif); font-size: var(--fs-h3); color: var(--hq-ink);
+  background: var(--alabaster); border: var(--hairline); border-radius: var(--radius);
+}
+.hq-archive__search:focus-visible { outline: none; border-color: var(--brass); box-shadow: var(--focus-ring); }
+.hq-archive__filters { display: flex; flex-wrap: wrap; gap: var(--s-1); margin-bottom: var(--s-3); }
+.hq-archive__chip { padding: 8px 16px; font-size: var(--fs-body-sm); }
+.hq-archive__chip[aria-pressed='true'] { color: var(--hq-ink); border-color: var(--brass); background: rgba(var(--ink-rgb), 0.04); }
+.hq-archive__crumb { font-family: var(--sans); font-size: var(--fs-label); letter-spacing: 0.04em; color: var(--umber); margin: 0; }
+.hq-archive__count { font-family: var(--serif); font-style: italic; color: var(--umber); margin: 2px 0 var(--s-3); }
+.hq-archive__empty { font-family: var(--serif); font-style: italic; color: var(--umber); margin: var(--s-3) 0; }
+.hq-archive__cat { border-top: var(--hairline); }
+.hq-archive__cat-sum, .hq-archive__grp-sum {
+  cursor: pointer; list-style: none; display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--s-2); padding: var(--s-3) 0; min-height: 44px;
+}
+.hq-archive__cat-sum::-webkit-details-marker, .hq-archive__grp-sum::-webkit-details-marker { display: none; }
+.hq-archive__cat-name { font-family: var(--serif); font-weight: 300; font-size: var(--fs-h2); color: var(--hq-ink); }
+.hq-archive__cat-n, .hq-archive__grp-n { font-family: var(--sans); font-size: var(--fs-meta); color: var(--umber); }
+.hq-archive__cat-sum::after, .hq-archive__grp-sum::after {
+  content: '+'; margin-left: auto; color: var(--brass); font-family: var(--sans); font-size: var(--fs-h3); line-height: 1;
+}
+.hq-archive__cat[open] > .hq-archive__cat-sum::after, .hq-archive__grp[open] > .hq-archive__grp-sum::after { content: '–'; }
+.hq-archive__grp { padding-left: var(--s-3); border-left: 2px solid var(--hq-brass-hair); margin: 0 0 var(--s-2); }
+.hq-archive__grp-name { font-family: var(--serif); font-style: italic; font-size: var(--fs-h3); color: var(--umber); }
+.hq-archive__entries { list-style: none; margin: 0; padding: 0 0 var(--s-2); display: grid; gap: var(--s-2); }
+.hq-archive__entry {
+  padding: var(--s-3) var(--s-4);
+  background: var(--alabaster); border: var(--hairline); border-radius: var(--radius);
+}
+.hq-archive__entry-title { font-family: var(--serif); font-weight: 400; font-size: var(--fs-h3); color: var(--hq-ink); margin: 0; }
+.hq-archive__entry-desc { font-family: var(--serif); font-size: var(--fs-body); line-height: 1.6; color: var(--umber); margin: var(--s-1) 0 0; max-width: 64ch; }
+
+/* =============================================================================
+   THE HOUSE TOOLBAR — one residence-wide bar of House services. Permanently part
+   of the residence (a floating brass-hairline plate, not an app nav bar); centred
+   at the foot so it never obstructs room content. iPad-first labels; icon-only on
+   phone; keyboard-reachable.
+   ============================================================================= */
+.hq-bar {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: max(16px, env(safe-area-inset-bottom)); z-index: var(--z-modal);
+  display: flex; gap: 2px; padding: 5px;
+  background: linear-gradient(152deg, var(--hq-plaster) 0%, var(--hq-plaster-2) 100%);
+  border: 1px solid var(--brass); border-radius: 999px; box-shadow: var(--hq-shadow-lift);
+}
+.hq-bar__btn {
+  display: inline-flex; flex-direction: column; align-items: center; gap: 3px;
+  min-width: 76px; min-height: 56px; padding: 8px 12px; border: 0; border-radius: 999px;
+  background: transparent; color: var(--hq-ink); cursor: pointer;
+  font-family: var(--sans); font-weight: 600; font-size: 11px;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  transition: background var(--motion-quick) var(--ease-settle);
+}
+.hq-bar__btn:hover, .hq-bar__btn:focus-visible { background: rgba(var(--ink-rgb), 0.05); outline: none; }
+.hq-bar__btn:focus-visible { box-shadow: var(--focus-ring); }
+.hq-bar__ico { display: inline-flex; color: var(--brass); }
+.hq-bar__lbl { line-height: 1; }
+
+.hq-modal {
+  position: fixed; inset: 0; z-index: calc(var(--z-modal) + 1);
+  display: grid; place-items: end center; padding: 0;
+  background: rgba(74, 52, 40, 0.28); opacity: 0; transition: opacity var(--motion-quick) var(--ease-settle);
+}
+.hq-modal.is-in { opacity: 1; }
+.hq-modal__sheet {
+  position: relative; width: 100%; max-width: 640px; max-height: 92vh; overflow: auto;
+  padding: var(--s-6) var(--s-5) var(--s-7);
+  background: linear-gradient(180deg, #FBF7F0 0%, #F5EEE1 100%);
+  border: var(--hairline); border-radius: 18px 18px 0 0;
+  box-shadow: 0 -30px 60px -30px rgba(74, 52, 40, 0.4);
+}
+@media (min-width: 768px) { .hq-modal { place-items: center; } .hq-modal__sheet { border-radius: 16px; } }
+.hq-modal__close {
+  position: absolute; top: 12px; right: 12px; width: 44px; height: 44px; border-radius: 50%;
+  font-size: 24px; line-height: 1; color: var(--umber); background: transparent; border: var(--hairline); cursor: pointer;
+}
+.hq-modal__close:hover, .hq-modal__close:focus-visible { color: var(--hq-ink); border-color: var(--brass); outline: none; }
+.hq-modal__eyebrow { color: var(--umber); margin: 0 0 var(--s-4); }
+
+/* --- Dictation ------------------------------------------------------------- */
+.hq-dict { display: grid; gap: var(--s-3); }
+.hq-dict__miczone { display: flex; align-items: center; gap: var(--s-3); }
+.hq-dict__mic {
+  flex: 0 0 auto; width: 64px; height: 64px; border-radius: 50%;
+  display: grid; place-items: center; color: var(--alabaster); background: var(--brass);
+  border: 1px solid var(--brass); cursor: pointer; transition: background var(--motion-quick) var(--ease-settle);
+}
+.hq-dict__mic[aria-pressed='true'] { background: var(--terracotta); border-color: var(--terracotta); }
+.hq-dict__mic:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.hq-dict__status { font-family: var(--serif); font-style: italic; color: var(--umber); margin: 0; }
+.hq-dict__field {
+  width: 100%; min-height: 120px; padding: var(--s-3); resize: vertical;
+  font-family: var(--serif); font-size: var(--fs-body); color: var(--hq-ink);
+  background: var(--alabaster); border: var(--hairline); border-radius: var(--radius);
+}
+.hq-dict__field:focus-visible { outline: none; border-color: var(--brass); box-shadow: var(--focus-ring); }
+.hq-dict__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); }
+.hq-dict__lbl { font-family: var(--sans); font-size: var(--fs-label); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--umber); }
+.hq-dict__dest, .hq-cal__in {
+  min-height: 48px; padding: 10px 14px; font-family: var(--serif); font-size: var(--fs-body-sm); color: var(--hq-ink);
+  background: var(--alabaster); border: var(--hairline); border-radius: var(--radius);
+}
+.hq-dict__dest { flex: 1 1 220px; }
+.hq-dict__save { margin-left: auto; }
+.hq-dict__done { font-family: var(--serif); font-weight: 300; font-size: var(--fs-h3); color: var(--hq-ink); margin: 0; }
+.hq-dict__note { font-family: var(--serif); font-style: italic; color: var(--umber); margin: 0; }
+
+/* --- Calendar service ------------------------------------------------------ */
+.hq-cal { display: grid; gap: var(--s-3); }
+.hq-cal__filters { display: flex; flex-wrap: wrap; gap: var(--s-1); }
+.hq-cal__chip { padding: 8px 14px; font-size: var(--fs-meta); }
+.hq-cal__chip[aria-pressed='true'] { color: var(--hq-ink); border-color: var(--brass); background: rgba(var(--ink-rgb), 0.04); }
+.hq-cal__list { display: grid; gap: var(--s-3); }
+.hq-cal__empty { font-family: var(--serif); font-style: italic; color: var(--umber); margin: 0; }
+.hq-cal__day { display: grid; gap: var(--s-1); }
+.hq-cal__date { font-family: var(--sans); font-size: var(--fs-label); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--brass); margin: 0; }
+.hq-cal__event { display: grid; gap: 2px; padding: var(--s-2) var(--s-3); background: var(--alabaster); border: var(--hairline); border-left: 3px solid var(--brass); border-radius: var(--radius); }
+.hq-cal__cat { font-family: var(--sans); font-size: var(--fs-meta); letter-spacing: 0.04em; text-transform: uppercase; color: var(--umber); }
+.hq-cal__title { font-family: var(--serif); font-size: var(--fs-body); color: var(--hq-ink); }
+.hq-cal__evnote { font-family: var(--serif); font-style: italic; font-size: var(--fs-body-sm); color: var(--umber); }
+.hq-cal__form { display: grid; gap: var(--s-2); padding-top: var(--s-3); border-top: var(--hairline); }
+.hq-cal__form-eyebrow { color: var(--umber); margin: 0; }
+.hq-cal__form-row { display: flex; gap: var(--s-2); }
+.hq-cal__form-row .hq-cal__in { flex: 1 1 auto; width: 100%; }
+.hq-cal__form-row--split { flex-wrap: wrap; }
+.hq-cal__form-row--split .hq-action { min-height: 48px; }
+
+/* --- iPad-first typography lift + phone companion layout -------------------- */
+@media (min-width: 768px) {
+  .hq-lede { font-size: var(--fs-body-lg, var(--fs-body)); }
+  .hq-archive__entry-desc { font-size: var(--fs-body-lg, var(--fs-body)); }
+}
+@media (max-width: 560px) {
+  .hq-bar { gap: 0; padding: 4px; }
+  .hq-bar__btn { min-width: 54px; padding: 8px; }
+  .hq-bar__lbl { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .hq-archive { padding: var(--s-4); }
+  .hq-archive__search { font-size: var(--fs-body); }
+  .hq-dict__save { margin-left: 0; width: 100%; }
+  .hq-cal__form-row--split { flex-direction: column; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hq-modal, .hq-dict__mic, .hq-bar__btn { transition: none; }
+}
+
+/* --- Quick Actions · Notifications · Global Search (House services) --------- */
+.hq-qa__grid { display: grid; gap: var(--s-2); grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.hq-qa__btn {
+  display: flex; flex-direction: column; gap: 2px; align-items: flex-start; text-align: left;
+  min-height: 60px; padding: var(--s-3) var(--s-4); cursor: pointer;
+  font-family: var(--serif); font-size: var(--fs-body); color: var(--hq-ink);
+  background: var(--alabaster); border: var(--hairline); border-left: 3px solid var(--brass); border-radius: var(--radius);
+}
+.hq-qa__btn:hover, .hq-qa__btn:focus-visible { border-color: var(--brass); background: rgba(var(--ink-rgb), 0.03); outline: none; }
+.hq-qa__btn:focus-visible { box-shadow: var(--focus-ring); }
+.hq-qa__soon { font-family: var(--sans); font-size: var(--fs-meta); letter-spacing: 0.04em; text-transform: uppercase; color: var(--umber); }
+.hq-notes__empty { font-family: var(--serif); font-weight: 300; font-size: var(--fs-h3); color: var(--hq-ink); margin: 0; }
+.hq-notes__note { font-family: var(--serif); font-style: italic; color: var(--umber); margin: var(--s-2) 0 0; }
+.hq-gsearch { display: grid; gap: var(--s-3); }
+.hq-gsearch__results { display: grid; gap: var(--s-2); }
+.hq-gsearch__list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); }
+.hq-gsearch__hit { display: grid; gap: 2px; padding: var(--s-3) var(--s-4); background: var(--alabaster); border: var(--hairline); border-radius: var(--radius); }
+.hq-gsearch__crumb { font-family: var(--sans); font-size: var(--fs-meta); letter-spacing: 0.04em; text-transform: uppercase; color: var(--brass); }
+.hq-gsearch__name { font-family: var(--serif); font-size: var(--fs-h3); color: var(--hq-ink); }
+.hq-gsearch__desc { font-family: var(--serif); font-size: var(--fs-body-sm); color: var(--umber); }
+@media (max-width: 560px) { .hq-qa__grid { grid-template-columns: 1fr; } }
+
+/* --- Archive refinement: clearer hierarchy, roomier accordions, iPad-first --- */
+.hq-archive__cat { border-top: 2px solid var(--hq-brass-hair); margin-top: var(--s-2); }
+.hq-archive__cat > .hq-archive__cat-sum { padding: var(--s-4) 0; }
+.hq-archive__grp { margin: 0 0 var(--s-3); }
+.hq-archive__entries { gap: var(--s-3); padding-bottom: var(--s-3); }
+.hq-archive__filters { row-gap: var(--s-1); }
+@media (min-width: 768px) {
+  .hq-archive { padding: var(--s-6); }
+  .hq-archive__search { min-height: 60px; font-size: var(--fs-h2); }
+  .hq-archive__cat-name { font-size: var(--fs-h1); }
+  .hq-archive__entry-title { font-size: var(--fs-h2); }
+  .hq-archive__entry-desc { font-size: var(--fs-body); line-height: 1.7; }
+  .hq-archive__entry { padding: var(--s-4) var(--s-5); }
+}
