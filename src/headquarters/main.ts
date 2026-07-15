@@ -1397,13 +1397,31 @@ function currentRoomId(): RoomId {
 }
 
 let hqModal: HTMLElement | null = null;
+let hqModalOpener: HTMLElement | null = null;
 function closeHqModal(): void {
   hqModal?.remove(); hqModal = null;
   document.removeEventListener('keydown', hqModalKey);
+  // Return focus to whatever opened the dialog (keyboard/screen-reader courtesy).
+  if (hqModalOpener && document.contains(hqModalOpener)) hqModalOpener.focus({ preventScroll: true });
+  hqModalOpener = null;
 }
-function hqModalKey(e: KeyboardEvent): void { if (e.key === 'Escape') closeHqModal(); }
+function focusables(root: HTMLElement): HTMLElement[] {
+  return [...root.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),input,select,textarea,[tabindex]:not([tabindex="-1"])')];
+}
+function hqModalKey(e: KeyboardEvent): void {
+  if (e.key === 'Escape') { closeHqModal(); return; }
+  if (e.key !== 'Tab' || !hqModal) return;
+  // Contain Tab focus within the open dialog.
+  const items = focusables(hqModal);
+  if (items.length === 0) return;
+  const first = items[0], last = items[items.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+}
 function openHqModal(panel: HTMLElement, label: string): void {
+  const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   closeHqModal();
+  hqModalOpener = opener;
   const scrim = el('div', { class: 'hq-modal', role: 'dialog', 'aria-modal': 'true', 'aria-label': label });
   scrim.addEventListener('click', (e) => { if (e.target === scrim) closeHqModal(); });
   const close = el('button', { class: 'hq-modal__close', type: 'button', 'aria-label': 'Close' }, '×');
@@ -1413,6 +1431,9 @@ function openHqModal(panel: HTMLElement, label: string): void {
   hqModal = scrim;
   document.addEventListener('keydown', hqModalKey);
   requestAnimationFrame(() => scrim.classList.add('is-in'));
+  // Move focus into the dialog: the first meaningful control, else the close button.
+  const target = focusables(panel)[0] ?? close;
+  target.focus({ preventScroll: true });
 }
 
 const MIC_SVG = `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M6 11a6 6 0 0 0 12 0"/><path d="M12 17v4"/></svg>`;
