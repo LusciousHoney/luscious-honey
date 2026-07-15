@@ -28,3 +28,6 @@ public/tribute/tk/*.wav
 # Headquarters scene MASTERS — preserved locally for provenance, never bundled.
 # Only the optimized derivatives in public/headquarters/scene/ ship.
 art-masters/
+
+# Headquarters preview/verification output — generated per-wing, never committed.
+.preview/
