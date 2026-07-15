@@ -48,6 +48,16 @@ import {
 } from './production.ts';
 import { RELATIONSHIPS, SALON_LEDE, HORIZON_NOTE } from './growth.ts';
 import { SAFEGUARDS, STUDY_LEDE, CONTINUITY_NOTE } from './business.ts';
+import {
+  COS_SECTIONS, COS_HOME_SECTION, isCosSection,
+  COS_EYEBROW, COS_TITLE, COS_LEDE,
+  BRIEFING, DECISIONS, DOCKET, CHAIRS, LEADERSHIP,
+  RESPONSES,
+  docketStatusLabel, chairStatusLabel, getResponse,
+  decisionViews, openDecisions, archiveShelves,
+  makeResponse, loadResponses, saveResponses, recordResponse, clearResponse,
+  type CosSectionId, type DecisionView,
+} from './chief-of-staff.ts';
 
 /* --- small helpers ------------------------------------------------------- */
 
@@ -948,6 +958,376 @@ function renderBusiness(root: HTMLElement, room: Room): void {
   root.replaceChildren(view);
 }
 
+/* =============================================================================
+   OFFICE OF THE CHIEF OF STAFF — the founder's private executive WORKSPACE
+   (Sprint 9A). NOT a room in the residence: Headquarters is architecturally
+   complete, so the office is reached from the House Toolbar / Quick Actions and
+   lives at #/chief-of-staff (with a calm section sub-route #/chief-of-staff/
+   <section>), never appearing in the atrium or the wing rail. The office is data
+   (see chief-of-staff.ts); this renders its six prepared sections. The Decision
+   System is the one interactive foundation — the Founder's own responses are
+   recorded and kept (localStorage, like the Calendar). No AI, no automation, no
+   fetch: everything is prepared before the Founder arrives.
+   ============================================================================= */
+const COS_ROUTE = '#/chief-of-staff';
+function renderChiefOfStaff(root: HTMLElement): void {
+  setMode('seated');
+
+  const section: CosSectionId = isCosSection(subSegment())
+    ? (subSegment() as CosSectionId)
+    : COS_HOME_SECTION;
+
+  // The section navigation — the office's own quiet index. Briefing is home
+  // (the bare route); the rest are sub-routes, so each section is deep-linkable.
+  const nav = el('nav', { class: 'hq-cos__nav', 'aria-label': 'Sections of the office' });
+  const navList = el('ul', { class: 'hq-cos__nav-list' });
+  for (const s of COS_SECTIONS) {
+    const href = s.id === COS_HOME_SECTION ? COS_ROUTE : `${COS_ROUTE}/${s.id}`;
+    const link = el('a', {
+      class: 'hq-cos__nav-link',
+      href,
+      ...(s.id === section ? { 'aria-current': 'page' } : {}),
+    }, s.label);
+    navList.append(el('li', { class: 'hq-cos__nav-item' }, link));
+  }
+  nav.append(navList);
+
+  const body = el('div', { class: 'hq-cos__body' });
+  const paint = () => body.replaceChildren(cosSectionView(section, paint));
+  paint();
+
+  const view = el(
+    'section',
+    { class: 'hq-view hq-view--seated hq-view--cos', 'aria-label': COS_TITLE },
+    el(
+      'div',
+      { class: 'hq-view__inner container' },
+      el(
+        'div',
+        { class: 'hq-seated__bar' },
+        // Not a wing, so no wing rail — just the way back to the residence.
+        el('a', { class: 'hq-back', href: getRoom(HOME_ROOM)!.route }, '← Return to the Executive Office'),
+      ),
+      el(
+        'header',
+        { class: 'hq-seated__head' },
+        el('p', { class: 'hq-eyebrow label' }, COS_EYEBROW),
+        el('h1', { class: 'hq-title hq-title--seated' }, COS_TITLE),
+        el('p', { class: 'hq-lede' }, COS_LEDE),
+      ),
+      nav,
+      body,
+    ),
+  );
+
+  root.replaceChildren(view);
+}
+
+/** Build the body for one section. `repaint` lets interactive sections (the
+    Decisions record) refresh in place after the Founder acts. */
+function cosSectionView(section: CosSectionId, repaint: () => void): HTMLElement {
+  switch (section) {
+    case 'briefing':   return cosBriefing();
+    case 'decisions':  return cosDecisions(repaint);
+    case 'docket':     return cosDocket();
+    case 'chairs':     return cosChairs();
+    case 'leadership': return cosLeadership();
+    case 'archive':    return cosArchive();
+  }
+}
+
+/** A section intro: an eyebrow + one prepared line beneath it. */
+function cosIntro(eyebrow: string, line: string): HTMLElement {
+  return el('div', { class: 'hq-cos__intro' },
+    el('p', { class: 'hq-cos__eyebrow label' }, eyebrow),
+    el('p', { class: 'hq-cos__lead' }, line));
+}
+
+/** A titled block of prepared lines (Today's Priorities, Risks, and the like). */
+function cosBlock(title: string, lines: string[]): HTMLElement {
+  const list = el('ul', { class: 'hq-cos__lines' });
+  for (const line of lines) list.append(el('li', { class: 'hq-cos__line' }, line));
+  return el('section', { class: 'hq-cos__block' },
+    el('h2', { class: 'hq-cos__block-title' }, title),
+    list);
+}
+
+/* --- 1. Founder Briefing -------------------------------------------------- */
+function cosBriefing(): HTMLElement {
+  const tod = timeOfDay();
+  const waiting = openDecisions(DECISIONS, loadResponses());
+
+  // Decisions Waiting — the one live line, derived from the record so it can
+  // never disagree with the Decisions section.
+  const decisionsWaiting = el('section', { class: 'hq-cos__block' },
+    el('h2', { class: 'hq-cos__block-title' }, 'Decisions Waiting'));
+  if (waiting.length === 0) {
+    decisionsWaiting.append(el('p', { class: 'hq-cos__quiet' },
+      'Nothing awaits your decision. Everything prepared has been answered.'));
+  } else {
+    const line = waiting.length === 1
+      ? 'One recommendation is prepared and waiting for your word.'
+      : `${spellCount(waiting.length)} recommendations are prepared and waiting for your word.`;
+    decisionsWaiting.append(el('p', { class: 'hq-cos__lead' }, line));
+    const list = el('ul', { class: 'hq-cos__lines' });
+    for (const v of waiting) list.append(el('li', { class: 'hq-cos__line' }, v.decision.title));
+    decisionsWaiting.append(list);
+    decisionsWaiting.append(el('a', { class: 'hq-cos__more', href: '#/chief-of-staff/decisions' },
+      'Review the decisions →'));
+  }
+
+  return el('div', { class: 'hq-cos__section hq-cos__section--briefing' },
+    el('section', { class: 'hq-cos__welcome' },
+      el('p', { class: 'hq-cos__eyebrow label' }, `${greeting(tod)}`),
+      el('p', { class: 'hq-cos__welcome-line' }, BRIEFING.goodMorning)),
+    cosBlock('Today’s Priorities', BRIEFING.todaysPriorities),
+    decisionsWaiting,
+    cosBlock('Progress Since Yesterday', BRIEFING.progressSinceYesterday),
+    cosBlock('Risks', BRIEFING.risks),
+    cosBlock('Looking Ahead', BRIEFING.lookingAhead),
+    el('aside', { class: 'hq-cos__note', role: 'note' },
+      el('p', { class: 'hq-cos__note-label label' }, 'A note from your Chief of Staff'),
+      el('p', { class: 'hq-cos__note-body' }, BRIEFING.chiefOfStaffNote)),
+  );
+}
+
+/* --- 2. Decision System (interactive record) ------------------------------ */
+function cosDecisions(repaint: () => void): HTMLElement {
+  const responses = loadResponses();
+  const views = decisionViews(DECISIONS, responses);
+
+  const list = el('div', { class: 'hq-cos__decisions' });
+  for (const v of views) list.append(cosDecisionCard(v, repaint));
+
+  return el('div', { class: 'hq-cos__section' },
+    cosIntro('Decisions', 'Each is prepared with a recommendation and the thinking behind it. Give your word when you are ready; your answer is kept.'),
+    list);
+}
+
+function cosDecisionCard(v: DecisionView, repaint: () => void): HTMLElement {
+  const d = v.decision;
+  const recorded = v.response ? getResponse(v.response.response) : null;
+
+  const card = el('article', {
+    class: 'hq-cos__decision',
+    ...(v.archived ? { 'data-archived': 'true' } : {}),
+  });
+
+  card.append(
+    el('h3', { class: 'hq-cos__decision-title' }, d.title),
+    el('p', { class: 'hq-cos__decision-summary' }, d.summary),
+    cosField('Recommendation', d.recommendation),
+    cosField('Reasoning', d.reasoning),
+  );
+
+  const tradeList = el('ul', { class: 'hq-cos__tradeoffs' });
+  for (const t of d.tradeOffs) tradeList.append(el('li', {}, t));
+  card.append(el('div', { class: 'hq-cos__field' },
+    el('p', { class: 'hq-cos__field-label label' }, 'Trade-offs'),
+    tradeList));
+
+  card.append(cosField('Requested of you', d.requestedAction));
+
+  // The recorded answer (if any), shown back plainly before the controls.
+  const status = el('p', { class: 'hq-cos__decision-status' });
+  if (recorded && v.response) {
+    status.classList.add('is-answered');
+    const when = formatWhen(v.response.respondedAt);
+    status.append(
+      el('span', { class: 'hq-cos__answer-label' }, `Your answer: ${recorded.label}`),
+      el('span', { class: 'hq-cos__answer-echo' }, `${recorded.echo}${when ? ` · ${when}` : ''}`),
+    );
+    if (v.response.note) {
+      status.append(el('span', { class: 'hq-cos__answer-note' }, `“${v.response.note}”`));
+    }
+  } else {
+    status.append(el('span', { class: 'hq-cos__answer-label hq-cos__answer-label--awaiting' },
+      'Awaiting your decision'));
+  }
+  card.append(status);
+
+  // Optional note — captured with whichever response the Founder gives next.
+  const noteId = `note_${d.id}`;
+  const noteInput = el('input', {
+    class: 'hq-cos__note-input',
+    id: noteId,
+    type: 'text',
+    maxlength: '160',
+    placeholder: 'Add a note (optional) — e.g. the change you would make',
+    ...(v.response?.note ? { value: v.response.note } : {}),
+  }) as HTMLInputElement;
+  card.append(el('div', { class: 'hq-cos__note-field' },
+    el('label', { class: 'hq-cos__note-input-label label', for: noteId }, 'Your note'),
+    noteInput));
+
+  // The six responses. The recorded one is marked; choosing any records it.
+  const controls = el('div', { class: 'hq-cos__responses', role: 'group',
+    'aria-label': `Your response to “${d.title}”` });
+  for (const r of RESPONSES) {
+    const chosen = v.response?.response === r.id;
+    const btn = el('button', {
+      class: 'hq-cos__response',
+      type: 'button',
+      'aria-pressed': chosen ? 'true' : 'false',
+    }, r.label) as HTMLButtonElement;
+    btn.addEventListener('click', () => {
+      const made = makeResponse({ decisionId: d.id, response: r.id, note: noteInput.value });
+      if (!made) return;
+      saveResponses(recordResponse(loadResponses(), made));
+      repaint();
+    });
+    controls.append(btn);
+  }
+  card.append(controls);
+
+  // Withdraw — return the decision to waiting, keeping nothing.
+  if (v.response) {
+    const withdraw = el('button', { class: 'hq-cos__withdraw', type: 'button' },
+      'Withdraw this answer') as HTMLButtonElement;
+    withdraw.addEventListener('click', () => {
+      saveResponses(clearResponse(loadResponses(), d.id));
+      repaint();
+    });
+    card.append(withdraw);
+  }
+
+  return card;
+}
+
+/** A labelled field: a small label over a line of prepared prose. */
+function cosField(label: string, body: string): HTMLElement {
+  return el('div', { class: 'hq-cos__field' },
+    el('p', { class: 'hq-cos__field-label label' }, label),
+    el('p', { class: 'hq-cos__field-body' }, body));
+}
+
+/* --- 3. Docket ------------------------------------------------------------ */
+function cosDocket(): HTMLElement {
+  const list = el('div', { class: 'hq-cos__docket' });
+  for (const item of DOCKET) {
+    const card = el('article', { class: 'hq-cos__docket-item' },
+      el('div', { class: 'hq-cos__docket-head' },
+        el('h3', { class: 'hq-cos__docket-question' }, item.question),
+        el('span', { class: 'hq-cos__tag label', 'data-status': item.status },
+          docketStatusLabel(item.status))),
+      cosField('Background', item.background),
+      cosField('Recommendation', item.recommendation),
+      el('p', { class: 'hq-cos__docket-owner' },
+        el('span', { class: 'label' }, 'Owner'), ` ${item.owner}`));
+    list.append(card);
+  }
+  return el('div', { class: 'hq-cos__section' },
+    cosIntro('Docket', 'The active questions before the House — matters that want leadership consideration, not tasks to complete.'),
+    list);
+}
+
+/* --- 4. Open Chairs ------------------------------------------------------- */
+function cosChairs(): HTMLElement {
+  const list = el('div', { class: 'hq-cos__chairs' });
+  for (const chair of CHAIRS) {
+    const resp = el('ul', { class: 'hq-cos__chair-resp' });
+    for (const r of chair.responsibilities) resp.append(el('li', {}, r));
+    list.append(el('article', { class: 'hq-cos__chair' },
+      el('div', { class: 'hq-cos__chair-head' },
+        el('h3', { class: 'hq-cos__chair-name' }, chair.name),
+        el('span', { class: 'hq-cos__tag label', 'data-status': chair.status },
+          chairStatusLabel(chair.status))),
+      el('p', { class: 'hq-cos__chair-purpose' }, chair.purpose),
+      cosField('Charge', chair.charge),
+      el('div', { class: 'hq-cos__field' },
+        el('p', { class: 'hq-cos__field-label label' }, 'Standing Responsibilities'),
+        resp)));
+  }
+  return el('div', { class: 'hq-cos__section' },
+    cosIntro('Open Chairs', 'The seats the House is preparing to fill. Each is described in full before anyone is ever invited to it. No recruitment yet — this is the ground being made ready.'),
+    list);
+}
+
+/* --- 5. Leadership Records ------------------------------------------------ */
+function cosLeadership(): HTMLElement {
+  // Who holds each charge today.
+  const holders = el('ul', { class: 'hq-cos__holders' });
+  for (const h of LEADERSHIP.holders) {
+    holders.append(el('li', { class: 'hq-cos__holder' },
+      el('p', { class: 'hq-cos__holder-chair' }, h.chair),
+      el('p', { class: 'hq-cos__holder-name' }, h.holder ?? 'Open'),
+      el('p', { class: 'hq-cos__holder-standing' }, h.standing)));
+  }
+
+  // Appointments — honestly empty in V1, the shelf prepared for the first letter.
+  const appts = el('div', { class: 'hq-cos__block' },
+    el('h2', { class: 'hq-cos__block-title' }, 'Appointments'));
+  if (LEADERSHIP.appointments.length === 0) {
+    appts.append(el('p', { class: 'hq-cos__quiet' },
+      'No appointments have been made yet. When the first chair is seated, its letter is kept here.'));
+  } else {
+    const list = el('ul', { class: 'hq-cos__lines' });
+    for (const a of LEADERSHIP.appointments) {
+      list.append(el('li', { class: 'hq-cos__line' }, `${a.appointee} — ${a.chair}${a.date ? ` · ${a.date}` : ''}`));
+    }
+    appts.append(list);
+  }
+
+  // Leadership history — the House's beginning is the first entry.
+  const history = el('ol', { class: 'hq-cos__history' });
+  for (const e of LEADERSHIP.history) {
+    history.append(el('li', { class: 'hq-cos__history-entry' },
+      el('span', { class: 'hq-cos__history-when label' }, e.when),
+      el('span', { class: 'hq-cos__history-event' }, e.event)));
+  }
+
+  return el('div', { class: 'hq-cos__section' },
+    cosIntro('Leadership Records', 'Who holds each charge, how it was given, and the story of the House’s leadership as it grows.'),
+    el('section', { class: 'hq-cos__block' },
+      el('h2', { class: 'hq-cos__block-title' }, 'Chairs & Charges'),
+      holders),
+    appts,
+    el('section', { class: 'hq-cos__block' },
+      el('h2', { class: 'hq-cos__block-title' }, 'Leadership History'),
+      history),
+  );
+}
+
+/* --- 6. Archive ----------------------------------------------------------- */
+function cosArchive(): HTMLElement {
+  const recorded = loadResponses().length;
+  const shelves = archiveShelves(recorded);
+
+  const grid = el('ul', { class: 'hq-cos__shelves' });
+  for (const s of shelves) {
+    const shelf = el('li', { class: 'hq-cos__shelf' },
+      el('div', { class: 'hq-cos__shelf-head' },
+        el('h3', { class: 'hq-cos__shelf-name' }, s.label),
+        el('span', { class: 'hq-cos__shelf-count label' },
+          s.count > 0 ? `${s.count} kept` : 'Empty')),
+      el('p', { class: 'hq-cos__shelf-note' }, s.note),
+      el('p', { class: 'hq-cos__shelf-state' },
+        s.count > 0 ? 'Held in the record.' : s.emptyLine));
+    grid.append(shelf);
+  }
+
+  return el('div', { class: 'hq-cos__section' },
+    cosIntro('Archive', 'The institutional record, given its shelves. Each category is ready the moment a document exists — the House keeps what it decides.'),
+    grid);
+}
+
+/* --- small shared helpers for the office ---------------------------------- */
+
+/** Spell out small counts for the Briefing's prose (falls back to digits). */
+function spellCount(n: number): string {
+  const words = ['zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+  return words[n] ?? String(n);
+}
+
+/** A gentle, human "when" from an ISO datetime (date only; never a raw stamp). */
+function formatWhen(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric' });
+  } catch { return ''; }
+}
+
 /** ERROR — an unrecognised route. Offers the way home rather than a dead end. */
 function renderError(root: HTMLElement): void {
   setMode('seated');
@@ -1344,6 +1724,18 @@ function route(): void {
     return;
   }
 
+  // The Office of the Chief of Staff is an operational WORKSPACE, not a room in
+  // the residence (Headquarters is architecturally complete). It is reached from
+  // the House Toolbar / Quick Actions, lives at #/chief-of-staff, and is handled
+  // here — before the room registry — so it never appears in the atrium or rail.
+  if (seg === 'chief-of-staff') {
+    renderChiefOfStaff(root);
+    window.scrollTo({ top: 0 });
+    root.setAttribute('tabindex', '-1');
+    root.focus({ preventScroll: true });
+    return;
+  }
+
   if (!isRoomId(seg)) {
     renderError(root);
     return;
@@ -1617,7 +2009,7 @@ function quickActions(room: RoomId): QuickAction[] {
   const search = (): void => openHqModal(globalSearchPanel(), 'Search the House');
   const go = (route: string) => (): void => { closeHqModal(); location.hash = route; };
   const common: Record<RoomId, QuickAction[]> = {
-    executive: [{ label: 'New Note', run: dictate }, { label: 'Dictate', run: dictate }, { label: 'Schedule', run: schedule }, { label: 'Search', run: search }],
+    executive: [{ label: 'Open the Chief of Staff', run: go('#/chief-of-staff') }, { label: 'Dictate', run: dictate }, { label: 'Schedule', run: schedule }, { label: 'Search', run: search }],
     operations: [{ label: 'Dictate Observation', run: dictate }, { label: 'Schedule Follow-up', run: schedule }, { label: 'Open Founder’s Desk', run: go('#/executive/desk') }, { label: 'Search', run: search }],
     creative: [{ label: 'Dictate', run: dictate }, { label: 'Open Archive', run: go('#/creative') }, { label: 'Schedule Creative Time', run: schedule }, { label: 'Search', run: search }],
     production: [{ label: 'Dictate Production Note', run: dictate }, { label: 'Schedule Session', run: schedule }, { label: 'Open Calendar', run: schedule }, { label: 'Search', run: search }],
@@ -1656,6 +2048,11 @@ function mountHouseToolbar(): void {
     return b;
   };
   const bar = el('nav', { class: 'hq-bar', 'aria-label': 'House services' },
+    // The Office of the Chief of Staff — the founder's operational workspace,
+    // reached from here rather than being a room in the residence. It navigates
+    // (a full surface) instead of opening a modal like the other services.
+    svc('Chief of Staff', ICON_COS, () => { closeHqModal(); location.hash = COS_ROUTE; },
+      'Open the Office of the Chief of Staff'),
     svc('Search', ICON_SEARCH, () => openHqModal(globalSearchPanel(), 'Search the House')),
     svc('Dictate', ICON_MIC, () => openHqModal(dictationPanel(), 'Dictation')),
     svc('Calendar', ICON_CAL, () => openHqModal(calendarPanel(), 'Headquarters Calendar')),
@@ -1665,6 +2062,7 @@ function mountHouseToolbar(): void {
   document.body.append(bar);
 }
 
+const ICON_COS = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3.5h6v2.5H9z"/><path d="M8.5 11h7M8.5 15h4.5"/></svg>`;
 const ICON_SEARCH = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>`;
 const ICON_MIC = MIC_SVG;
 const ICON_CAL = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 9h17M8 3v4M16 3v4"/></svg>`;
@@ -1688,5 +2086,5 @@ if (document.readyState === 'loading') {
 }
 
 // Re-exported for tests and future milestones (kept off the module's happy path).
-export { renderScene, renderSeated, renderOperations, renderCreative, renderProduction, renderGrowth, renderBusiness, renderError, renderAccessDenied };
+export { renderScene, renderSeated, renderOperations, renderCreative, renderProduction, renderGrowth, renderBusiness, renderChiefOfStaff, renderError, renderAccessDenied };
 export type { Room, RoomId };

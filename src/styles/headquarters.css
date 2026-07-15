@@ -1181,6 +1181,300 @@
 }
 
 /* =============================================================================
+   SPRINT 9A — the Office of the Chief of Staff. The founder's private executive
+   workspace: understand what needs attention, review prepared recommendations,
+   make decisions, and keep the record. Composed entirely in the residence's
+   editorial language — plaster plates, a brushed-brass hairline, serif prose,
+   generous negative space. No badges, no urgency, no dashboard. Everything reads
+   as thoughtfully prepared work laid out before the founder arrives.
+   ============================================================================= */
+.hq-view--cos {
+  --hq-cos-quiet: var(--umber);
+}
+
+/* The office's own section index — understated brass-underline tabs, never a
+   toolbar. A calm way to move between the six prepared sections. */
+.hq-cos__nav { margin: var(--s-2) 0 var(--s-1); }
+.hq-cos__nav-list {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4);
+  border-bottom: 1.5px solid var(--hq-brass-hair);
+  padding-bottom: var(--s-2);
+}
+.hq-cos__nav-link {
+  font-family: var(--sans); font-size: var(--fs-label);
+  letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--umber); text-decoration: none;
+  padding: 6px 0; border-bottom: 2px solid transparent;
+  margin-bottom: -2px; transition: color var(--motion-quick) var(--ease-settle);
+}
+.hq-cos__nav-link:hover,
+.hq-cos__nav-link:focus-visible { color: var(--hq-ink); border-bottom-color: var(--brass); outline: none; }
+.hq-cos__nav-link[aria-current='page'] { color: var(--hq-ink); border-bottom-color: var(--brass); }
+
+.hq-cos__body { margin-top: var(--s-4); }
+.hq-cos__section { display: grid; gap: var(--s-5); }
+
+/* Section intro — an eyebrow and a single prepared line. */
+.hq-cos__intro { display: grid; gap: var(--s-1); max-width: 62ch; }
+.hq-cos__eyebrow { color: var(--umber); margin: 0; }
+.hq-cos__lead {
+  font-family: var(--serif); font-size: var(--fs-body);
+  color: var(--hq-ink); margin: 0; line-height: 1.5;
+}
+.hq-cos__quiet {
+  font-family: var(--serif); font-style: italic; font-size: var(--fs-body);
+  color: var(--umber); margin: 0; max-width: 60ch;
+}
+
+/* A titled block of prepared lines (Priorities, Risks, Looking Ahead …). */
+.hq-cos__block { display: grid; gap: var(--s-2); }
+.hq-cos__block-title {
+  font-family: var(--serif); font-weight: 300; font-size: var(--fs-h3);
+  color: var(--hq-ink); margin: 0;
+}
+.hq-cos__lines { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); }
+.hq-cos__line {
+  font-family: var(--serif); font-size: var(--fs-body); line-height: 1.5;
+  color: var(--hq-ink); max-width: 64ch;
+  padding-left: var(--s-3); border-left: 2px solid var(--hq-brass-hair);
+}
+.hq-cos__more {
+  justify-self: start; margin-top: var(--s-1);
+  font-family: var(--sans); font-size: var(--fs-label); letter-spacing: 0.04em;
+  color: var(--brass); text-decoration: none;
+}
+.hq-cos__more:hover, .hq-cos__more:focus-visible { color: var(--terracotta); outline: none; }
+
+/* Founder Briefing — the warm opening, then the prepared blocks and the note. */
+.hq-cos__section--briefing { gap: var(--s-6); }
+.hq-cos__welcome { display: grid; gap: var(--s-2); max-width: 66ch; }
+.hq-cos__welcome-line {
+  font-family: var(--serif); font-size: var(--fs-h3); font-weight: 300;
+  line-height: 1.45; color: var(--hq-ink); margin: 0;
+}
+.hq-cos__note {
+  display: grid; gap: var(--s-1); max-width: 66ch;
+  padding: var(--s-4) var(--s-5);
+  background:
+    linear-gradient(var(--hq-brass-hair), var(--hq-brass-hair)) top left / 100% 1.5px no-repeat,
+    linear-gradient(152deg, var(--hq-plaster) 0%, var(--hq-plaster-2) 100%);
+  border: var(--hairline); border-radius: var(--radius);
+  box-shadow: var(--hq-shadow-card);
+}
+.hq-cos__note-label { color: var(--umber); margin: 0; }
+.hq-cos__note-body {
+  font-family: var(--serif); font-style: italic; font-size: var(--fs-body);
+  line-height: 1.5; color: var(--hq-ink); margin: 0;
+}
+
+/* Decision System — each recommendation a plaster record with the founder's
+   response controls. The one interactive foundation of the office. */
+.hq-cos__decisions { display: grid; gap: var(--s-4); }
+.hq-cos__decision {
+  display: grid; gap: var(--s-3);
+  padding: var(--s-5);
+  background:
+    linear-gradient(var(--hq-brass-hair), var(--hq-brass-hair)) top left / 100% 1.5px no-repeat,
+    linear-gradient(152deg, var(--hq-plaster) 0%, var(--hq-plaster-2) 100%);
+  border: var(--hairline); border-radius: var(--radius);
+  box-shadow: var(--hq-shadow-card);
+  animation: hq-rise var(--motion-settle) var(--ease-settle) both;
+}
+.hq-cos__decision[data-archived='true'] { opacity: 0.66; }
+.hq-cos__decision-title {
+  font-family: var(--serif); font-weight: 300; font-size: var(--fs-h3);
+  color: var(--hq-ink); margin: 0;
+}
+.hq-cos__decision-summary {
+  font-family: var(--serif); font-size: var(--fs-body); line-height: 1.5;
+  color: var(--hq-ink); margin: 0; max-width: 62ch;
+}
+.hq-cos__field { display: grid; gap: 4px; }
+.hq-cos__field-label { color: var(--umber); margin: 0; }
+.hq-cos__field-body {
+  font-family: var(--serif); font-size: var(--fs-body-sm); line-height: 1.5;
+  color: var(--hq-ink); margin: 0; max-width: 64ch;
+}
+.hq-cos__tradeoffs {
+  list-style: none; margin: 0; padding: 0; display: grid; gap: 6px;
+}
+.hq-cos__tradeoffs li {
+  font-family: var(--serif); font-size: var(--fs-body-sm); line-height: 1.45;
+  color: var(--umber); max-width: 64ch;
+  padding-left: var(--s-3); position: relative;
+}
+.hq-cos__tradeoffs li::before {
+  content: '—'; position: absolute; left: 0; color: var(--brass);
+}
+
+/* The recorded answer, shown back plainly before the controls. */
+.hq-cos__decision-status {
+  display: grid; gap: 2px; margin: 0;
+  padding-top: var(--s-2); border-top: 1px solid var(--hq-brass-hair);
+}
+.hq-cos__answer-label {
+  font-family: var(--sans); font-size: var(--fs-label); letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--hq-ink);
+}
+.hq-cos__answer-label--awaiting { color: var(--umber); }
+.hq-cos__answer-echo {
+  font-family: var(--serif); font-style: italic; font-size: var(--fs-body-sm);
+  color: var(--umber);
+}
+.hq-cos__answer-note {
+  font-family: var(--serif); font-size: var(--fs-body-sm); color: var(--hq-ink);
+  margin-top: 2px;
+}
+
+/* Optional note the founder attaches to a response. */
+.hq-cos__note-field { display: grid; gap: 4px; }
+.hq-cos__note-input-label { color: var(--umber); margin: 0; }
+.hq-cos__note-input {
+  font-family: var(--serif); font-size: var(--fs-body-sm); color: var(--hq-ink);
+  padding: 10px var(--s-3); max-width: 52ch;
+  background: rgba(var(--ink-rgb), 0.015);
+  border: var(--hairline); border-radius: var(--radius);
+}
+.hq-cos__note-input:focus-visible {
+  outline: none; border-color: var(--brass); box-shadow: var(--focus-ring);
+}
+.hq-cos__note-input::placeholder { color: var(--umber); opacity: 0.7; }
+
+/* The six responses — quiet plaster buttons; the recorded one is marked. */
+.hq-cos__responses { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.hq-cos__response {
+  font-family: var(--sans); font-size: var(--fs-label); letter-spacing: 0.03em;
+  color: var(--hq-ink); background: transparent;
+  padding: 10px var(--s-3); min-height: 44px;
+  border: 1px solid var(--hq-brass-hair); border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color var(--motion-quick) var(--ease-settle),
+              background var(--motion-quick) var(--ease-settle);
+}
+.hq-cos__response:hover,
+.hq-cos__response:focus-visible {
+  border-color: var(--brass); background: rgba(var(--ink-rgb), 0.03); outline: none;
+}
+.hq-cos__response[aria-pressed='true'] {
+  color: var(--alabaster); background: var(--ink); border-color: var(--ink);
+}
+.hq-cos__withdraw {
+  justify-self: start;
+  font-family: var(--sans); font-size: var(--fs-label); letter-spacing: 0.03em;
+  color: var(--umber); background: transparent; border: none; cursor: pointer;
+  padding: 4px 0; text-decoration: underline; text-underline-offset: 3px;
+}
+.hq-cos__withdraw:hover, .hq-cos__withdraw:focus-visible { color: var(--terracotta); outline: none; }
+
+/* Docket & Chairs — plaster cards with a quiet status tag. */
+.hq-cos__docket, .hq-cos__chairs { display: grid; gap: var(--s-4); }
+.hq-cos__docket-item, .hq-cos__chair {
+  display: grid; gap: var(--s-3);
+  padding: var(--s-5);
+  background:
+    linear-gradient(var(--hq-brass-hair), var(--hq-brass-hair)) top left / 100% 1.5px no-repeat,
+    linear-gradient(152deg, var(--hq-plaster) 0%, var(--hq-plaster-2) 100%);
+  border: var(--hairline); border-radius: var(--radius);
+  box-shadow: var(--hq-shadow-card);
+  animation: hq-rise var(--motion-settle) var(--ease-settle) both;
+}
+.hq-cos__docket-head, .hq-cos__chair-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--s-3); flex-wrap: wrap;
+}
+.hq-cos__docket-question, .hq-cos__chair-name {
+  font-family: var(--serif); font-weight: 300; font-size: var(--fs-h3);
+  color: var(--hq-ink); margin: 0; max-width: 52ch;
+}
+.hq-cos__tag {
+  color: var(--umber); white-space: nowrap;
+  padding: 3px 10px; border: 1px solid var(--hq-brass-hair); border-radius: 999px;
+}
+.hq-cos__tag[data-status='ready_for_you'],
+.hq-cos__tag[data-status='open'] { color: var(--brass); border-color: var(--brass); }
+.hq-cos__docket-owner {
+  font-family: var(--serif); font-size: var(--fs-body-sm); color: var(--umber); margin: 0;
+}
+.hq-cos__chair-purpose {
+  font-family: var(--serif); font-style: italic; font-size: var(--fs-body);
+  color: var(--hq-ink); margin: 0; max-width: 60ch;
+}
+.hq-cos__chair-resp {
+  list-style: none; margin: 0; padding: 0; display: grid; gap: 6px;
+}
+.hq-cos__chair-resp li {
+  font-family: var(--serif); font-size: var(--fs-body-sm); line-height: 1.45;
+  color: var(--hq-ink); max-width: 60ch;
+  padding-left: var(--s-3); border-left: 2px solid var(--hq-brass-hair);
+}
+
+/* Leadership Records — holders, appointments, and the history ledger. */
+.hq-cos__holders { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-3); }
+.hq-cos__holder {
+  display: grid; gap: 2px;
+  padding: var(--s-3) var(--s-4);
+  border-left: 2px solid var(--hq-brass-hair);
+}
+.hq-cos__holder-chair {
+  font-family: var(--sans); font-size: var(--fs-label); letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--umber); margin: 0;
+}
+.hq-cos__holder-name {
+  font-family: var(--serif); font-size: var(--fs-h3); font-weight: 300;
+  color: var(--hq-ink); margin: 0;
+}
+.hq-cos__holder-standing {
+  font-family: var(--serif); font-style: italic; font-size: var(--fs-body-sm);
+  color: var(--umber); margin: 0; max-width: 60ch;
+}
+.hq-cos__history { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-3); }
+.hq-cos__history-entry {
+  display: grid; grid-template-columns: 12ch 1fr; gap: var(--s-3); align-items: baseline;
+}
+.hq-cos__history-when { color: var(--umber); }
+.hq-cos__history-event {
+  font-family: var(--serif); font-size: var(--fs-body); line-height: 1.5;
+  color: var(--hq-ink); max-width: 60ch;
+}
+
+/* Archive — the prepared shelves, honest about being empty. */
+.hq-cos__shelves {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: var(--s-3);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+}
+.hq-cos__shelf {
+  display: grid; gap: var(--s-1); align-content: start;
+  padding: var(--s-4) var(--s-5);
+  background:
+    linear-gradient(var(--hq-brass-hair), var(--hq-brass-hair)) top left / 100% 1.5px no-repeat,
+    linear-gradient(152deg, var(--hq-plaster) 0%, var(--hq-plaster-2) 100%);
+  border: var(--hairline); border-radius: var(--radius);
+  box-shadow: var(--hq-shadow-card);
+  animation: hq-rise var(--motion-settle) var(--ease-settle) both;
+}
+.hq-cos__shelf-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-2); }
+.hq-cos__shelf-name {
+  font-family: var(--serif); font-weight: 300; font-size: var(--fs-h3);
+  color: var(--hq-ink); margin: 0;
+}
+.hq-cos__shelf-count { color: var(--umber); white-space: nowrap; }
+.hq-cos__shelf-note {
+  font-family: var(--serif); font-size: var(--fs-body-sm); color: var(--hq-ink);
+  margin: 0; max-width: 40ch;
+}
+.hq-cos__shelf-state {
+  font-family: var(--serif); font-style: italic; font-size: var(--fs-body-sm);
+  color: var(--umber); margin: 0; max-width: 40ch;
+}
+
+@media (max-width: 720px) {
+  .hq-cos__history-entry { grid-template-columns: 1fr; gap: 2px; }
+  .hq-cos__responses { gap: var(--s-1); }
+}
+
+/* =============================================================================
    MOBILE — the Indexed Headquarters. Below the editorial breakpoint the scene
    is not compressed: it becomes a plain, legible vertical INDEX of the wings.
    The primary work is always immediately available (Build Bible §8.5, §16).
@@ -1222,7 +1516,13 @@
   .hq-manuscript,
   .hq-narration,
   .hq-corr__card,
-  .hq-arch__record { animation: none; }
+  .hq-arch__record,
+  .hq-cos__decision,
+  .hq-cos__docket-item,
+  .hq-cos__chair,
+  .hq-cos__shelf { animation: none; }
+  .hq-cos__nav-link,
+  .hq-cos__response { transition: none; }
   .hq-atmos__foliage { animation: none; }
   .hq-atmos__sun,
   .hq-atmos__art,
