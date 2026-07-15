@@ -1183,6 +1183,59 @@
 }
 
 /* =============================================================================
+   MILESTONE 8 — the Business Office. "A private counsel's study where what the
+   House has built is kept safe." The residence's most rooted, permanent room —
+   protection before administration. The ARCHIVE is the hero: a wall of archival
+   records, warm walnut and brass on limestone, library light at evening.
+   Grounded and permanent, never dark or corporate; composed in the residence's
+   editorial language like every other wing. No numbers, no records, no dashboard,
+   no illustration. This wing completes the residence — all six are live.
+   ============================================================================= */
+.hq-view--business {
+  --hq-walnut:      #6E4E34;                    /* deep warm walnut — the archive's wood */
+  --hq-walnut-hair: rgba(110, 78, 52, 0.5);     /* a walnut/leather edge line */
+}
+
+.hq-arch { display: grid; gap: var(--s-4); }
+.hq-arch__eyebrow { color: var(--umber); margin: 0; }
+
+/* The Archive — the wall of records. Each subject a warm plaster-and-walnut plate
+   with a brushed-brass hairline above and a walnut base rule below, so it reads as
+   a bound, archival record standing on a shelf — not a tile, never a database. */
+.hq-arch__list {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: var(--s-3);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+}
+.hq-arch__record {
+  display: grid; gap: var(--s-1); align-content: start;
+  padding: var(--s-4) var(--s-5);
+  background:
+    linear-gradient(var(--hq-brass-hair), var(--hq-brass-hair)) top left / 100% 1.5px no-repeat,
+    linear-gradient(152deg, var(--hq-plaster) 0%, var(--hq-plaster-2) 100%);
+  border: var(--hairline);
+  border-bottom: 2px solid var(--hq-walnut-hair);   /* the walnut base — archival weight */
+  border-radius: var(--radius);
+  box-shadow: var(--hq-shadow-card);
+  animation: hq-rise var(--motion-settle) var(--ease-settle) both;
+}
+.hq-arch__name {
+  font-family: var(--serif); font-weight: 300; font-size: var(--fs-h3);
+  color: var(--hq-ink); margin: 0;
+}
+.hq-arch__note {
+  font-family: var(--serif); font-style: italic; font-size: var(--fs-body-sm);
+  color: var(--umber); margin: 0; line-height: 1.45; max-width: 40ch;
+}
+
+/* The continuity inscription — the room's quiet reassurance of permanence. */
+.hq-arch__continuity {
+  max-width: 52ch; margin: var(--s-2) 0 0;
+  font-family: var(--serif); font-style: italic; font-size: var(--fs-body);
+  color: var(--umber);
+}
+
+/* =============================================================================
    MOBILE — the Indexed Headquarters. Below the editorial breakpoint the scene
    is not compressed: it becomes a plain, legible vertical INDEX of the wings.
    The primary work is always immediately available (Build Bible §8.5, §16).
@@ -1223,7 +1276,8 @@
   .hq-board,
   .hq-manuscript,
   .hq-narration,
-  .hq-corr__card { animation: none; }
+  .hq-corr__card,
+  .hq-arch__record { animation: none; }
   .hq-atmos__foliage { animation: none; }
   .hq-atmos__sun,
   .hq-atmos__art,
