@@ -210,7 +210,9 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 50% 38%;        /* landscape (desktop/tablet): hold the view + desk */
+  /* Focal point comes from the Scene Asset (--hq-scene-focal, set on .hq-atmos__art),
+     so replacement artwork can re-aim the crop with no CSS change. */
+  object-position: var(--hq-scene-focal, 50% 38%);   /* landscape (desktop/tablet) */
   opacity: 0;
   transition: opacity var(--motion-room) var(--ease-camera);
 }
@@ -229,35 +231,9 @@
 .hq-page[data-hq-art='on'][data-tod='evening']   { --hq-scene-tint: 0.38; }
 .hq-page[data-hq-art='on'][data-tod='late']      { --hq-scene-tint: 0.30; }
 
-/* A restrained, warm light lift behind the hero text ONLY — keeps the dark
-   editorial type legible over the photograph without washing the room. Applied
-   only in artwork mode; the CSS-environment scene is unaffected. */
-.hq-page[data-hq-art='on'] .hq-view--scene .hq-hero { position: relative; z-index: 0; }
-.hq-page[data-hq-art='on'] .hq-view--scene .hq-hero::before {
-  content: '';
-  position: absolute;
-  inset: -10% 0 -14% 0;            /* vertical bleed only — never past the viewport */
-  z-index: -1;
-  /* Warm light across the text COLUMN (left), clearing to the open room (right).
-     Guarantees the dark editorial type stays legible over the photograph. */
-  background:
-    linear-gradient(103deg,
-      rgba(247, 243, 236, 0.92) 0%,
-      rgba(247, 243, 236, 0.70) 34%,
-      rgba(247, 243, 236, 0.28) 58%,
-      rgba(247, 243, 236, 0) 78%);
-  pointer-events: none;
-}
-/* Portrait viewports: the hero type is full-width, so lift the whole block
-   top-down instead of just the left column (still soft, still warm). */
-@media (max-width: 900px) {
-  .hq-page[data-hq-art='on'] .hq-view--scene .hq-hero::before {
-    background: linear-gradient(180deg,
-      rgba(247, 243, 236, 0.90) 0%,
-      rgba(247, 243, 236, 0.76) 58%,
-      rgba(247, 243, 236, 0.46) 100%);
-  }
-}
+/* The greeting sits DIRECTLY on the scenery — no wash, no panel, no gradient
+   block. Legibility comes from white type + a soft text-shadow (see
+   .hq-title--greeting), never from a plate behind the words. */
 
 /* Focused-work dim: a warm scrim that lifts over the atmosphere when Seated.
    z-index keeps it above BOTH the CSS environment and the artwork/tint planes. */
@@ -314,10 +290,10 @@
    light leading from the upper-left, the room's intention as the hero.
    ============================================================================= */
 .hq-view--scene .hq-hero {
-  padding-block: var(--s-7) var(--s-3);
-  min-height: 48vh;
+  padding-block: var(--s-5) var(--s-3);
+  min-height: 0;
   display: grid;
-  align-content: center;
+  align-content: start;
 }
 
 /* The wings as thresholds — secondary to the room, never a dominating grid. */
@@ -1475,6 +1451,256 @@
 }
 
 /* =============================================================================
+   SPRINT 10 — Executive Hospitality. Refined floating editorial cards, the four
+   Hospitality cards, and the Atmosphere (room-soundtrack) control. The scenery
+   stays the emotional focal point; the cards are curated panels that quietly
+   support it — luxury from typography, light, and restraint, never decoration.
+   Navigation, rooms, and the House Toolbar are unchanged.
+   ============================================================================= */
+
+/* A shared "editorial panel" material: warm, SOLID ivory parchment/plaster with
+   a brushed-brass hairline and a soft low shadow so the card floats on the light
+   rather than sitting flat. NOT glass — the background never bleeds through, so
+   the dark editorial type stays fully legible over the scenery. Used by the
+   refined Daily Briefing and the Hospitality cards. */
+:root {
+  /* An elegant signature/handwritten face — used ONLY for short hospitality
+     sign-offs, one-line Founder notes, and small editorial annotations. Never
+     for body text, labels, buttons, or operational information. */
+  --script: 'Pinyon Script', 'Snell Roundhand', cursive;
+  /* Solid warm ivory parchment — the two stops of the panel gradient. */
+  --hq-panel-a: #FCF8F1;
+  --hq-panel-b: #F4ECDD;
+  --hq-shadow-float:
+    0 1px 0 rgba(255, 252, 245, 0.85) inset,
+    0 28px 52px -28px rgba(74, 52, 40, 0.40),
+    0 6px 16px -12px rgba(74, 52, 40, 0.24);
+}
+
+/* --- Refined Daily Briefing (readability + a floating feel) --------------- */
+.hq-briefing {
+  margin-top: var(--s-4);
+  max-width: 46ch;
+  gap: var(--s-1);
+  padding: var(--s-4) var(--s-5);
+  background: linear-gradient(152deg, var(--hq-panel-a) 0%, var(--hq-panel-b) 100%);
+  border: var(--hairline);
+  border-left: 2px solid var(--brass);
+  border-radius: 3px;
+  box-shadow: var(--hq-shadow-float);
+}
+.hq-briefing__line {
+  font-size: var(--fs-h2);          /* larger, more editorial */
+  line-height: 1.24; color: var(--ink-900);
+}
+.hq-briefing__meta { font-size: var(--fs-body-sm); }
+
+/* --- The hero as a spread: the greeting opposite the two suspended cards ---
+   Base (phone/tablet portrait) stacks: greeting, then the two cards full-width.
+   The two-column spread + the gentle "suspended" stagger apply only on the wide
+   editorial layout (min-width 901px), so the media order can't be overridden. */
+.hq-hero__lede-col { display: grid; gap: var(--s-3); align-content: center; }
+/* The greeting — prominent but not oversized, so the scenery stays the focal
+   point. Lighter than the display face; the sub-lines and sign-off sit quietly
+   beneath it (matching the approved reference). */
+.hq-title--greeting {
+  font-size: clamp(2.7rem, 1.5rem + 4.6vw, 4.6rem);
+  font-weight: 400; line-height: 1.0; letter-spacing: -0.015em; max-width: 15ch; margin: 0;
+  color: #fff;                                   /* white type, directly on the scenery */
+  text-shadow: 0 2px 30px rgba(18, 28, 42, 0.45), 0 1px 3px rgba(18, 28, 42, 0.35);
+}
+.hq-hero__greet-line { display: block; }
+.hq-hero__sub { display: grid; gap: 3px; margin: 0; }
+.hq-hero__sub .hq-lede {
+  margin: 0; max-width: 40ch; color: rgba(255, 253, 249, 0.97); font-style: normal;
+  font-size: 1.28rem; font-weight: 400; line-height: 1.5;
+  text-shadow: 0 1px 16px rgba(18, 28, 42, 0.55), 0 1px 3px rgba(18, 28, 42, 0.5);
+}
+/* A personal handwritten note from the Chief of Staff — signature script, warm
+   brass, a touch larger than the supporting copy. Not italic serif, not caps. */
+.hq-hero__signoff {
+  margin: 14px 0 0 72px; font-family: var(--script); font-style: normal;   /* nudged right + down onto quieter scenery */
+  font-size: 2rem; line-height: 1; color: #E8C583;   /* brighter brass for contrast */
+  text-shadow: 0 1px 12px rgba(18, 28, 42, 0.55), 0 1px 2px rgba(18, 28, 42, 0.5);
+}
+.hq-hosp--suspended { display: grid; gap: var(--s-3); align-content: start; }
+
+@media (min-width: 901px) {
+  .hq-view--scene .hq-hero {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: var(--s-6);
+    align-items: start;
+    padding-top: var(--s-6);          /* generous breathing room from the toolbar */
+  }
+  /* Greeting eased inward from the window frame for more breathing room. */
+  .hq-hero__lede-col { padding-left: var(--s-5); position: relative; }
+  /* Delicate brushed-brass editorial framing — an L-crop mark above-left of the
+     headline and a short horizontal accent beneath the block. Not a border. */
+  .hq-hero__lede-col::before {
+    content: ''; position: absolute; top: -18px; left: calc(var(--s-5) - 2px);
+    width: 26px; height: 26px;
+    border-top: 1.5px solid var(--brass-hi); border-left: 1.5px solid var(--brass-hi);
+    opacity: 0.92; filter: drop-shadow(0 1px 2px rgba(18, 28, 42, 0.4));
+  }
+  .hq-hero__lede-col::after {
+    content: ''; position: absolute; left: var(--s-5); bottom: -22px;
+    width: 48px; height: 1.5px; background: var(--brass-hi); opacity: 0.85;
+    box-shadow: 0 1px 2px rgba(18, 28, 42, 0.35);
+  }
+  /* Suspended cards: refined business-card plaques, ~18% shorter, EQUAL width +
+     height, stacked, inset from the right edge (ocean centre stays open). */
+  .hq-hosp--suspended { justify-items: end; gap: var(--s-3); padding-right: var(--s-5); }
+  .hq-hosp--suspended .hq-hcard {
+    width: 380px; max-width: 380px; height: 148px;
+    padding: var(--s-3) var(--s-4);
+    display: flex; flex-direction: column; justify-content: center;
+    overflow: hidden;
+  }
+  .hq-hosp--suspended .hq-hcard__body { gap: var(--s-1); }
+  .hq-hosp--suspended .hq-hcard__line { font-size: var(--fs-body-sm); line-height: 1.38; max-width: none; }
+}
+
+/* --- The lower editorial cards (the sill row), grounded below a large,
+   uninterrupted scenic band ------------------------------------------------ */
+.hq-hosp { margin-top: var(--s-5); }
+.hq-hosp__list {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: var(--s-3);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+  align-items: stretch;
+}
+.hq-hosp--lower .hq-hcard { height: 100%; }
+
+/* Today's Briefing — the live card body (honest Daily Briefing, sized for a card). */
+.hq-hcard__live { display: grid; gap: 6px; }
+.hq-hcard__live .hq-briefing__line {
+  font-size: var(--fs-h3); font-weight: 300; line-height: 1.3; color: var(--ink-900); margin: 0;
+}
+.hq-hcard__live .hq-briefing__line--quiet { font-style: italic; color: var(--umber); }
+.hq-hcard__live .hq-briefing__meta { font-size: var(--fs-body-sm); margin: 0; }
+.hq-hcard__live .hq-briefing__enter { margin-top: var(--s-1); }
+
+/* Each card is a floating editorial panel — generous, calm, high-contrast type.
+   `article` for the resting cards; `button` for the Atmosphere action card. */
+.hq-hcard {
+  display: flex; flex-direction: column; text-align: left; width: 100%;
+  padding: var(--s-4) var(--s-4) var(--s-5);
+  /* Brass hairline across the head of the plate, then SOLID ivory parchment —
+     the same proven material as the wings; the scenery never bleeds through. */
+  background:
+    linear-gradient(var(--hq-brass-hair), var(--hq-brass-hair)) top left / 100% 1.5px no-repeat,
+    linear-gradient(152deg, var(--hq-panel-a) 0%, var(--hq-panel-b) 100%);
+  border: var(--hairline);
+  border-radius: 3px;
+  box-shadow: var(--hq-shadow-float);
+  animation: hq-rise var(--motion-settle) var(--ease-settle) both;
+}
+.hq-hcard__body { display: grid; gap: var(--s-2); }
+.hq-hcard__eyebrow { color: var(--umber); margin: 0; }
+
+/* The dark-oxblood action button along the card's lower edge — consistent across
+   the row, aligned at the same vertical position (margin-top:auto in the flex
+   column), full card width. Real links (or the Atmosphere modal trigger). */
+.hq-hcard__btn {
+  margin-top: auto; align-self: stretch;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 44px; padding: 11px var(--s-4);
+  background: #5a201c; color: #F7ECE5;
+  border: 0; border-radius: 4px; cursor: pointer; text-decoration: none;
+  font-family: var(--sans); font-weight: 600; font-size: var(--fs-label);
+  letter-spacing: 0.05em; text-transform: uppercase; text-align: center;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  box-shadow: 0 10px 20px -14px rgba(60, 20, 18, 0.55);
+  transition: background var(--motion-quick) var(--ease-settle);
+}
+.hq-hcard__btn:hover, .hq-hcard__btn:focus-visible { background: #491713; outline: none; }
+.hq-hcard__btn:focus-visible { box-shadow: var(--focus-ring); }
+.hq-hcard__rule {
+  display: block; width: 34px; height: 1.5px; margin: 2px 0 0;
+  background: var(--brass);
+}
+.hq-hcard__line {
+  font-family: var(--serif); font-weight: 300; font-style: italic;
+  font-size: var(--fs-h3); line-height: 1.36; color: var(--ink-900);
+  margin: 0; max-width: 34ch;
+}
+/* Lower cards read as executive dashboard summaries: upright, calm body text.
+   Italics are reserved for the reflective Mindful Moment line only. */
+.hq-hosp--lower .hq-hcard__line { font-style: normal; font-size: var(--fs-body); line-height: 1.5; }
+.hq-hosp--lower .hq-hcard[data-kind='mindful'] .hq-hcard__line { font-style: italic; }
+.hq-hcard__attr {
+  margin: var(--s-1) 0 0; font-family: var(--sans);
+  font-size: var(--fs-label); letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--umber);
+}
+
+/* The Atmosphere action card — a real button; the CTA reads as an invitation. */
+.hq-hcard--action { cursor: pointer; font: inherit;
+  transition: box-shadow var(--motion-quick) var(--ease-settle),
+              transform var(--motion-quick) var(--ease-settle); }
+.hq-hcard--action:hover,
+.hq-hcard--action:focus-visible {
+  box-shadow: var(--hq-shadow-lift); transform: translateY(-2px); outline: none;
+  border-color: var(--brass);
+}
+.hq-hcard__cta {
+  display: inline-block; margin-top: auto; padding-top: var(--s-3);   /* aligns CTAs to the card's lower edge */
+  font-family: var(--sans); font-size: var(--fs-label); font-weight: 600;
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--brass);
+}
+.hq-hcard--action:hover .hq-hcard__cta,
+.hq-hcard--action:focus-visible .hq-hcard__cta { color: var(--terracotta); }
+
+/* --- Atmosphere control — the room-soundtrack preference panel (modal) ---- */
+.hq-atmo { display: grid; gap: var(--s-3); }
+.hq-atmo__lede {
+  margin: 0; max-width: 56ch; font-family: var(--serif);
+  font-size: var(--fs-body-sm); line-height: 1.5; color: var(--umber);
+}
+.hq-atmo__rooms { display: grid; gap: var(--s-3); }
+.hq-atmo__room {
+  display: grid; gap: var(--s-2);
+  padding: var(--s-3) 0;
+  border-top: 1px solid var(--hq-brass-hair);
+}
+.hq-atmo__room:first-child { border-top: none; }
+.hq-atmo__name {
+  margin: 0; font-family: var(--serif); font-weight: 300; font-size: var(--fs-h3);
+  color: var(--hq-ink);
+}
+.hq-atmo__fields {
+  display: grid; gap: var(--s-2);
+  grid-template-columns: minmax(120px, 0.7fr) minmax(0, 1.3fr) minmax(0, 1.3fr);
+}
+.hq-atmo__in {
+  font-family: var(--sans); font-size: var(--fs-body-sm); color: var(--hq-ink);
+  padding: 10px 12px; min-height: 44px;
+  background: rgba(var(--ink-rgb), 0.02);
+  border: var(--hairline); border-radius: var(--radius);
+}
+.hq-atmo__in:focus-visible { outline: none; border-color: var(--brass); box-shadow: var(--focus-ring); }
+.hq-atmo__in::placeholder { color: var(--umber); opacity: 0.7; }
+.hq-atmo__row-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s-3); flex-wrap: wrap;
+}
+.hq-atmo__status { margin: 0; font-family: var(--serif); font-style: italic;
+  font-size: var(--fs-body-sm); color: var(--umber); }
+.hq-atmo__status--none { opacity: 0.8; }
+.hq-atmo__actions { display: flex; gap: var(--s-2); align-items: center; }
+.hq-atmo__clear {
+  font-family: var(--sans); font-size: var(--fs-label); letter-spacing: 0.03em;
+  color: var(--umber); background: transparent; border: none; cursor: pointer;
+  min-height: 44px; padding: 0 6px; text-decoration: underline; text-underline-offset: 3px;
+}
+.hq-atmo__clear:hover, .hq-atmo__clear:focus-visible { color: var(--terracotta); outline: none; }
+
+@media (max-width: 720px) {
+  .hq-atmo__fields { grid-template-columns: 1fr; }
+}
+
+/* =============================================================================
    MOBILE — the Indexed Headquarters. Below the editorial breakpoint the scene
    is not compressed: it becomes a plain, legible vertical INDEX of the wings.
    The primary work is always immediately available (Build Bible §8.5, §16).
@@ -1520,9 +1746,11 @@
   .hq-cos__decision,
   .hq-cos__docket-item,
   .hq-cos__chair,
-  .hq-cos__shelf { animation: none; }
+  .hq-cos__shelf,
+  .hq-hcard { animation: none; }
   .hq-cos__nav-link,
-  .hq-cos__response { transition: none; }
+  .hq-cos__response,
+  .hq-hcard--action { transition: none; }
   .hq-atmos__foliage { animation: none; }
   .hq-atmos__sun,
   .hq-atmos__art,
@@ -1550,8 +1778,9 @@
 .hq-archive__chip, .hq-cal__chip, .hq-briefing__enter, .hq-board__route {
   min-height: 44px; display: inline-flex; align-items: center;
 }
-/* Keep room content clear of the floating toolbar. */
-.hq-view__inner { padding-bottom: 96px; }
+/* Keep room content clear of the fixed top toolbar (padding lives on the body,
+   below) and give the foot a little breathing room. */
+.hq-view__inner { padding-bottom: var(--s-6); }
 /* Never scroll horizontally (guards the frozen atmosphere's decorative bleed too).
    `clip` leaves the fixed atmosphere and toolbar untouched. */
 .hq-page { overflow-x: clip; }
@@ -1607,44 +1836,122 @@
 .hq-archive__entry-desc { font-family: var(--serif); font-size: var(--fs-body); line-height: 1.6; color: var(--umber); margin: var(--s-1) 0 0; max-width: 64ch; }
 
 /* =============================================================================
-   THE HOUSE TOOLBAR — one residence-wide bar of House services. Permanently part
-   of the residence (a floating brass-hairline plate, not an app nav bar); centred
-   at the foot so it never obstructs room content. iPad-first labels; icon-only on
-   phone; keyboard-reachable.
+   THE HOUSE TOOLBAR — one residence-wide bar of House services, now seated along
+   the TOP of the residence (Sprint 10, approved composition). Same services,
+   routes, labels, and behaviour — a visual repositioning only. Opaque warm
+   parchment with a brass hairline (never glass); services at the left, the
+   Founder identity at the right. iPad-first labels; icon-only on phone;
+   keyboard-reachable. The modal sits above it (z-index).
    ============================================================================= */
 .hq-bar {
-  position: fixed; left: 50%; transform: translateX(-50%);
-  bottom: max(16px, env(safe-area-inset-bottom)); z-index: var(--z-modal);
-  display: flex; gap: 2px; padding: 5px;
-  background: linear-gradient(152deg, var(--hq-plaster) 0%, var(--hq-plaster-2) 100%);
-  border: 1px solid var(--brass); border-radius: 999px; box-shadow: var(--hq-shadow-lift);
+  position: fixed; top: 16px; left: 0; right: 0; z-index: var(--z-modal);
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-3);
+  padding: 9px max(var(--s-4), env(safe-area-inset-right)) 9px max(var(--s-4), env(safe-area-inset-left));
+  padding-top: max(9px, env(safe-area-inset-top));
+  /* DARK SMOKED ARCHITECTURAL GLASS — a physical tinted pane floating over the
+     ocean, as in a coastal hotel. A cool charcoal blue-grey tint with a subtle
+     vertical depth gradient; the scenery reads CLEARLY through it (light frost,
+     not a heavy wash). A crisp specular highlight along the top edge and a soft
+     inner base shadow give the glass real thickness; a low cast shadow floats
+     it above the room. Never cream, never a flat opaque grey. */
+  background: linear-gradient(180deg, rgba(37, 48, 62, 0.44) 0%, rgba(26, 35, 47, 0.34) 100%);
+  -webkit-backdrop-filter: saturate(1.12) blur(10px);
+  backdrop-filter: saturate(1.12) blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),           /* crisp glass top edge */
+    inset 0 -16px 22px -18px rgba(10, 16, 26, 0.55),   /* thickness at the base */
+    0 12px 34px -24px rgba(10, 18, 30, 0.55);          /* soft cast — floating */
 }
+/* Where blur isn't supported, deepen the tint so the light labels stay legible. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .hq-bar { background: linear-gradient(180deg, rgba(37, 48, 62, 0.9) 0%, rgba(26, 35, 47, 0.86) 100%); }
+}
+.hq-bar__services { display: flex; align-items: center; gap: 4px; min-width: 0; flex-wrap: nowrap; overflow: hidden; }
 .hq-bar__btn {
-  display: inline-flex; flex-direction: column; align-items: center; gap: 3px;
-  min-width: 76px; min-height: 56px; padding: 8px 12px; border: 0; border-radius: 999px;
-  background: transparent; color: var(--hq-ink); cursor: pointer;
-  font-family: var(--sans); font-weight: 600; font-size: 11px;
-  letter-spacing: 0.06em; text-transform: uppercase;
+  display: inline-flex; flex-direction: row; align-items: center; gap: 8px;
+  min-height: 44px; padding: 7px 15px; border: 0; border-radius: 999px;
+  background: transparent; color: rgba(255, 253, 249, 0.95); cursor: pointer;
+  font-family: var(--sans); font-weight: 500; font-size: 13px;
+  letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap;
   transition: background var(--motion-quick) var(--ease-settle);
 }
-.hq-bar__btn:hover, .hq-bar__btn:focus-visible { background: rgba(var(--ink-rgb), 0.05); outline: none; }
-.hq-bar__btn:focus-visible { box-shadow: var(--focus-ring); }
-.hq-bar__ico { display: inline-flex; color: var(--brass); }
+.hq-bar__btn:hover, .hq-bar__btn:focus-visible { background: rgba(255, 255, 255, 0.14); outline: none; }
+.hq-bar__btn:focus-visible { box-shadow: 0 0 0 2px rgba(0,0,0,0.3), 0 0 0 4px var(--brass-hi); }
+.hq-bar__ico { display: inline-flex; color: rgba(255, 253, 249, 0.9); }
 .hq-bar__lbl { line-height: 1; }
+
+/* The Founder identity — display only (no account management). A restrained
+   editorial name/role with a small brass monogram crest. */
+.hq-bar__identity { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+.hq-bar__id-text {
+  display: flex; align-items: baseline; gap: 6px;
+  font-family: var(--serif); font-size: var(--fs-body-sm); color: rgba(255, 253, 249, 0.95);
+}
+.hq-bar__id-sep { color: rgba(255, 255, 255, 0.4); }
+.hq-bar__id-role {
+  font-family: var(--sans); font-size: var(--fs-label); letter-spacing: 0.08em;
+  text-transform: uppercase; color: rgba(255, 253, 249, 0.72);
+}
+.hq-bar__id-crest {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: radial-gradient(120% 120% at 30% 25%, var(--brass-hi) 0%, var(--brass) 78%);
+  color: var(--alabaster); font-family: var(--sans); font-weight: 600;
+  font-size: 11px; letter-spacing: 0.04em;
+  box-shadow: inset 0 1px 0 rgba(255, 252, 245, 0.4);
+}
+
+/* Clear the fixed top toolbar (JS present) and retire the redundant static
+   masthead — the toolbar now carries the residence's identity. Without JS the
+   masthead remains as the honest header. */
+body.hq-has-topbar { padding-top: 80px; }
+body.hq-has-topbar .site-header { display: none; }
+
+/* The Soundscape pill — a separate control at the bottom-right, opening the
+   room-soundtrack model. A warm dark pill; above content, below the modal. */
+.hq-soundscape {
+  position: fixed; z-index: var(--z-modal);
+  right: max(var(--s-4), env(safe-area-inset-right));
+  bottom: max(var(--s-4), env(safe-area-inset-bottom));
+  display: inline-flex; align-items: center; gap: 9px;
+  min-height: 44px; padding: 10px 18px; border-radius: 999px; cursor: pointer;
+  background: rgba(58, 46, 38, 0.82);
+  -webkit-backdrop-filter: saturate(1.1) blur(8px);
+  backdrop-filter: saturate(1.1) blur(8px);
+  border: 1px solid rgba(255, 252, 245, 0.14);
+  box-shadow: 0 14px 32px -18px rgba(74, 52, 40, 0.6);
+  color: var(--alabaster); font-family: var(--sans); font-weight: 600;
+  font-size: var(--fs-label); letter-spacing: 0.06em; text-transform: uppercase;
+  transition: background var(--motion-quick) var(--ease-settle);
+}
+.hq-soundscape:hover, .hq-soundscape:focus-visible { background: rgba(58, 46, 38, 0.95); outline: none; }
+.hq-soundscape:focus-visible { box-shadow: var(--focus-ring); }
+.hq-soundscape__ico { display: inline-flex; color: var(--brass-hi); }
 
 .hq-modal {
   position: fixed; inset: 0; z-index: calc(var(--z-modal) + 1);
   display: grid; place-items: end center; padding: 0;
-  background: rgba(74, 52, 40, 0.28); opacity: 0; transition: opacity var(--motion-quick) var(--ease-settle);
+  /* Fade the BACKDROP only (its alpha), never the sheet — so the opaque
+     parchment sheet is solid from the first frame and no content ever shows
+     through it. A dedicated, substantial dim: the residence recedes and its
+     text is not readable behind the panel. */
+  background: rgba(38, 26, 18, 0);
+  transition: background-color var(--motion-quick) var(--ease-settle);
 }
-.hq-modal.is-in { opacity: 1; }
+.hq-modal.is-in { background: rgba(38, 26, 18, 0.56); }
+/* Background interaction lock while a modal is open — the residence holds still. */
+body.hq-modal-open { overflow: hidden; }
 .hq-modal__sheet {
   position: relative; width: 100%; max-width: 640px; max-height: 92vh; overflow: auto;
   padding: var(--s-6) var(--s-5) var(--s-7);
-  background: linear-gradient(180deg, #FBF7F0 0%, #F5EEE1 100%);
+  background: linear-gradient(180deg, #FBF7F0 0%, #F5EEE1 100%);  /* fully opaque parchment */
   border: var(--hairline); border-radius: 18px 18px 0 0;
   box-shadow: 0 -30px 60px -30px rgba(74, 52, 40, 0.4);
+  transform: translateY(14px);
+  transition: transform var(--motion-quick) var(--ease-settle);
 }
+.hq-modal.is-in .hq-modal__sheet { transform: translateY(0); }
 @media (min-width: 768px) { .hq-modal { place-items: center; } .hq-modal__sheet { border-radius: 16px; } }
 .hq-modal__close {
   position: absolute; top: 12px; right: 12px; width: 44px; height: 44px; border-radius: 50%;
@@ -1706,10 +2013,19 @@
   .hq-lede { font-size: var(--fs-body-lg, var(--fs-body)); }
   .hq-archive__entry-desc { font-size: var(--fs-body-lg, var(--fs-body)); }
 }
-@media (max-width: 560px) {
-  .hq-bar { gap: 0; padding: 4px; }
-  .hq-bar__btn { min-width: 54px; padding: 8px; }
+/* Below the wide editorial layout the top bar becomes icon-only services + a
+   compact identity crest, so it always stays on one line (never clips). Labels
+   and the name/role are visually hidden but remain in the accessibility tree
+   (each button keeps its aria-label). */
+@media (max-width: 900px) {
+  .hq-bar { gap: var(--s-2); padding: 3px max(12px, env(safe-area-inset-right)) 3px max(12px, env(safe-area-inset-left)); }
+  .hq-bar__services { gap: 0; }
+  .hq-bar__btn { padding: 8px 10px; gap: 0; }
   .hq-bar__lbl { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .hq-bar__id-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  body.hq-has-topbar { padding-top: 72px; }
+}
+@media (max-width: 560px) {
   .hq-archive { padding: var(--s-4); }
   .hq-archive__search { font-size: var(--fs-body); }
   .hq-dict__save { margin-left: 0; width: 100%; }
@@ -1717,7 +2033,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hq-modal, .hq-dict__mic, .hq-bar__btn { transition: none; }
+  .hq-modal, .hq-modal__sheet, .hq-dict__mic, .hq-bar__btn { transition: none; }
+  .hq-modal__sheet { transform: none; }
 }
 
 /* --- Quick Actions · Notifications · Global Search (House services) --------- */
