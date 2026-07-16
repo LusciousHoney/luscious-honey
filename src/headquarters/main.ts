@@ -51,9 +51,10 @@ import { SAFEGUARDS, STUDY_LEDE, CONTINUITY_NOTE } from './business.ts';
 import {
   COS_SECTIONS, COS_HOME_SECTION, isCosSection,
   COS_EYEBROW, COS_TITLE, COS_LEDE,
-  BRIEFING, DECISIONS, DOCKET, CHAIRS, LEADERSHIP,
+  BRIEFING, DECISIONS, DOCKET,
+  openChairViews, leadershipViews, appointmentsOnRecord, leadershipHistoryView,
   RESPONSES,
-  docketStatusLabel, chairStatusLabel, getResponse,
+  docketStatusLabel, getResponse,
   decisionViews, openDecisions, archiveShelves,
   makeResponse, loadResponses, saveResponses, recordResponse, clearResponse,
   type CosSectionId, type DecisionView,
@@ -1221,58 +1222,76 @@ function cosDocket(): HTMLElement {
     list);
 }
 
-/* --- 4. Open Chairs ------------------------------------------------------- */
+/* --- 4. Open Chairs — derived from the Executive Register ----------------- */
 function cosChairs(): HTMLElement {
+  const chairs = openChairViews();
   const list = el('div', { class: 'hq-cos__chairs' });
-  for (const chair of CHAIRS) {
+  for (const chair of chairs) {
     const resp = el('ul', { class: 'hq-cos__chair-resp' });
     for (const r of chair.responsibilities) resp.append(el('li', {}, r));
-    list.append(el('article', { class: 'hq-cos__chair' },
-      el('div', { class: 'hq-cos__chair-head' },
-        el('h3', { class: 'hq-cos__chair-name' }, chair.name),
-        el('span', { class: 'hq-cos__tag label', 'data-status': chair.status },
-          chairStatusLabel(chair.status))),
+    const head = el('div', { class: 'hq-cos__chair-head' },
+      el('h3', { class: 'hq-cos__chair-name' },
+        `Chair #${String(chair.ordinal).padStart(3, '0')} — ${chair.title}`),
+      el('span', { class: 'hq-cos__tag label', 'data-status': chair.status },
+        chair.statusLabel));
+    const card = el('article', { class: 'hq-cos__chair' },
+      head,
       el('p', { class: 'hq-cos__chair-purpose' }, chair.purpose),
       cosField('Charge', chair.charge),
       el('div', { class: 'hq-cos__field' },
         el('p', { class: 'hq-cos__field-label label' }, 'Standing Responsibilities'),
-        resp)));
+        resp));
+    if (chair.establishedOn) {
+      card.append(el('p', { class: 'hq-cos__chair-established' },
+        el('span', { class: 'label' }, 'Established'), ` ${chair.establishedOn}`));
+    }
+    list.append(card);
   }
   return el('div', { class: 'hq-cos__section' },
-    cosIntro('Open Chairs', 'The seats the House is preparing to fill. Each is described in full before anyone is ever invited to it. No recruitment yet — this is the ground being made ready.'),
+    cosIntro('Open Chairs', 'The seats the House is preparing to fill, drawn from the Executive Register. Each is described in full before anyone is ever invited to it. No recruitment yet — this is the ground being made ready.'),
     list);
 }
 
-/* --- 5. Leadership Records ------------------------------------------------ */
+/* --- 5. Leadership Records — derived from Register history ----------------- */
 function cosLeadership(): HTMLElement {
-  // Who holds each charge today.
+  // Each Chair's truthful current standing, derived from the Register.
   const holders = el('ul', { class: 'hq-cos__holders' });
-  for (const h of LEADERSHIP.holders) {
-    holders.append(el('li', { class: 'hq-cos__holder' },
-      el('p', { class: 'hq-cos__holder-chair' }, h.chair),
-      el('p', { class: 'hq-cos__holder-name' }, h.holder ?? 'Open'),
-      el('p', { class: 'hq-cos__holder-standing' }, h.standing)));
+  for (const c of leadershipViews()) {
+    const holder = el('li', { class: 'hq-cos__holder' },
+      el('p', { class: 'hq-cos__holder-chair' },
+        `Chair #${String(c.ordinal).padStart(3, '0')} — ${c.title}`),
+      el('p', { class: 'hq-cos__holder-name' }, c.standing));
+    if (c.operatingNote) {
+      holder.append(el('p', { class: 'hq-cos__holder-standing' }, c.operatingNote));
+    }
+    if (c.founderNote) {
+      holder.append(el('p', { class: 'hq-cos__holder-standing' },
+        el('span', { class: 'label' }, 'Founder’s note'), ` ${c.founderNote}`));
+    }
+    holders.append(holder);
   }
 
-  // Appointments — honestly empty in V1, the shelf prepared for the first letter.
+  // Appointments — only real records; honestly empty until the first letter.
+  const onRecord = appointmentsOnRecord();
   const appts = el('div', { class: 'hq-cos__block' },
     el('h2', { class: 'hq-cos__block-title' }, 'Appointments'));
-  if (LEADERSHIP.appointments.length === 0) {
+  if (onRecord.length === 0) {
     appts.append(el('p', { class: 'hq-cos__quiet' },
-      'No appointments have been made yet. When the first chair is seated, its letter is kept here.'));
+      'No appointments have been made yet. Every Chair is established but not yet formally appointed; when the first is seated, its letter is kept here.'));
   } else {
     const list = el('ul', { class: 'hq-cos__lines' });
-    for (const a of LEADERSHIP.appointments) {
-      list.append(el('li', { class: 'hq-cos__line' }, `${a.appointee} — ${a.chair}${a.date ? ` · ${a.date}` : ''}`));
+    for (const a of onRecord) {
+      list.append(el('li', { class: 'hq-cos__line' },
+        `${a.appointee} — ${a.chairId}${a.effectiveDate ? ` · ${a.effectiveDate}` : ''}`));
     }
     appts.append(list);
   }
 
-  // Leadership history — the House's beginning is the first entry.
+  // Leadership history — the preserved Register entries, oldest first.
   const history = el('ol', { class: 'hq-cos__history' });
-  for (const e of LEADERSHIP.history) {
+  for (const e of leadershipHistoryView()) {
     history.append(el('li', { class: 'hq-cos__history-entry' },
-      el('span', { class: 'hq-cos__history-when label' }, e.when),
+      el('span', { class: 'hq-cos__history-when label' }, e.on),
       el('span', { class: 'hq-cos__history-event' }, e.event)));
   }
 
