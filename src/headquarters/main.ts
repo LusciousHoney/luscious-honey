@@ -48,6 +48,13 @@ import {
 } from './production.ts';
 import { RELATIONSHIPS, SALON_LEDE, HORIZON_NOTE } from './growth.ts';
 import { SAFEGUARDS, STUDY_LEDE, CONTINUITY_NOTE } from './business.ts';
+import { CURRENT_SCENE, scenePictureHTML } from './scene.ts';
+import { SUSPENDED_CARDS, LOWER_CARDS, FOUNDER_IDENTITY, type HospitalityCard } from './hospitality.ts';
+import {
+  SOUNDTRACK_PROVIDERS, soundtrackRooms, providerLabel,
+  makePreference, preferenceFor, setPreference, clearPreference,
+  loadPreferences, savePreferences,
+} from './atmosphere.ts';
 import {
   COS_SECTIONS, COS_HOME_SECTION, isCosSection,
   COS_EYEBROW, COS_TITLE, COS_LEDE,
@@ -104,18 +111,10 @@ function setTimeOfDay(): void {
 // (decoding async, low priority), and it never reserves layout — it fills the
 // fixed `.hq-atmos__art` box, so a slow or failed load causes no shift and the
 // CSS environment simply shows through underneath. Assets: public/headquarters/scene/.
-const SCENE = '/headquarters/scene';
-const SCENE_PICTURE = `
-  <picture>
-    <source media="(max-width: 900px)" type="image/avif" srcset="${SCENE}/exec-mobile.avif">
-    <source media="(max-width: 900px)" type="image/webp" srcset="${SCENE}/exec-mobile.webp">
-    <source media="(max-width: 900px)" srcset="${SCENE}/exec-mobile.jpg">
-    <source type="image/avif" srcset="${SCENE}/exec-1024.avif 1024w, ${SCENE}/exec-1400.avif 1400w" sizes="100vw">
-    <source type="image/webp" srcset="${SCENE}/exec-1024.webp 1024w, ${SCENE}/exec-1400.webp 1400w" sizes="100vw">
-    <img class="hq-atmos__art-img" alt="" aria-hidden="true" loading="lazy" decoding="async" fetchpriority="low"
-         src="${SCENE}/exec-1400.jpg"
-         srcset="${SCENE}/exec-1024.jpg 1024w, ${SCENE}/exec-1400.jpg 1400w" sizes="100vw">
-  </picture>`;
+// The scene is a REPLACEABLE asset (see scene.ts): the markup and focal point
+// come from CURRENT_SCENE, so approved production artwork swaps in without any
+// change here. `--hq-scene-focal` carries the landscape crop's focal point to CSS.
+const SCENE_PICTURE = scenePictureHTML(CURRENT_SCENE);
 
 function ensureAtmosphere(): void {
   if (document.querySelector('.hq-atmos')) return;
@@ -127,7 +126,7 @@ function ensureAtmosphere(): void {
   //   'failed' → the image errored; stay on the CSS environment (graceful).
   // Until either fires, the CSS environment renders — the residence is usable
   // before (and without) the artwork.
-  const art = el('div', { class: 'hq-atmos__art' });
+  const art = el('div', { class: 'hq-atmos__art', style: `--hq-scene-focal: ${CURRENT_SCENE.focal};` });
   art.innerHTML = SCENE_PICTURE;
   const img = art.querySelector('img');
   if (img) {
@@ -188,7 +187,6 @@ function renderRail(current: RoomId): HTMLElement {
  */
 function renderScene(root: HTMLElement): void {
   setMode('scene');
-  const tod = timeOfDay();
 
   const wings = el('ul', { class: 'hq-wings__list' });
   for (const room of ROOMS) {
@@ -209,11 +207,10 @@ function renderScene(root: HTMLElement): void {
   }
 
   // The Daily Briefing — a single quiet plaster-document note, orientation only.
-  // Filled asynchronously; the room reads completely before it arrives.
-  const briefing = el('aside', { class: 'hq-briefing', 'aria-label': 'Today at the desk', 'aria-busy': 'true' },
-    el('p', { class: 'hq-briefing__eyebrow label' }, 'Today'),
-    el('p', { class: 'hq-briefing__line' }, 'Reading the desk…'),
-  );
+  // The two suspended cards float high in the scene (Today's Intention, Thought
+  // of the Day). The greeting sits opposite them, so the hero reads as a spread.
+  const suspended = el('div', { class: 'hq-hosp hq-hosp--suspended', 'aria-label': 'A few words for the morning' });
+  for (const c of SUSPENDED_CARDS) suspended.append(hospitalityCard(c));
 
   const scene = el(
     'section',
@@ -224,15 +221,23 @@ function renderScene(root: HTMLElement): void {
       el(
         'div',
         { class: 'hq-hero' },
-        el('p', { class: 'hq-eyebrow label' }, `${greeting(tod)} · Executive Office`),
-        el('h1', { class: 'hq-title' }, 'The day begins with possibility.'),
         el(
-          'p',
-          { class: 'hq-lede' },
-          'Morning light across the limestone, the terrace open to clean air, the writing table waiting. Every wing of the residence opens from here.',
+          'div',
+          { class: 'hq-hero__lede-col' },
+          el('h1', { class: 'hq-title hq-title--greeting' },
+            el('span', { class: 'hq-hero__greet-line' }, 'Good morning,'),
+            el('span', { class: 'hq-hero__greet-line' }, `${FOUNDER_IDENTITY.name}.`)),
+          el(
+            'div',
+            { class: 'hq-hero__sub' },
+            el('p', { class: 'hq-lede' }, 'The House is awake.'),
+            el('p', { class: 'hq-lede' }, 'Your day is ready when you are.'),
+          ),
+          el('p', { class: 'hq-hero__signoff' }, '— Chief of Staff'),
         ),
-        briefing,
+        suspended,
       ),
+      renderLowerCards(),
       el(
         'nav',
         { class: 'hq-wings', 'aria-label': 'The wings of the residence' },
@@ -242,7 +247,132 @@ function renderScene(root: HTMLElement): void {
   );
 
   root.replaceChildren(scene);
-  void mountBriefing(briefing);
+}
+
+/* --- The five lower editorial cards along the sill (Sprint 10) ------------
+   Today's Briefing · Priorities · From the House · Mindful Moment · Atmosphere.
+   Opaque warm-parchment panels; the scenery stays the focal point. Today's
+   Briefing is filled by the real Daily Briefing; Atmosphere opens the soundtrack
+   control; the rest rest as calm editorial text. */
+function renderLowerCards(): HTMLElement {
+  const list = el('div', { class: 'hq-hosp__list' });
+  for (const card of LOWER_CARDS) list.append(hospitalityCard(card));
+  return el('section', { class: 'hq-hosp hq-hosp--lower', 'aria-label': 'The morning at a glance' }, list);
+}
+
+/* Honest destinations for each lower card's action button — real House routes,
+   never fabricated data. Atmosphere opens the Soundscape control (a modal). */
+const CARD_ROUTES: Record<string, string> = {
+  briefing: '#/executive/desk',        // the Founder's Desk
+  priorities: '#/chief-of-staff/docket', // the Docket
+  house: '#/chief-of-staff',           // the Chief of Staff briefing
+  mindful: '#/chief-of-staff',         // a calm, prepared space
+};
+
+function hospitalityCard(card: HospitalityCard): HTMLElement {
+  const body = el('div', { class: 'hq-hcard__body' },
+    el('p', { class: 'hq-hcard__eyebrow label' }, card.eyebrow),
+    el('span', { class: 'hq-hcard__rule', 'aria-hidden': 'true' }));
+
+  // A live card (Today's Briefing) is filled from the real Daily Briefing — the
+  // honest awaiting-review line, never a fabricated count. A resting card carries
+  // its curated editorial line.
+  if (card.live) {
+    const host = el('div', { class: 'hq-hcard__live', 'aria-busy': 'true' },
+      el('p', { class: 'hq-briefing__line hq-briefing__line--quiet' }, 'Reading the desk…'));
+    body.append(host);
+    void mountBriefing(host);
+  } else {
+    body.append(el('p', { class: 'hq-hcard__line' }, card.body));
+    if (card.attribution) body.append(el('p', { class: 'hq-hcard__attr' }, `— ${card.attribution}`));
+  }
+
+  const article = el('article', { class: 'hq-hcard', 'data-kind': card.kind }, body);
+
+  // The lower cards carry a dark-oxblood action button along the bottom (aligned
+  // across the row). Atmosphere opens the Soundscape modal; the rest are real
+  // navigation links to honest House destinations. Suspended cards have none.
+  if (card.action) {
+    if (card.action === 'atmosphere') {
+      const btn = el('button', { class: 'hq-hcard__btn', type: 'button' }, card.actionLabel ?? 'Open');
+      btn.addEventListener('click', openAtmosphere);
+      article.append(btn);
+    } else {
+      const href = CARD_ROUTES[card.action] ?? getRoom(HOME_ROOM)!.route;
+      article.append(el('a', { class: 'hq-hcard__btn', href }, card.actionLabel ?? 'Open'));
+    }
+  }
+  return article;
+}
+
+/* --- Atmosphere: the room-soundtrack preference control (Sprint 10) ---------
+   Interface + preference model only (see atmosphere.ts): the founder assigns a
+   preferred soundtrack to each room, and the House remembers it. NO streaming,
+   auth, or playback — a future player reads these preferences. Reached from the
+   Atmosphere hospitality card and every room's Quick Actions (no toolbar change). */
+function openAtmosphere(): void {
+  openHqModal(atmospherePanel(), 'Atmosphere');
+}
+
+function atmospherePanel(): HTMLElement {
+  const panel = el('section', { class: 'hq-atmo', 'aria-label': 'Atmosphere — room soundtracks' });
+  panel.append(
+    el('p', { class: 'hq-modal__eyebrow label' }, 'Atmosphere'),
+    el('p', { class: 'hq-atmo__lede' },
+      'Choose the soundtrack you would like waiting in each room. The House remembers your preference; the music itself arrives in a later chapter.'),
+  );
+
+  const rows = el('div', { class: 'hq-atmo__rooms' });
+  for (const room of soundtrackRooms()) {
+    rows.append(atmosphereRow(room.id, room.name));
+  }
+  panel.append(rows);
+  return panel;
+}
+
+function atmosphereRow(roomId: ReturnType<typeof soundtrackRooms>[number]['id'], roomName: string): HTMLElement {
+  const current = preferenceFor(loadPreferences(), roomId);
+
+  const provider = el('select', { class: 'hq-atmo__in', 'aria-label': `Provider for ${roomName}` }) as HTMLSelectElement;
+  for (const p of SOUNDTRACK_PROVIDERS) {
+    const opt = el('option', { value: p.id }, p.label) as HTMLOptionElement;
+    if (current?.provider === p.id) opt.selected = true;
+    provider.append(opt);
+  }
+  const title = el('input', { class: 'hq-atmo__in hq-atmo__in--title', type: 'text',
+    'aria-label': `Playlist for ${roomName}`, placeholder: 'Playlist or station', maxlength: '80' }) as HTMLInputElement;
+  if (current?.title) title.value = current.title;
+  const link = el('input', { class: 'hq-atmo__in', type: 'url',
+    'aria-label': `Link for ${roomName} (optional)`, placeholder: 'Link (optional)' }) as HTMLInputElement;
+  if (current?.url) link.value = current.url;
+
+  const status = el('p', { class: 'hq-atmo__status', 'aria-live': 'polite' });
+  const renderStatus = (pref: typeof current): void => {
+    status.replaceChildren();
+    if (pref) status.append(el('span', {}, `Preferred: ${pref.title} · ${providerLabel(pref.provider)}`));
+    else status.append(el('span', { class: 'hq-atmo__status--none' }, 'No soundtrack chosen yet.'));
+  };
+  renderStatus(current);
+
+  const save = el('button', { class: 'hq-action hq-atmo__save', type: 'button' }, 'Remember') as HTMLButtonElement;
+  save.addEventListener('click', () => {
+    const pref = makePreference({ roomId, provider: provider.value, title: title.value, url: link.value });
+    if (!pref) { renderStatus(preferenceFor(loadPreferences(), roomId)); return; }
+    savePreferences(setPreference(loadPreferences(), pref));
+    renderStatus(pref);
+  });
+
+  const clear = el('button', { class: 'hq-atmo__clear', type: 'button' }, 'Clear') as HTMLButtonElement;
+  clear.addEventListener('click', () => {
+    savePreferences(clearPreference(loadPreferences(), roomId));
+    provider.selectedIndex = 0; title.value = ''; link.value = '';
+    renderStatus(null);
+  });
+
+  return el('div', { class: 'hq-atmo__room' },
+    el('p', { class: 'hq-atmo__name' }, roomName),
+    el('div', { class: 'hq-atmo__fields' }, provider, title, link),
+    el('div', { class: 'hq-atmo__row-foot' }, status, el('div', { class: 'hq-atmo__actions' }, clear, save)));
 }
 
 /**
@@ -254,8 +384,7 @@ function renderScene(root: HTMLElement): void {
 async function mountBriefing(host: HTMLElement): Promise<void> {
   const res = await fetchBriefing();
   host.setAttribute('aria-busy', 'false');
-  host.replaceChildren();
-  host.append(el('p', { class: 'hq-briefing__eyebrow label' }, 'Today'));
+  host.replaceChildren();   // the card supplies the "Today's Briefing" eyebrow
 
   if (!res.ok) {
     host.append(el('p', { class: 'hq-briefing__line hq-briefing__line--quiet' },
@@ -278,9 +407,7 @@ async function mountBriefing(host: HTMLElement): Promise<void> {
   } else if (b.open > 0) {
     host.append(el('p', { class: 'hq-briefing__meta' }, `${b.open} in motion · nothing needs a decision right now.`));
   }
-
-  host.append(el('a', { class: 'hq-briefing__enter', href: `${getRoom(HOME_ROOM)!.route}/desk` },
-    awaiting > 0 ? 'Go to the Founder’s Desk →' : 'Open the Founder’s Desk →'));
+  // The card's own oxblood button is the single path into the Desk (no duplicate link).
 }
 
 /**
@@ -1729,6 +1856,8 @@ function route(): void {
   const root = document.getElementById('hq-app');
   if (!root) return;
 
+  closeHqModal();   // any open House modal closes when the founder navigates
+
   const seg = currentSegment();
 
   // Empty hash → restore the last room from Headquarters Memory (or the atrium).
@@ -1811,6 +1940,7 @@ let hqModal: HTMLElement | null = null;
 let hqModalOpener: HTMLElement | null = null;
 function closeHqModal(): void {
   hqModal?.remove(); hqModal = null;
+  document.body.classList.remove('hq-modal-open');   // release the background
   document.removeEventListener('keydown', hqModalKey);
   // Return focus to whatever opened the dialog (keyboard/screen-reader courtesy).
   if (hqModalOpener && document.contains(hqModalOpener)) hqModalOpener.focus({ preventScroll: true });
@@ -1839,6 +1969,7 @@ function openHqModal(panel: HTMLElement, label: string): void {
   close.addEventListener('click', closeHqModal);
   scrim.append(el('div', { class: 'hq-modal__sheet' }, close, panel));
   document.body.append(scrim);
+  document.body.classList.add('hq-modal-open');   // lock background scroll/interaction
   hqModal = scrim;
   document.addEventListener('keydown', hqModalKey);
   requestAnimationFrame(() => scrim.classList.add('is-in'));
@@ -2035,7 +2166,10 @@ function quickActions(room: RoomId): QuickAction[] {
     growth: [{ label: 'Dictate Idea', run: dictate }, { label: 'Schedule Conversation', run: schedule }, { label: 'Open Calendar', run: schedule }, { label: 'Search', run: search }],
     business: [{ label: 'Dictate Note', run: dictate }, { label: 'Schedule Follow-up', run: schedule }, { label: 'Open Archive', run: go('#/creative') }, { label: 'Search', run: search }],
   };
-  return common[room] ?? common.executive;
+  // Atmosphere is available house-wide via Quick Actions (an existing mechanism —
+  // the House Toolbar itself is unchanged), so any room's soundtrack is one tap away.
+  const base = common[room] ?? common.executive;
+  return [...base, { label: 'Atmosphere', run: openAtmosphere }];
 }
 function quickActionsPanel(): HTMLElement {
   const room = currentRoomId();
@@ -2053,10 +2187,11 @@ function quickActionsPanel(): HTMLElement {
 }
 
 /**
- * THE HOUSE TOOLBAR — one Headquarters-wide bar of House SERVICES, present in
- * every room and permanently part of the residence (not an app nav bar). Search ·
- * Dictate · Calendar · Notifications · room Quick Actions. iPad-first with clear
- * labels; icon-only compact on phone; keyboard-reachable; reduced-motion honoured.
+ * THE HOUSE TOOLBAR — one Headquarters-wide bar of House SERVICES, now seated
+ * along the TOP of the residence (Sprint 10). Same services, routes, labels, and
+ * behaviour — a visual repositioning only. Chief of Staff · Search · Dictate ·
+ * Calendar · Notifications · Actions at the left; the Founder identity (display
+ * only) at the right. iPad-first labels; icon-only on phone; keyboard-reachable.
  */
 function mountHouseToolbar(): void {
   if (document.querySelector('.hq-bar')) return;
@@ -2066,7 +2201,7 @@ function mountHouseToolbar(): void {
     b.addEventListener('click', open);
     return b;
   };
-  const bar = el('nav', { class: 'hq-bar', 'aria-label': 'House services' },
+  const services = el('div', { class: 'hq-bar__services', role: 'group', 'aria-label': 'House services' },
     // The Office of the Chief of Staff — the founder's operational workspace,
     // reached from here rather than being a room in the residence. It navigates
     // (a full surface) instead of opening a modal like the other services.
@@ -2078,8 +2213,37 @@ function mountHouseToolbar(): void {
     svc('Notifications', ICON_BELL, () => openHqModal(notificationsPanel(), 'Notifications')),
     svc('Actions', ICON_STAR, () => openHqModal(quickActionsPanel(), 'Quick actions')),
   );
+
+  // The Founder identity — display only, no account management. A restrained
+  // name/role with a small brass monogram crest (decorative).
+  const crest = FOUNDER_IDENTITY.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+  const identity = el('div', { class: 'hq-bar__identity' },
+    el('span', { class: 'hq-bar__id-text' },
+      el('span', { class: 'hq-bar__id-name' }, FOUNDER_IDENTITY.name),
+      el('span', { class: 'hq-bar__id-sep', 'aria-hidden': 'true' }, '·'),
+      el('span', { class: 'hq-bar__id-role' }, FOUNDER_IDENTITY.role)),
+    el('span', { class: 'hq-bar__id-crest', 'aria-hidden': 'true' }, crest),
+  );
+
+  const bar = el('nav', { class: 'hq-bar', 'aria-label': 'Headquarters' }, services, identity);
   document.body.append(bar);
+  document.body.classList.add('hq-has-topbar');   // clear + retire the static masthead
 }
+
+/** The Soundscape pill — a separate, always-present control at the bottom-right
+    that opens the room-soundtrack preference model (the same Atmosphere panel;
+    no playback/OAuth/streaming). A real, accessible button; never baked into the
+    scene. Also reachable from the Atmosphere card and Quick Actions. */
+function mountSoundscapePill(): void {
+  if (document.querySelector('.hq-soundscape')) return;
+  const pill = el('button', { class: 'hq-soundscape', type: 'button',
+    'aria-label': 'Soundscape — choose room soundtracks' }) as HTMLButtonElement;
+  pill.innerHTML = `<span class="hq-soundscape__ico" aria-hidden="true">${ICON_NOTE}</span><span class="hq-soundscape__lbl">Soundscape</span>`;
+  pill.addEventListener('click', openAtmosphere);
+  document.body.append(pill);
+}
+
+const ICON_NOTE = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></svg>`;
 
 const ICON_COS = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3.5h6v2.5H9z"/><path d="M8.5 11h7M8.5 15h4.5"/></svg>`;
 const ICON_SEARCH = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>`;
@@ -2092,6 +2256,7 @@ function boot(): void {
   setTimeOfDay();
   ensureAtmosphere();
   mountHouseToolbar();
+  mountSoundscapePill();
   window.addEventListener('hashchange', route);
   // The Morning Arrival wraps the first render of the day, then the residence
   // resolves to wherever the founder last was.
