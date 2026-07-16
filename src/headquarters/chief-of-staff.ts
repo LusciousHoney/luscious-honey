@@ -16,7 +16,28 @@
    Dictation, the Founder's decisions are the Founder's own and persist client-
    side in localStorage. Everything else is curated, placeholder V1 content —
    the framework, prepared for real records to be laid in later.
+
+   OPEN CHAIRS and LEADERSHIP RECORDS are NOT held here — they are DERIVED from
+   the Executive Register (Sprint 11A, `executive-register.ts`), the single
+   institutional source of truth for Chairs, standing, appointments, and history.
+   This module keeps only the office's own material (sections, briefing, the
+   decision system, the docket, the archive) plus the thin selectors below that
+   present the Register inside this workspace. No Chair data is duplicated here.
    ============================================================================= */
+
+import {
+  CHAIRS as EXECUTIVE_CHAIRS,
+  FOUNDING_REGISTER, APPOINTMENTS, DOSSIERS,
+  chairStandings, openChairStandings, establishedOn, institutionalStanding, leadershipHistory,
+  loadCollection, STORAGE_KEYS, isFounderNote,
+  CHAIR_CHIEF_OF_STAFF,
+  chairStatusLabel,
+  type ExecutiveRecords, type ChairStatus, type AppointmentRecord, type RegisterEntry,
+} from './executive-register.ts';
+
+// Re-exported so this office remains the workspace's import surface, while the
+// Register stays the source of truth.
+export { chairStatusLabel };
 
 /* -----------------------------------------------------------------------------
    THE SECTIONS — the office is organised as data, so its internal navigation is
@@ -422,134 +443,120 @@ export const DOCKET: DocketItem[] = [
 ];
 
 /* =============================================================================
-   4. OPEN CHAIRS — the structural foundation only (Version 1).
+   4. OPEN CHAIRS — DERIVED from the Executive Register.
 
-   The seats the House is preparing to fill. Each chair is described so its
-   purpose and charge are clear before anyone is ever invited to it. NO
-   interviews, NO recruitment workflow — data structure and presentation only.
+   The seats the House is preparing to fill, drawn straight from the approved
+   foundation. A Chair is shown here when its derived standing is an active or
+   future opening (not retired, not seated). Nothing is duplicated: the Chairs,
+   their standing, and their history all come from `executive-register.ts`.
+
+   One presentation rule lives here: where this section exposes the Creative
+   Director's charter, the word "canon" and its variations are replaced with
+   plain creative-standards language — a wording choice for this surface, not a
+   change to the approved foundation.
    ============================================================================= */
-export type ChairStatus = 'open' | 'preparing' | 'seated';
 
-export interface ChairStatusKind { id: ChairStatus; label: string; }
-export const CHAIR_STATUSES: ChairStatusKind[] = [
-  { id: 'open',      label: 'Open' },
-  { id: 'preparing', label: 'Preparing' },
-  { id: 'seated',    label: 'Seated' },
+/** Replace "canon" language with plain creative-standards wording, in order from
+    the most specific phrase to the bare word, so no "canon" remains. */
+const CANON_REPLACEMENTS: [RegExp, string][] = [
+  [/accumulating creative canon/gi, 'accumulating body of creative standards'],
+  [/creative canon/gi, 'creative standards'],
+  [/\bcanons\b/gi, 'creative standards'],
+  [/\bcanon\b/gi, 'creative standards'],
 ];
-const CHAIR_STATUS_BY_ID = new Map(CHAIR_STATUSES.map((s) => [s.id, s]));
-
-export function chairStatusLabel(id: ChairStatus): string {
-  return CHAIR_STATUS_BY_ID.get(id)?.label ?? id;
+export function neutralizeCanon(text: string): string {
+  return CANON_REPLACEMENTS.reduce((s, [re, rep]) => s.replace(re, rep), text);
 }
 
-export interface Chair {
-  id: string;
-  /** The chair's name (institutional). */
-  name: string;
-  /** Why the chair exists, in a sentence. */
+/** The live records this workspace reads: the Register foundation, plus any
+    Founder notes genuinely written client-side. Selectors take records as an
+    argument (testable); this gathers the live ones for rendering. */
+export function executiveRecords(): ExecutiveRecords {
+  return {
+    register: FOUNDING_REGISTER,
+    appointments: APPOINTMENTS,
+    dossiers: DOSSIERS,
+    founderNotes: loadCollection(STORAGE_KEYS.founderNotes, isFounderNote),
+  };
+}
+
+/** One open Chair, shaped for this section — derived, with canon language
+    neutralised on every exposed field. */
+export interface OpenChairView {
+  ordinal: number;
+  title: string;
   purpose: string;
-  /** The charge given to whoever sits in it — what they are trusted to do. */
   charge: string;
-  /** The standing responsibilities the chair carries. */
   responsibilities: string[];
   status: ChairStatus;
+  statusLabel: string;
+  establishedOn: string | null;
 }
 
-export const CHAIRS: Chair[] = [
-  {
-    id: 'chair_editorial',
-    name: 'Editorial Chair',
-    purpose: 'To hold the standard of everything the House publishes.',
-    charge: 'Guard the quality and the voice of the work, and decide what is ready to bear the House’s name.',
-    responsibilities: [
-      'Set and hold the editorial standard.',
-      'Shepherd work from draft to finished.',
-      'Keep the House’s voice consistent across everything it makes.',
-    ],
-    status: 'open',
-  },
-  {
-    id: 'chair_production',
-    name: 'Production Chair',
-    purpose: 'To carry finished work through to made, recorded, and released.',
-    charge: 'Turn approved work into finished work, on a rhythm the House can rely on.',
-    responsibilities: [
-      'Own the path from approved to released.',
-      'Keep production moving without haste or noise.',
-      'Protect the calm of the studio while it works.',
-    ],
-    status: 'open',
-  },
-  {
-    id: 'chair_growth',
-    name: 'Growth Chair',
-    purpose: 'To tend the House’s conversations with the world.',
-    charge: 'Find the House its audience and steward every relationship with care.',
-    responsibilities: [
-      'Hold the House’s ongoing relationships.',
-      'Decide where and how the work meets the world.',
-      'Keep growth in the House’s voice, never at its expense.',
-    ],
-    status: 'open',
-  },
-];
+export function openChairViews(records: ExecutiveRecords = executiveRecords()): OpenChairView[] {
+  return openChairStandings(EXECUTIVE_CHAIRS, records).map((s) => ({
+    ordinal: s.chair.ordinal,
+    title: s.chair.title,
+    purpose: neutralizeCanon(s.chair.purpose),
+    charge: neutralizeCanon(s.chair.charge),
+    responsibilities: s.chair.standingResponsibilities.map(neutralizeCanon),
+    status: s.status,
+    statusLabel: chairStatusLabel(s.status),
+    establishedOn: establishedOn(s),
+  }));
+}
 
 /* =============================================================================
-   5. LEADERSHIP RECORDS — the foundation for chair, appointment, and history.
+   5. LEADERSHIP RECORDS — DERIVED from Chair definitions + Register history.
 
-   Version 1 placeholder content. Chairs currently held, appointments made, and
-   the leadership history. Presentation only; honest empty states where the House
-   has, truthfully, no record yet.
+   Every Chair's truthful current standing, its appointment (only if a real
+   Appointment record exists), any genuine Founder note, and the preserved
+   leadership history. No standing is stored here; all of it is derived, so the
+   record can never disagree with the Register.
    ============================================================================= */
-export interface LeadershipHolder {
-  chair: string;
-  /** Who holds the chair. `null` while the chair is unfilled — shown honestly. */
-  holder: string | null;
-  /** How the charge is held today — an editorial line, never fabricated. */
+
+/** One Chair's line in the leadership record — its truthful present standing. */
+export interface LeadershipStandingView {
+  ordinal: number;
+  title: string;
+  /** The truthful institutional standing (e.g. "Established — not yet appointed"). */
   standing: string;
+  status: ChairStatus;
+  /** True only when a real, effective Appointment record seats the Chair. */
+  seated: boolean;
+  establishedOn: string | null;
+  /** The Founder's own note, only if genuinely written. */
+  founderNote: string | null;
+  /** An honest distinction for Chair #001: established and operating as the live
+      workspace, though never formally appointed. Null for every other Chair. */
+  operatingNote: string | null;
 }
 
-export interface Appointment {
-  id: string;
-  chair: string;
-  appointee: string;
-  /** ISO date, or a phrase; empty in V1. */
-  date: string;
-  note: string;
+export function leadershipViews(records: ExecutiveRecords = executiveRecords()): LeadershipStandingView[] {
+  return chairStandings(EXECUTIVE_CHAIRS, records).map((s) => ({
+    ordinal: s.chair.ordinal,
+    title: s.chair.title,
+    standing: institutionalStanding(s),
+    status: s.status,
+    seated: !!s.seatedBy,
+    establishedOn: establishedOn(s),
+    founderNote: s.founderNote?.note ?? null,
+    operatingNote: s.chair.id === CHAIR_CHIEF_OF_STAFF
+      ? 'Established and operating as the live workspace — this office — though no formal appointment has been made.'
+      : null,
+  }));
 }
 
-export interface LeadershipEntry {
-  /** ISO date or an editorial marker of when. */
-  when: string;
-  /** What happened, in the House’s record voice. */
-  event: string;
+/** The appointments genuinely on record — honestly empty until the first letter. */
+export function appointmentsOnRecord(records: ExecutiveRecords = executiveRecords()): AppointmentRecord[] {
+  return records.appointments ?? [];
 }
 
-export interface LeadershipRecords {
-  /** Chairs and who holds them today. */
-  holders: LeadershipHolder[];
-  /** Appointments made — empty in V1, the shelf prepared for the first letter. */
-  appointments: Appointment[];
-  /** The leadership history — the House’s beginning is the first entry. */
-  history: LeadershipEntry[];
+/** The preserved leadership history, oldest first — the Register's own entries,
+    never rewritten or deleted. */
+export function leadershipHistoryView(records: ExecutiveRecords = executiveRecords()): RegisterEntry[] {
+  return leadershipHistory(records);
 }
-
-export const LEADERSHIP: LeadershipRecords = {
-  holders: [
-    { chair: 'Founder',         holder: 'Luscious Honey',
-      standing: 'Holds every charge until each chair is filled — and holds the House itself.' },
-    { chair: 'Chief of Staff',  holder: 'This office',
-      standing: 'Prepares the work, keeps the record, and coordinates the House on the Founder’s behalf.' },
-    { chair: 'Editorial Chair', holder: null, standing: 'Open — the charge is presently held by the Founder.' },
-    { chair: 'Production Chair', holder: null, standing: 'Open — the charge is presently held by the Founder.' },
-    { chair: 'Growth Chair',    holder: null, standing: 'Open — the charge is presently held by the Founder.' },
-  ],
-  appointments: [],
-  history: [
-    { when: 'The founding', event: 'The House was founded and its residence built — all wings opened.' },
-    { when: 'The founding', event: 'The Office of the Chief of Staff was established to help lead it.' },
-  ],
-};
 
 /* =============================================================================
    6. ARCHIVE — the institutional record, given its shelves.

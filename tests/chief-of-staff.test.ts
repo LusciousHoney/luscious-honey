@@ -12,11 +12,11 @@ import assert from 'node:assert/strict';
 
 import {
   COS_SECTIONS, COS_HOME_SECTION, isCosSection,
-  BRIEFING, DECISIONS, DOCKET, CHAIRS, LEADERSHIP,
+  BRIEFING, DECISIONS, DOCKET,
   RESPONSES, getResponse,
   makeResponse, responsesById, decisionView, decisionViews,
   openDecisions, recordResponse, clearResponse, archiveShelves,
-  docketStatusLabel, chairStatusLabel,
+  docketStatusLabel,
   type DecisionResponse,
 } from '../src/headquarters/chief-of-staff.ts';
 
@@ -135,7 +135,7 @@ test('getResponse resolves labels and echoes for known ids only', () => {
   assert.equal(getResponse('mystery'), null);
 });
 
-/* --- docket & chairs ------------------------------------------------------ */
+/* --- docket --------------------------------------------------------------- */
 test('every docket item is a question with background, recommendation, owner, status', () => {
   assert.ok(DOCKET.length > 0);
   for (const d of DOCKET) {
@@ -145,23 +145,9 @@ test('every docket item is a question with background, recommendation, owner, st
   }
 });
 
-test('every chair carries a full charge — purpose, charge, responsibilities, status', () => {
-  assert.ok(CHAIRS.length > 0);
-  for (const c of CHAIRS) {
-    assert.ok(c.name.length > 0 && c.purpose.length > 0 && c.charge.length > 0);
-    assert.ok(c.responsibilities.length > 0);
-    assert.ok(chairStatusLabel(c.status).length > 0);
-  }
-});
-
-/* --- leadership records --------------------------------------------------- */
-test('leadership records hold current charges and an honest history', () => {
-  assert.ok(LEADERSHIP.holders.length > 0);
-  assert.deepEqual(LEADERSHIP.appointments, [], 'no appointments fabricated in V1');
-  assert.ok(LEADERSHIP.history.length > 0);
-  // Open chairs are honestly null, not a made-up name.
-  assert.ok(LEADERSHIP.holders.some((h) => h.holder === null), 'some chairs are honestly open');
-});
+// Open Chairs and Leadership Records are no longer held in this module — they are
+// derived from the Executive Register. Their behaviour is covered by
+// tests/executive-integration.test.ts.
 
 /* --- archive -------------------------------------------------------------- */
 test('archive prepares the five categories, honestly empty except recorded decisions', () => {

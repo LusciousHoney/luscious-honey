@@ -770,3 +770,53 @@ export function chairStanding(
     history: chairHistory(register, chair.id),
   };
 }
+
+/** The records the Register composes standings from. Grouped so selectors take a
+    single, testable argument (each list defaults to empty — honest by absence). */
+export interface ExecutiveRecords {
+  register?: RegisterEntry[];
+  appointments?: AppointmentRecord[];
+  dossiers?: Dossier[];
+  founderNotes?: FounderNote[];
+}
+
+/** Every Chair with its derived standing, in institutional order (by ordinal).
+    The order and the set both come from the data — no count is ever assumed, so
+    a third Chair appears the moment it is added, with no change here. */
+export function chairStandings(chairs: ExecutiveChair[], records: ExecutiveRecords = {}): ChairStanding[] {
+  return [...chairs].sort((a, b) => a.ordinal - b.ordinal).map((c) => chairStanding(c, records));
+}
+
+/** A Chair is an "opening" when it is not retired and not held by an effective
+    appointment — an active or future seat still to be filled. */
+export function isOpening(s: ChairStanding): boolean {
+  return s.status !== 'retired' && !s.seatedBy;
+}
+
+/** The open Chairs — active or future openings — in institutional order. */
+export function openChairStandings(chairs: ExecutiveChair[], records: ExecutiveRecords = {}): ChairStanding[] {
+  return chairStandings(chairs, records).filter(isOpening);
+}
+
+/** The day a Chair was established, drawn from its own history (or null). */
+export function establishedOn(s: ChairStanding): string | null {
+  return s.history.find((e) => e.type === 'established')?.on ?? null;
+}
+
+/** A truthful one-line institutional standing for a Chair, derived from the
+    record — never asserts an appointment that no Appointment record supports. */
+export function institutionalStanding(s: ChairStanding): string {
+  if (s.status === 'retired') return 'Retired';
+  if (s.seatedBy) return `Seated — ${s.seatedBy.appointee}`;
+  if (s.status === 'vacant') return 'Vacant';
+  if (s.status === 'preparing') return 'Preparing to fill';
+  return 'Established — not yet appointed';
+}
+
+/** The whole leadership history, every Chair's entries merged and read in order
+    (oldest first). Ties on the day fall back to the order recorded. */
+export function leadershipHistory(records: ExecutiveRecords = {}): RegisterEntry[] {
+  return [...(records.register ?? [])].sort(
+    (a, b) => (a.on === b.on ? a.recordedAt.localeCompare(b.recordedAt) : a.on.localeCompare(b.on)),
+  );
+}
