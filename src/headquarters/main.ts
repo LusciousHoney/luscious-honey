@@ -61,12 +61,15 @@ import {
 } from './chief-of-staff.ts';
 import {
   loadRecommendations, saveRecommendations, upsertRecommendation,
-  makeSubmission, routeRecommendation, advance, setVisibility,
+  makeSubmission, routeRecommendation, setVisibility,
   operationalBriefing, chiefOfStaffQueue,
-  SUBMISSION_TYPES, PRIORITIES, REC_STATUSES,
+  triage, prepareRecommendation, presentToFounder, requestRevision,
+  recordFounderDecision, setBlocked, advance,
+  decisionsForFounder,
+  SUBMISSION_TYPES, PRIORITIES, TRIAGE_OUTCOMES,
   recStatusLabel, priorityLabel, ownerLabel, typeLabel as recTypeLabel, visibilityLabel,
-  canTransition,
-  type Recommendation, type SubmissionType, type Priority, type RecStatus,
+  triageStateLabel,
+  type Recommendation, type SubmissionType, type Priority, type TriageOutcome,
 } from './chief-of-staff-ops.ts';
 import { CHAIRS as EXECUTIVE_CHAIRS } from './executive-register.ts';
 
@@ -1134,6 +1137,21 @@ function cosOperational(): HTMLElement {
       list);
   }
 
+  // The loop, in one line — a summary of where work sits, linking to the Inbox
+  // rather than duplicating it. Only non-zero states are named.
+  const parts: string[] = [];
+  if (brief.needsTriageCount > 0) parts.push(`${brief.needsTriageCount} to triage`);
+  if (brief.inPreparationCount > 0) parts.push(`${brief.inPreparationCount} in preparation`);
+  if (brief.inFollowUpCount > 0) parts.push(`${brief.inFollowUpCount} in execution`);
+  if (brief.blockedCount > 0) parts.push(`${brief.blockedCount} blocked`);
+  if (brief.heldCount > 0) parts.push(`${brief.heldCount} held`);
+  if (parts.length > 0) {
+    block.append(
+      el('h3', { class: 'hq-cos__field-label label' }, 'The Working Loop'),
+      el('p', { class: 'hq-cos__line' }, parts.join(' · ')),
+      el('a', { class: 'hq-cos__more', href: '#/chief-of-staff/inbox' }, 'Open the Executive Inbox →'));
+  }
+
   // Institutional priorities — active work in priority order.
   const prio = el('ul', { class: 'hq-cos__lines' });
   for (const r of brief.priorities) {
@@ -1264,18 +1282,22 @@ function cosInboxQueue(recs: Recommendation[], repaint: () => void): HTMLElement
 /** One submission in the queue, with the Chief of Staff's coordination controls. */
 function cosInboxCard(r: Recommendation, repaint: () => void): HTMLElement {
   const card = el('article', { class: 'hq-cos__decision' });
+  const persist = (next: Recommendation): void => {
+    saveRecommendations(upsertRecommendation(loadRecommendations(), next));
+    repaint();
+  };
 
   card.append(
     el('div', { class: 'hq-cos__chair-head' },
       el('h3', { class: 'hq-cos__decision-title' }, r.title),
       el('span', { class: 'hq-cos__tag label', 'data-status': r.priority }, priorityLabel(r.priority))),
     el('p', { class: 'hq-cos__decision-summary' },
-      `${recTypeLabel(r)} · ${ownerLabel(r)} · ${recStatusLabel(r.status)} · ${visibilityLabel(r.visibility)}`),
+      `${recTypeLabel(r)} · ${ownerLabel(r)} · ${recStatusLabel(r.status)} · ${triageStateLabel(r)} · ${visibilityLabel(r.visibility)}`),
   );
   if (r.summary) card.append(el('p', { class: 'hq-cos__field-body' }, r.summary));
 
   // Route to a Chair (validated by the engine against the Register).
-  const assign = el('select', { class: 'hq-cos__input', 'aria-label': `Route “${r.title}”` }) as HTMLSelectElement;
+  const assign = el('select', { class: 'hq-cos__input', 'aria-label': `Route “${r.title}” to a Chair` }) as HTMLSelectElement;
   const unassigned = el('option', { value: '' }, 'Unassigned');
   if (r.ownerChairId === null) unassigned.setAttribute('selected', 'selected');
   assign.append(unassigned);
@@ -1284,38 +1306,122 @@ function cosInboxCard(r: Recommendation, repaint: () => void): HTMLElement {
     if (r.ownerChairId === c.id) o.setAttribute('selected', 'selected');
     assign.append(o);
   }
-  assign.addEventListener('change', () => {
-    saveRecommendations(upsertRecommendation(loadRecommendations(), routeRecommendation(r, assign.value || null)));
-    repaint();
-  });
+  assign.addEventListener('change', () => persist(routeRecommendation(r, assign.value || null)));
   card.append(el('div', { class: 'hq-cos__field' },
     el('span', { class: 'hq-cos__field-label label' }, 'Route to'), assign));
 
-  // Move it along — only permitted lifecycle transitions are offered.
-  const controls = el('div', { class: 'hq-cos__responses', role: 'group', 'aria-label': `Move “${r.title}”` });
-  for (const s of REC_STATUSES) {
-    if (!canTransition(r.status, s.id)) continue;
-    const btn = el('button', { class: 'hq-cos__response', type: 'button' }, s.label) as HTMLButtonElement;
-    btn.addEventListener('click', () => {
-      saveRecommendations(upsertRecommendation(loadRecommendations(), advance(r, s.id as RecStatus)));
-      repaint();
-    });
-    controls.append(btn);
+  // Contextual coordination, by where the item sits in the loop.
+  if (r.status === 'awaiting_founder') {
+    card.append(el('p', { class: 'hq-cos__quiet' }, 'With the Founder — awaiting her decision.'),
+      el('a', { class: 'hq-cos__more', href: '#/chief-of-staff/decisions' }, 'See it in Decisions →'));
+  } else if (r.status === 'decided' || r.status === 'executing') {
+    card.append(cosFollowUpControls(r, persist));
+  } else if (r.status === 'preparing' && r.triage === 'prepare') {
+    card.append(cosPrepForm(r, persist));
+    card.append(cosTriageRow(r, assign, persist, 'Re-triage'));
+  } else {
+    // Untriaged incoming work, or a held item awaiting a fresh decision.
+    card.append(cosTriageRow(r, assign, persist, 'Triage'));
   }
-  if (controls.childElementCount > 0) card.append(controls);
 
   // Visibility — keep it on the Founder's radar, or hold it internally.
   const nextVis = r.visibility === 'visible' ? 'internal' : 'visible';
   const visBtn = el('button', { class: 'hq-cos__withdraw', type: 'button' },
     r.visibility === 'visible' ? 'Hold internally' : 'Put on the Founder’s radar') as HTMLButtonElement;
-  visBtn.addEventListener('click', () => {
-    saveRecommendations(upsertRecommendation(loadRecommendations(), setVisibility(r, nextVis)));
-    repaint();
-  });
+  visBtn.addEventListener('click', () => persist(setVisibility(r, nextVis)));
   card.append(visBtn);
 
   return card;
 }
+
+/** The five triage outcomes — the Chief of Staff decides what happens next. */
+function cosTriageRow(
+  r: Recommendation, assign: HTMLSelectElement, persist: (n: Recommendation) => void, heading: string,
+): HTMLElement {
+  const row = el('div', { class: 'hq-cos__field' },
+    el('span', { class: 'hq-cos__field-label label' }, heading));
+  const group = el('div', { class: 'hq-cos__responses', role: 'group', 'aria-label': `Triage “${r.title}”` });
+  for (const t of TRIAGE_OUTCOMES) {
+    const btn = el('button', { class: 'hq-cos__response', type: 'button' }, t.label) as HTMLButtonElement;
+    btn.addEventListener('click', () =>
+      persist(triage(r, t.id as TriageOutcome, { ownerChairId: assign.value || null })));
+    group.append(btn);
+  }
+  row.append(group);
+  return row;
+}
+
+/** The Chief of Staff's preparation surface — turn the item into a decision-ready
+    brief. Only the recommended direction and the decision requested are required. */
+function cosPrepForm(r: Recommendation, persist: (n: Recommendation) => void): HTMLElement {
+  const p = r.preparation;
+  const ta = (id: string, label: string, val: string, ph: string, rows = '2'): [HTMLElement, HTMLTextAreaElement] => {
+    const t = el('textarea', { class: 'hq-cos__note-input', id, rows, maxlength: '600', placeholder: ph }) as HTMLTextAreaElement;
+    if (val) t.value = val;
+    return [el('div', { class: 'hq-cos__field' }, el('label', { class: 'hq-cos__field-label label', for: id }, label), t), t];
+  };
+  const uid = r.id.replace(/[^a-z0-9]/gi, '');
+  const [issueF, issue] = ta(`p-issue-${uid}`, 'Issue', p?.issue ?? '', 'The issue, concisely.');
+  const [ctxF, ctx] = ta(`p-ctx-${uid}`, 'Context', p?.context ?? '', 'Relevant context.');
+  const [recF, recIn] = ta(`p-rec-${uid}`, 'Recommended direction (required)', p?.recommendation ?? '', 'What you recommend.');
+  const [altF, alt] = ta(`p-alt-${uid}`, 'Alternatives (one per line)', (p?.alternatives ?? []).join('\n'), 'Meaningful alternatives, if any.');
+  const [toF, to] = ta(`p-to-${uid}`, 'Risks / trade-offs (one per line)', (p?.tradeoffs ?? []).join('\n'), 'What is given up or risked.');
+  const [drF, dr] = ta(`p-dr-${uid}`, 'Decision requested (required)', p?.decisionRequested ?? '', 'The one decision you need.');
+
+  const feedback = el('p', { class: 'hq-cos__quiet', role: 'status', 'aria-live': 'polite' });
+  const lines = (s: string): string[] => s.split('\n').map((x) => x.trim()).filter(Boolean);
+
+  const save = el('button', { class: 'hq-cos__response', type: 'button' }, 'Save preparation') as HTMLButtonElement;
+  const present = el('button', { class: 'hq-cos__response', type: 'button' }, 'Present to the Founder') as HTMLButtonElement;
+
+  const build = (): Recommendation | null => prepareRecommendation(r, {
+    issue: issue.value, context: ctx.value, recommendation: recIn.value,
+    alternatives: lines(alt.value), tradeoffs: lines(to.value), decisionRequested: dr.value,
+  });
+  save.addEventListener('click', () => {
+    const next = build();
+    if (!next) { feedback.textContent = 'A recommended direction and a decision requested are needed.'; return; }
+    persist(next);
+  });
+  present.addEventListener('click', () => {
+    const next = build();
+    if (!next) { feedback.textContent = 'A recommended direction and a decision requested are needed.'; return; }
+    persist(presentToFounder(next));
+  });
+
+  return el('div', { class: 'hq-cos__field' },
+    el('p', { class: 'hq-cos__field-label label' }, 'Prepare the Decision'),
+    issueF, ctxF, recF, altF, toF, drF,
+    el('div', { class: 'hq-cos__responses' }, save, present),
+    feedback);
+}
+
+/** Execution follow-up — the Chief of Staff tracks approved work to completion. */
+function cosFollowUpControls(r: Recommendation, persist: (n: Recommendation) => void): HTMLElement {
+  const wrap = el('div', { class: 'hq-cos__field' },
+    el('span', { class: 'hq-cos__field-label label' }, 'Execution follow-up'));
+  const group = el('div', { class: 'hq-cos__responses', role: 'group', 'aria-label': `Follow up on “${r.title}”` });
+
+  if (r.status === 'decided') {
+    const begin = el('button', { class: 'hq-cos__response', type: 'button' }, 'Begin execution') as HTMLButtonElement;
+    begin.addEventListener('click', () => persist(advance(r, 'executing')));
+    group.append(begin);
+  }
+  const complete = el('button', { class: 'hq-cos__response', type: 'button' }, 'Mark complete') as HTMLButtonElement;
+  complete.addEventListener('click', () => persist(advance(r, 'complete')));
+  group.append(complete);
+
+  const block = el('button', { class: 'hq-cos__response', type: 'button', 'aria-pressed': r.blocked ? 'true' : 'false' },
+    r.blocked ? 'Unblock' : 'Mark blocked') as HTMLButtonElement;
+  block.addEventListener('click', () => persist(setBlocked(r, !r.blocked)));
+  group.append(block);
+
+  wrap.append(group);
+  if (r.blocked) wrap.append(el('p', { class: 'hq-cos__quiet' }, 'Blocked — needs attention before it can move.'));
+  return wrap;
+}
+
+/* --- 2. Decision System (interactive record) ------------------------------ */
 
 /* --- 2. Decision System (interactive record) ------------------------------ */
 function cosDecisions(repaint: () => void): HTMLElement {
@@ -1327,7 +1433,76 @@ function cosDecisions(repaint: () => void): HTMLElement {
 
   return el('div', { class: 'hq-cos__section' },
     cosIntro('Decisions', 'Each is prepared with a recommendation and the thinking behind it. Give your word when you are ready; your answer is kept.'),
+    cosFounderDecisions(repaint),
     list);
+}
+
+/** The Founder's prepared operational decisions — only items the Chief of Staff
+    has prepared and presented reach her here. She responds once; the same record
+    carries her answer forward (no duplicate decision record is created). */
+function cosFounderDecisions(repaint: () => void): HTMLElement {
+  const ready = decisionsForFounder(loadRecommendations());
+  const block = el('section', { class: 'hq-cos__block' },
+    el('h2', { class: 'hq-cos__block-title' }, 'Prepared for You'));
+  if (ready.length === 0) {
+    block.append(el('p', { class: 'hq-cos__quiet' },
+      'Nothing is ready for your decision right now. When the Chief of Staff prepares one, it appears here.'));
+    return block;
+  }
+  const list = el('div', { class: 'hq-cos__decisions' });
+  for (const r of ready) list.append(cosPreparedDecisionCard(r, repaint));
+  block.append(list);
+  return block;
+}
+
+function cosPreparedDecisionCard(r: Recommendation, repaint: () => void): HTMLElement {
+  const p = r.preparation!;
+  const persist = (next: Recommendation): void => {
+    saveRecommendations(upsertRecommendation(loadRecommendations(), next));
+    repaint();
+  };
+  const card = el('article', { class: 'hq-cos__decision' });
+  card.append(
+    el('div', { class: 'hq-cos__chair-head' },
+      el('h3', { class: 'hq-cos__decision-title' }, r.title),
+      el('span', { class: 'hq-cos__tag label', 'data-status': r.priority }, priorityLabel(r.priority))),
+    el('p', { class: 'hq-cos__decision-summary' }, `${recTypeLabel(r)} · ${ownerLabel(r)} · prepared ${formatWhen(p.preparedAt)}`),
+  );
+  if (p.issue) card.append(cosField('Issue', p.issue));
+  if (p.context) card.append(cosField('Context', p.context));
+  card.append(cosField('Recommendation', p.recommendation));
+  if (p.alternatives.length) {
+    const ul = el('ul', { class: 'hq-cos__tradeoffs' });
+    for (const a of p.alternatives) ul.append(el('li', {}, a));
+    card.append(el('div', { class: 'hq-cos__field' }, el('p', { class: 'hq-cos__field-label label' }, 'Alternatives'), ul));
+  }
+  if (p.tradeoffs.length) {
+    const ul = el('ul', { class: 'hq-cos__tradeoffs' });
+    for (const t of p.tradeoffs) ul.append(el('li', {}, t));
+    card.append(el('div', { class: 'hq-cos__field' }, el('p', { class: 'hq-cos__field-label label' }, 'Risks / trade-offs'), ul));
+  }
+  card.append(cosField('Decision requested', p.decisionRequested));
+
+  const noteId = `fnote_${r.id.replace(/[^a-z0-9]/gi, '')}`;
+  const note = el('input', {
+    class: 'hq-cos__note-input', id: noteId, type: 'text', maxlength: '200',
+    placeholder: 'Add a note (optional)',
+  }) as HTMLInputElement;
+  card.append(el('div', { class: 'hq-cos__note-field' },
+    el('label', { class: 'hq-cos__note-input-label label', for: noteId }, 'Your note'), note));
+
+  const controls = el('div', { class: 'hq-cos__responses', role: 'group', 'aria-label': `Your response to “${r.title}”` });
+  const respond = (label: string, fn: () => Recommendation): void => {
+    const b = el('button', { class: 'hq-cos__response', type: 'button' }, label) as HTMLButtonElement;
+    b.addEventListener('click', () => persist(fn()));
+    controls.append(b);
+  };
+  respond('Approve', () => recordFounderDecision(r, 'approved', note.value));
+  respond('Decline', () => recordFounderDecision(r, 'declined', note.value));
+  respond('Defer', () => recordFounderDecision(r, 'deferred', note.value));
+  respond('Request Revision', () => requestRevision(r, note.value));
+  card.append(controls);
+  return card;
 }
 
 function cosDecisionCard(v: DecisionView, repaint: () => void): HTMLElement {
