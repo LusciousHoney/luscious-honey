@@ -28,6 +28,10 @@ import {
   triage, prepareRecommendation, presentToFounder, requestRevision, setBlocked,
   needsTriage, inPreparation, decisionsForFounder, executionFollowUp,
   blockedItems, heldItems, completedItems,
+  // Sprint 12D — Creative Director (receiving Chair)
+  CREATIVE_STAGES, creativeStageLabel,
+  creativeAccept, creativeStart, creativeComplete, creativeReturn, creativeRequestClarification,
+  creativeQueue, creativeStanding,
   type Recommendation,
 } from '../src/headquarters/chief-of-staff-ops.ts';
 import { CHAIR_CHIEF_OF_STAFF, CHAIR_CREATIVE_DIRECTOR, STORAGE_ROOT } from '../src/headquarters/executive-register.ts';
@@ -430,4 +434,91 @@ test('the integrated briefing derives every loop count honestly', () => {
   assert.equal(b.heldCount, 1);
   // Honest quiet when truly empty.
   assert.equal(operationalBriefing([]).quiet, true);
+});
+
+/* =============================================================================
+   SPRINT 12D — CREATIVE DIRECTOR (receiving Chair)
+   ============================================================================= */
+
+// A record routed to the Creative Director, in execution.
+const routedToCreative = (id: string): Recommendation =>
+  triage(sub(id), 'route', { ownerChairId: CHAIR_CREATIVE_DIRECTOR }, T);
+
+test('the creative queue shows ONLY active work routed to Chair #002', () => {
+  const mine = routedToCreative('cd1');
+  const other = triage(sub('cofs'), 'route', { ownerChairId: CHAIR_CHIEF_OF_STAFF }, T);
+  const unrouted = sub('u'); // unassigned, still preparing
+  const done = creativeComplete(routedToCreative('cd2'), T); // complete → inactive
+  const q = creativeQueue([mine, other, unrouted, done]);
+  assert.deepEqual(q.map((r) => r.id), ['cd1'], 'other Chairs’ and inactive work are never exposed');
+});
+
+test('the four creative stages have labels; null reads as Awaiting Creative', () => {
+  assert.deepEqual(CREATIVE_STAGES.map((s) => s.id), ['accepted', 'in_progress', 'clarification', 'complete']);
+  assert.equal(creativeStageLabel(null), 'Awaiting Creative');
+  assert.equal(creativeStageLabel('in_progress'), 'In Progress');
+});
+
+test('Accept → In Progress → Complete stays in the same record and lifecycle', () => {
+  const routed = routedToCreative('c');
+  assert.equal(routed.status, 'executing');
+  assert.equal(routed.creativeStage, null, 'routed but not yet accepted');
+  const accepted = creativeAccept(routed, T);
+  assert.equal(accepted.creativeStage, 'accepted');
+  assert.equal(accepted.status, 'executing');
+  const started = creativeStart(accepted, T);
+  assert.equal(started.creativeStage, 'in_progress');
+  const done = creativeComplete(started, T);
+  assert.equal(done.creativeStage, 'complete');
+  assert.equal(done.status, 'complete', 'the same lifecycle carries it to complete');
+});
+
+test('Return to Chief of Staff clears creative ownership and re-opens for triage', () => {
+  const accepted = creativeAccept(routedToCreative('r'), T);
+  const returned = creativeReturn(accepted, T);
+  assert.equal(returned.ownerChairId, null, 'ownership released');
+  assert.equal(returned.creativeStage, null);
+  assert.equal(returned.triage, null, 'back to untriaged');
+  assert.equal(returned.status, 'preparing', 'returns to the office');
+  assert.deepEqual(creativeQueue([returned]), [], 'no longer in Creative’s queue');
+});
+
+test('Request Founder clarification returns THROUGH the Chief of Staff, never direct', () => {
+  const accepted = creativeAccept(routedToCreative('q'), T);
+  const clar = creativeRequestClarification(accepted, '  which title voice?  ', T);
+  assert.equal(clar.creativeStage, 'clarification');
+  assert.equal(clar.creativeNote, 'which title voice?', 'note trimmed + kept for the office to carry');
+  assert.equal(clar.status, 'held', 'paused, not sent to the Founder');
+  assert.equal(clar.founderDecision, 'pending', 'the Founder is not addressed directly');
+  assert.equal(clar.ownerChairId, CHAIR_CREATIVE_DIRECTOR, 'the Chair still holds it while paused');
+});
+
+test('creativeStanding gives the Chief of Staff an honest at-a-glance count', () => {
+  const store = [
+    routedToCreative('a'),                                   // awaiting
+    creativeAccept(routedToCreative('b'), T),                // accepted
+    creativeStart(routedToCreative('c'), T),                 // in progress
+    creativeRequestClarification(creativeAccept(routedToCreative('d'), T), 'n', T), // clarification
+    creativeComplete(routedToCreative('e'), T),              // completed
+    triage(sub('x'), 'route', { ownerChairId: CHAIR_CHIEF_OF_STAFF }, T), // not Creative's
+  ];
+  const s = creativeStanding(store);
+  assert.deepEqual(s, { awaiting: 1, accepted: 1, inProgress: 1, clarification: 1, completed: 1 });
+});
+
+test('the executing → preparing return transition is guarded and legal', () => {
+  assert.ok(canTransition('executing', 'preparing'), 'return path is legal');
+  // A record with no legal path is left unchanged by creativeReturn.
+  const complete = creativeComplete(routedToCreative('z'), T);
+  assert.equal(creativeReturn(complete, T).status, 'complete', 'complete is terminal — return is a no-op on status');
+});
+
+test('a pre-12D record normalizes to creativeStage null without data loss', () => {
+  const legacy = { ...routedToCreative('leg') } as Recommendation;
+  delete (legacy as { creativeStage?: unknown }).creativeStage;
+  const n = normalizeRecommendation(legacy);
+  assert.equal(n.creativeStage, null);
+  assert.equal(n.ownerChairId, CHAIR_CREATIVE_DIRECTOR, 'ownership intact');
+  const bad = normalizeRecommendation({ ...routedToCreative('b2'), creativeStage: 'nonsense' as never });
+  assert.equal(bad.creativeStage, null, 'unknown stage dropped to safe default');
 });
