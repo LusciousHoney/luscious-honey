@@ -24,7 +24,7 @@
 
 import {
   STORAGE_ROOT, loadCollection, saveCollection,
-  CHAIRS, getChair, CHAIR_CREATIVE_DIRECTOR, CHAIR_HEAD_OF_PRODUCTION,
+  CHAIRS, getChair, CHAIR_CREATIVE_DIRECTOR, CHAIR_HEAD_OF_PRODUCTION, CHAIR_DIRECTOR_OF_GROWTH,
   founderDecisionLabel,
   type ExecutiveChair, type FounderDecision,
 } from './executive-register.ts';
@@ -186,6 +186,10 @@ export interface Recommendation {
   productionStage: ProductionStage | null;
   /** A note Production sends back through the Chief of Staff. */
   productionNote?: string;
+  /** The Director of Growth's progression on this item, or null until accepted. */
+  growthStage: GrowthStage | null;
+  /** A note Growth sends back through the Chief of Staff. */
+  growthNote?: string;
   /** ISO datetime created. */
   createdAt: string;
   /** ISO datetime last changed. */
@@ -260,6 +264,7 @@ export function makeRecommendation(
     blocked: false,
     creativeStage: null,
     productionStage: null,
+    growthStage: null,
     createdAt: ts,
     updatedAt: ts,
   };
@@ -644,6 +649,141 @@ export function productionStanding(recs: Recommendation[]): ProductionStanding {
 }
 
 /* -----------------------------------------------------------------------------
+   RECEIVING CHAIR — DIRECTOR OF GROWTH (Sprint 12F). The Director of Growth works
+   only on items the Chief of Staff has routed to Chair #004. `growthStage` is the
+   Chair's own progression annotation beside the shared lifecycle — NOT a second
+   engine; every action updates the same recommendation record. The Chair never
+   speaks to the Founder directly: a clarification returns to the office.
+
+   Eligibility mirrors Production: Growth may only take up genuinely ready work —
+   approved (decided) or validly routed for execution (executing). Held, withdrawn,
+   awaiting-Founder, or still-in-preparation work must never silently enter Growth.
+   Blocked reuses the shared `blocked` flag; clarification pauses the item (held)
+   while PRESERVING its stage, safe because only Growth items carry a growthStage.
+   --------------------------------------------------------------------------- */
+export type GrowthStage =
+  | 'accepted' | 'strategy' | 'research' | 'campaign_planning'
+  | 'ready_to_launch' | 'active' | 'measuring' | 'complete';
+
+export interface GrowthStageKind { id: GrowthStage; label: string; }
+export const GROWTH_STAGES: GrowthStageKind[] = [
+  { id: 'accepted',          label: 'Accepted' },
+  { id: 'strategy',          label: 'Strategy' },
+  { id: 'research',          label: 'Research' },
+  { id: 'campaign_planning', label: 'Campaign Planning' },
+  { id: 'ready_to_launch',   label: 'Ready to Launch' },
+  { id: 'active',            label: 'Active' },
+  { id: 'measuring',         label: 'Measuring Results' },
+  { id: 'complete',          label: 'Growth Complete' },
+];
+const GROWTH_STAGE_BY_ID = new Map(GROWTH_STAGES.map((s) => [s.id, s]));
+const GROWTH_STAGE_ORDER: GrowthStage[] = GROWTH_STAGES.map((s) => s.id);
+function growthStageIndex(s: GrowthStage | null): number {
+  return s ? GROWTH_STAGE_ORDER.indexOf(s) : -1;
+}
+
+/** The label for a growth stage; null (routed, not accepted) → "Awaiting Growth". */
+export function growthStageLabel(stage: GrowthStage | null): string {
+  return stage ? (GROWTH_STAGE_BY_ID.get(stage)?.label ?? stage) : 'Awaiting Growth';
+}
+
+/** Whether Growth may take up this item: approved (decided) or validly routed for
+    execution (executing). Never held / withdrawn / awaiting-Founder / preparing. */
+export function isGrowthEligible(rec: Recommendation): boolean {
+  return rec.status === 'decided' || rec.status === 'executing';
+}
+
+/** A growth stage move is valid only forward along the sequence (no regress,
+    from null only to accepted). */
+export function canAdvanceGrowthStage(from: GrowthStage | null, to: GrowthStage): boolean {
+  if (!GROWTH_STAGE_BY_ID.has(to)) return false;
+  return growthStageIndex(to) > growthStageIndex(from);
+}
+
+/** Advance the growth stage, forward-only. Keeps the item in execution (advancing
+    there when eligible) until it reaches complete. Returns unchanged on an invalid
+    (backward/unknown) move — the progression holds. */
+export function advanceGrowth(rec: Recommendation, to: GrowthStage, now: Date = new Date()): Recommendation {
+  if (!canAdvanceGrowthStage(rec.growthStage, to)) return rec;
+  const status = to === 'complete'
+    ? (canTransition(rec.status, 'complete') ? 'complete' : rec.status)
+    : (canTransition(rec.status, 'executing') ? 'executing' : rec.status);
+  return { ...rec, growthStage: to, status, updatedAt: now.toISOString() };
+}
+
+/** Accept a routed item for Growth — only when it is genuinely eligible. */
+export function growthAccept(rec: Recommendation, now: Date = new Date()): Recommendation {
+  if (!isGrowthEligible(rec)) return rec;
+  return advanceGrowth(rec, 'accepted', now);
+}
+export const growthStrategy = (rec: Recommendation, now?: Date): Recommendation => advanceGrowth(rec, 'strategy', now);
+export const growthResearch = (rec: Recommendation, now?: Date): Recommendation => advanceGrowth(rec, 'research', now);
+export const growthCampaignPlanning = (rec: Recommendation, now?: Date): Recommendation => advanceGrowth(rec, 'campaign_planning', now);
+export const growthReadyToLaunch = (rec: Recommendation, now?: Date): Recommendation => advanceGrowth(rec, 'ready_to_launch', now);
+export const growthActive = (rec: Recommendation, now?: Date): Recommendation => advanceGrowth(rec, 'active', now);
+export const growthMeasuring = (rec: Recommendation, now?: Date): Recommendation => advanceGrowth(rec, 'measuring', now);
+export const growthComplete = (rec: Recommendation, now?: Date): Recommendation => advanceGrowth(rec, 'complete', now);
+
+/** Return the work to the Chief of Staff — ownership and growth annotations
+    cleared; it re-enters the office untriaged. */
+export function growthReturn(rec: Recommendation, now: Date = new Date()): Recommendation {
+  const status = canTransition(rec.status, 'preparing') ? 'preparing' : rec.status;
+  return {
+    ...rec, ownerChairId: null, growthStage: null, growthNote: undefined,
+    triage: null, status, updatedAt: now.toISOString(),
+  };
+}
+
+/** Request clarification — routed BACK through the Chief of Staff, never to the
+    Founder. The item pauses (held) with its stage preserved and the note kept. */
+export function growthRequestClarification(rec: Recommendation, note: string = '', now: Date = new Date()): Recommendation {
+  const status = canTransition(rec.status, 'held') ? 'held' : rec.status;
+  const trimmed = note.trim();
+  return { ...rec, growthNote: trimmed || undefined, status, updatedAt: now.toISOString() };
+}
+
+/** The Director of Growth's queue — work routed to Chair #004 that is active, or
+    paused for clarification. Work owned by other Chairs is never exposed here. */
+export function growthQueue(recs: Recommendation[]): Recommendation[] {
+  return recs
+    .filter((r) => r.ownerChairId === CHAIR_DIRECTOR_OF_GROWTH
+      && (isActiveStatus(r.status) || (r.status === 'held' && !!r.growthNote)))
+    .sort((a, b) => (priorityRank(a.priority) - priorityRank(b.priority)) || b.updatedAt.localeCompare(a.updatedAt));
+}
+
+/** What the Chief of Staff needs to know about Growth at a glance. */
+export interface GrowthStanding {
+  awaiting: number;      // routed, not yet accepted
+  accepted: number;
+  strategy: number;
+  research: number;
+  campaignPlanning: number;
+  readyToLaunch: number;
+  active: number;
+  measuring: number;
+  blocked: number;
+  clarification: number; // paused, needs the office to carry a clarification
+  complete: number;
+}
+export function growthStanding(recs: Recommendation[]): GrowthStanding {
+  const owned = recs.filter((r) => r.ownerChairId === CHAIR_DIRECTOR_OF_GROWTH);
+  const active = owned.filter((r) => isActiveStatus(r.status));
+  return {
+    awaiting: active.filter((r) => r.growthStage === null).length,
+    accepted: active.filter((r) => r.growthStage === 'accepted').length,
+    strategy: active.filter((r) => r.growthStage === 'strategy').length,
+    research: active.filter((r) => r.growthStage === 'research').length,
+    campaignPlanning: active.filter((r) => r.growthStage === 'campaign_planning').length,
+    readyToLaunch: active.filter((r) => r.growthStage === 'ready_to_launch').length,
+    active: active.filter((r) => r.growthStage === 'active').length,
+    measuring: active.filter((r) => r.growthStage === 'measuring').length,
+    blocked: active.filter((r) => r.blocked).length,
+    clarification: owned.filter((r) => r.status === 'held' && !!r.growthNote).length,
+    complete: owned.filter((r) => r.growthStage === 'complete').length,
+  };
+}
+
+/* -----------------------------------------------------------------------------
    DERIVED VIEWS — the honest, computed picture of the operational record.
    --------------------------------------------------------------------------- */
 
@@ -861,10 +1001,12 @@ export function normalizeRecommendation(rec: Recommendation): Recommendation {
   const blocked = rec.blocked === true;
   const creativeStage = rec.creativeStage && CREATIVE_STAGE_BY_ID.has(rec.creativeStage) ? rec.creativeStage : null;
   const productionStage = rec.productionStage && PRODUCTION_STAGE_BY_ID.has(rec.productionStage) ? rec.productionStage : null;
+  const growthStage = rec.growthStage && GROWTH_STAGE_BY_ID.has(rec.growthStage) ? rec.growthStage : null;
   const unchanged = rec.type === type && rec.visibility === visibility
     && rec.triage === triage && rec.preparation === preparation && rec.blocked === blocked
-    && rec.creativeStage === creativeStage && rec.productionStage === productionStage;
-  return unchanged ? rec : { ...rec, type, visibility, triage, preparation, blocked, creativeStage, productionStage };
+    && rec.creativeStage === creativeStage && rec.productionStage === productionStage
+    && rec.growthStage === growthStage;
+  return unchanged ? rec : { ...rec, type, visibility, triage, preparation, blocked, creativeStage, productionStage, growthStage };
 }
 
 export function loadRecommendations(): Recommendation[] {

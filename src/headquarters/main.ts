@@ -71,6 +71,9 @@ import {
   productionQueue, productionAccept, productionPlanning, productionReady, productionInProduction,
   productionDeliveryReady, productionComplete, productionReturn, productionRequestClarification,
   productionStageLabel, isProductionEligible, productionStanding, decisionLabel,
+  growthQueue, growthAccept, growthStrategy, growthResearch, growthCampaignPlanning,
+  growthReadyToLaunch, growthActive, growthMeasuring, growthComplete, growthReturn,
+  growthRequestClarification, growthStageLabel, isGrowthEligible, growthStanding,
   SUBMISSION_TYPES, PRIORITIES, TRIAGE_OUTCOMES,
   recStatusLabel, priorityLabel, ownerLabel, typeLabel as recTypeLabel, visibilityLabel,
   triageStateLabel,
@@ -1059,6 +1062,9 @@ function sprintContent(sprint: ProductionSprint): Node[] {
 function renderGrowth(root: HTMLElement, room: Room): void {
   setMode('seated');
 
+  // The receiving queue — work routed to the Director of Growth (Sprint 12F).
+  const intake = el('div', { class: 'hq-growth-intake' });
+
   // The correspondence: each relationship as a calm plaster card — a standing
   // conversation, never a statistic. Curated and spacious, a salon not a grid.
   const cards = el('ul', { class: 'hq-corr__list' });
@@ -1095,11 +1101,101 @@ function renderGrowth(root: HTMLElement, room: Room): void {
         el('h1', { class: 'hq-title hq-title--seated' }, room.name),
         el('p', { class: 'hq-lede' }, SALON_LEDE),
       ),
+      intake,
       salon,
     ),
   );
 
   root.replaceChildren(view);
+  mountGrowthIntake(intake);
+}
+
+/* --- The Director of Growth's receiving queue (Sprint 12F) -----------------
+   Work routed here by the Chief of Staff — ONLY items owned by Chair #004.
+   Growth takes up only eligible work (approved/decided or validly routed for
+   execution); a clarification returns to the Chief of Staff, never the Founder.
+   Renders synchronously from the client store and repaints itself in place. */
+function mountGrowthIntake(host: HTMLElement): void {
+  const repaint = (): void => mountGrowthIntake(host);
+  const queue = growthQueue(loadRecommendations());
+
+  const section = el('section', { class: 'hq-cos__section', 'aria-label': 'Work from the Chief of Staff' },
+    el('p', { class: 'hq-cos__eyebrow label' }, 'From the Chief of Staff'),
+    el('p', { class: 'hq-cos__lead' }, 'Work routed to the Director of Growth. Everything here arrives through the Chief of Staff — carrying it outward is yours.'));
+
+  if (queue.length === 0) {
+    section.append(el('p', { class: 'hq-cos__quiet' },
+      'Nothing has been routed to you yet. When the Chief of Staff sends finished work to carry outward, it appears here.'));
+  } else {
+    const list = el('div', { class: 'hq-cos__decisions' });
+    for (const r of queue) list.append(cosGrowthCard(r, repaint));
+    section.append(list);
+  }
+  host.replaceChildren(section);
+}
+
+function cosGrowthCard(r: Recommendation, repaint: () => void): HTMLElement {
+  const persist = (next: Recommendation): void => {
+    saveRecommendations(upsertRecommendation(loadRecommendations(), next));
+    repaint();
+  };
+  const card = el('article', { class: 'hq-cos__decision' });
+  card.append(
+    el('div', { class: 'hq-cos__chair-head' },
+      el('h3', { class: 'hq-cos__decision-title' }, r.title),
+      el('span', { class: 'hq-cos__tag label', 'data-status': r.priority }, priorityLabel(r.priority))),
+    el('p', { class: 'hq-cos__decision-summary' },
+      `${recTypeLabel(r)} · ${recStatusLabel(r.status)} · ${growthStageLabel(r.growthStage)}${r.blocked ? ' · Blocked' : ''} · ${visibilityLabel(r.visibility)}`),
+    el('p', { class: 'hq-cos__decision-summary' },
+      `${ownerLabel(r)} · recorded ${formatWhen(r.createdAt)}${r.preparation ? ` · prepared ${formatWhen(r.preparation.preparedAt)}` : ''}${r.founderDecision !== 'pending' ? ` · Founder: ${decisionLabel(r)}` : ''}`),
+  );
+  if (r.summary) card.append(el('p', { class: 'hq-cos__field-body' }, r.summary));
+  if (r.preparation?.recommendation) card.append(cosField('Chief of Staff’s note', r.preparation.recommendation));
+  if (r.growthNote) card.append(cosField('Clarification requested (with the Chief of Staff)', r.growthNote));
+
+  // Eligibility guard — Growth only takes up genuinely ready work.
+  if (r.growthStage === null && !isGrowthEligible(r)) {
+    card.append(el('p', { class: 'hq-cos__quiet' },
+      'Awaiting a Founder decision — this cannot enter growth yet. The Chief of Staff will route it when it is ready.'));
+    // Still allow returning it to the office.
+    card.append(cosReturnButton(r, persist, growthReturn));
+    return card;
+  }
+
+  const group = el('div', { class: 'hq-cos__responses', role: 'group', 'aria-label': `Growth of “${r.title}”` });
+  const act = (label: string, fn: () => Recommendation): void => {
+    const b = el('button', { class: 'hq-cos__response', type: 'button' }, label) as HTMLButtonElement;
+    b.addEventListener('click', () => persist(fn()));
+    group.append(b);
+  };
+  const st = r.growthStage;
+  if (st === null) act('Accept Growth Initiative', () => growthAccept(r));
+  if (st === 'accepted') act('Begin Strategy', () => growthStrategy(r));
+  if (st === 'strategy') act('Begin Research', () => growthResearch(r));
+  if (st === 'research') act('Begin Campaign Planning', () => growthCampaignPlanning(r));
+  if (st === 'campaign_planning') act('Mark Ready to Launch', () => growthReadyToLaunch(r));
+  if (st === 'ready_to_launch') act('Mark Active', () => growthActive(r));
+  if (st === 'active') act('Measure Results', () => growthMeasuring(r));
+  if (st === 'measuring') act('Mark Growth Complete', () => growthComplete(r));
+  if (st !== null) act(r.blocked ? 'Unblock' : 'Mark Blocked', () => setBlocked(r, !r.blocked));
+  card.append(group);
+
+  card.append(cosReturnButton(r, persist, growthReturn));
+
+  // Request clarification — routed BACK through the Chief of Staff.
+  const noteId = `gnote_${r.id.replace(/[^a-z0-9]/gi, '')}`;
+  const note = el('input', {
+    class: 'hq-cos__note-input', id: noteId, type: 'text', maxlength: '200',
+    placeholder: 'What needs clarifying?',
+    ...(r.growthNote ? { value: r.growthNote } : {}),
+  }) as HTMLInputElement;
+  const clarify = el('button', { class: 'hq-cos__withdraw', type: 'button' },
+    'Request clarification (via Chief of Staff)') as HTMLButtonElement;
+  clarify.addEventListener('click', () => persist(growthRequestClarification(r, note.value)));
+  card.append(el('div', { class: 'hq-cos__note-field' },
+    el('label', { class: 'hq-cos__note-input-label label', for: noteId }, 'Clarification note'), note, clarify));
+
+  return card;
 }
 
 /* =============================================================================
@@ -1394,6 +1490,26 @@ function cosOperational(): HTMLElement {
     block.append(
       el('h3', { class: 'hq-cos__field-label label' }, 'Head of Production'),
       el('p', { class: 'hq-cos__line' }, hpParts.join(' · ')));
+  }
+
+  // The Director of Growth's standing (Sprint 12F).
+  const gr = growthStanding(loadRecommendations());
+  const grParts: string[] = [];
+  if (gr.awaiting) grParts.push(`${gr.awaiting} awaiting acceptance`);
+  if (gr.accepted) grParts.push(`${gr.accepted} accepted`);
+  if (gr.strategy) grParts.push(`${gr.strategy} in strategy`);
+  if (gr.research) grParts.push(`${gr.research} in research`);
+  if (gr.campaignPlanning) grParts.push(`${gr.campaignPlanning} planning campaigns`);
+  if (gr.readyToLaunch) grParts.push(`${gr.readyToLaunch} ready to launch`);
+  if (gr.active) grParts.push(`${gr.active} active`);
+  if (gr.measuring) grParts.push(`${gr.measuring} measuring results`);
+  if (gr.blocked) grParts.push(`${gr.blocked} blocked`);
+  if (gr.clarification) grParts.push(`${gr.clarification} needing clarification`);
+  if (gr.complete) grParts.push(`${gr.complete} complete`);
+  if (grParts.length > 0) {
+    block.append(
+      el('h3', { class: 'hq-cos__field-label label' }, 'Director of Growth'),
+      el('p', { class: 'hq-cos__line' }, grParts.join(' · ')));
   }
 
   return block;

@@ -37,9 +37,14 @@ import {
   productionAccept, productionPlanning, productionReady, productionInProduction,
   productionDeliveryReady, productionComplete, productionReturn, productionRequestClarification,
   productionQueue, productionStanding,
+  // Sprint 12F — Director of Growth (receiving Chair)
+  GROWTH_STAGES, growthStageLabel, isGrowthEligible, canAdvanceGrowthStage,
+  growthAccept, growthStrategy, growthResearch, growthCampaignPlanning,
+  growthReadyToLaunch, growthActive, growthMeasuring, growthComplete,
+  growthReturn, growthRequestClarification, growthQueue, growthStanding,
   type Recommendation,
 } from '../src/headquarters/chief-of-staff-ops.ts';
-import { CHAIR_CHIEF_OF_STAFF, CHAIR_CREATIVE_DIRECTOR, CHAIR_HEAD_OF_PRODUCTION, STORAGE_ROOT } from '../src/headquarters/executive-register.ts';
+import { CHAIR_CHIEF_OF_STAFF, CHAIR_CREATIVE_DIRECTOR, CHAIR_HEAD_OF_PRODUCTION, CHAIR_DIRECTOR_OF_GROWTH, STORAGE_ROOT } from '../src/headquarters/executive-register.ts';
 
 const T = new Date('2026-07-16T09:00:00.000Z');
 function rec(over: Partial<Recommendation> = {}): Recommendation {
@@ -665,4 +670,143 @@ test('Creative Director behaviour and the Founder decision loop are preserved', 
   // Founder loop still routes decisions correctly.
   const waiting = presentToFounder(prepareRecommendation(sub('fl'), { recommendation: 'r', decisionRequested: 'd' }, T)!, T);
   assert.equal(recordFounderDecision(waiting, 'approved', '', T).status, 'decided');
+});
+
+/* =============================================================================
+   SPRINT 12F — DIRECTOR OF GROWTH (receiving Chair)
+   ============================================================================= */
+
+// An approved item routed to the Director of Growth (decided → eligible).
+const approvedToGrowth = (id: string): Recommendation => {
+  const waiting = presentToFounder(prepareRecommendation(sub(id), { recommendation: 'r', decisionRequested: 'd' }, T)!, T);
+  const decided = recordFounderDecision(waiting, 'approved', '', T);
+  return routeRecommendation(decided, CHAIR_DIRECTOR_OF_GROWTH, T);
+};
+// A directly-routed operational item (triage route → executing, owned by #004).
+const routedToGrowth = (id: string): Recommendation =>
+  triage(sub(id), 'route', { ownerChairId: CHAIR_DIRECTOR_OF_GROWTH }, T);
+
+test('the growth queue shows ONLY work routed to Chair #004', () => {
+  const mine = routedToGrowth('g1');
+  const production = triage(sub('p'), 'route', { ownerChairId: CHAIR_HEAD_OF_PRODUCTION }, T);
+  const done = growthComplete(growthAccept(routedToGrowth('g2'), T), T);
+  const q = growthQueue([mine, production, done]);
+  assert.deepEqual(q.map((r) => r.id), ['g1'], 'other Chairs’ and completed work are not exposed');
+});
+
+test('the eight growth stages have labels; null reads as Awaiting Growth', () => {
+  assert.deepEqual(GROWTH_STAGES.map((s) => s.id),
+    ['accepted', 'strategy', 'research', 'campaign_planning', 'ready_to_launch', 'active', 'measuring', 'complete']);
+  assert.equal(growthStageLabel(null), 'Awaiting Growth');
+  assert.equal(growthStageLabel('ready_to_launch'), 'Ready to Launch');
+});
+
+test('eligibility: only approved (decided) or validly-routed (executing) work may proceed', () => {
+  assert.equal(isGrowthEligible(approvedToGrowth('a')), true, 'approved → eligible');
+  assert.equal(isGrowthEligible(routedToGrowth('b')), true, 'routed for execution → eligible');
+  // Not eligible: preparing / awaiting_founder / held / withdrawn.
+  assert.equal(isGrowthEligible(routeRecommendation(sub('c'), CHAIR_DIRECTOR_OF_GROWTH, T)), false, 'preparing → not eligible');
+  const waiting = presentToFounder(prepareRecommendation(sub('d'), { recommendation: 'r', decisionRequested: 'x' }, T)!, T);
+  assert.equal(isGrowthEligible(routeRecommendation(waiting, CHAIR_DIRECTOR_OF_GROWTH, T)), false, 'awaiting Founder → not eligible');
+  const held = triage(sub('e'), 'hold', {}, T);
+  assert.equal(isGrowthEligible(held), false, 'held → not eligible');
+});
+
+test('Accept only takes up eligible work; an ineligible item is left untouched', () => {
+  const ineligible = routeRecommendation(sub('x'), CHAIR_DIRECTOR_OF_GROWTH, T); // preparing
+  assert.equal(growthAccept(ineligible, T).growthStage, null, 'ineligible → not accepted');
+  const accepted = growthAccept(approvedToGrowth('y'), T);
+  assert.equal(accepted.growthStage, 'accepted');
+  assert.equal(accepted.status, 'executing');
+});
+
+test('valid growth progression runs forward through every stage to complete', () => {
+  let r = growthAccept(approvedToGrowth('prog'), T);
+  r = growthStrategy(r, T);          assert.equal(r.growthStage, 'strategy');
+  r = growthResearch(r, T);          assert.equal(r.growthStage, 'research');
+  r = growthCampaignPlanning(r, T);  assert.equal(r.growthStage, 'campaign_planning');
+  r = growthReadyToLaunch(r, T);     assert.equal(r.growthStage, 'ready_to_launch');
+  r = growthActive(r, T);            assert.equal(r.growthStage, 'active');
+  r = growthMeasuring(r, T);         assert.equal(r.growthStage, 'measuring');
+  r = growthComplete(r, T);          assert.equal(r.growthStage, 'complete');
+  assert.equal(r.status, 'complete', 'the same lifecycle carries it to complete');
+});
+
+test('invalid growth progression (skipping backward or regressing) is refused', () => {
+  const accepted = growthAccept(approvedToGrowth('inv'), T);
+  assert.ok(!canAdvanceGrowthStage('accepted', 'accepted'), 'no same-stage move');
+  assert.ok(!canAdvanceGrowthStage('active', 'research'), 'no regress');
+  assert.ok(canAdvanceGrowthStage('accepted', 'strategy'));
+  // A later stage cannot be pulled back to an earlier one.
+  const active = growthActive(growthReadyToLaunch(growthCampaignPlanning(growthResearch(growthStrategy(accepted, T), T), T), T), T);
+  assert.equal(growthStrategy(active, T).growthStage, 'active', 'cannot regress to strategy');
+});
+
+test('Return to Chief of Staff clears growth ownership and re-opens for triage', () => {
+  const accepted = growthAccept(approvedToGrowth('ret'), T);
+  const returned = growthReturn(accepted, T);
+  assert.equal(returned.ownerChairId, null);
+  assert.equal(returned.growthStage, null);
+  assert.equal(returned.triage, null);
+  assert.equal(returned.status, 'preparing');
+  assert.deepEqual(growthQueue([returned]), []);
+});
+
+test('Mark Blocked toggles the shared flag without losing the growth stage', () => {
+  const active = growthActive(growthReadyToLaunch(growthCampaignPlanning(growthResearch(growthStrategy(growthAccept(approvedToGrowth('b'), T), T), T), T), T), T);
+  const blocked = setBlocked(active, true, T);
+  assert.equal(blocked.blocked, true);
+  assert.equal(blocked.growthStage, 'active', 'stage preserved while blocked');
+  assert.equal(setBlocked(blocked, false, T).blocked, false);
+});
+
+test('Request clarification pauses to held, preserves the stage, routes via the office', () => {
+  const strategy = growthStrategy(growthAccept(approvedToGrowth('cl'), T), T);
+  const clar = growthRequestClarification(strategy, '  which audience?  ', T);
+  assert.equal(clar.status, 'held', 'paused, not sent to the Founder');
+  assert.equal(clar.growthStage, 'strategy', 'stage preserved');
+  assert.equal(clar.growthNote, 'which audience?');
+  assert.equal(clar.founderDecision, 'approved', 'the Founder is not re-addressed');
+  assert.equal(clar.ownerChairId, CHAIR_DIRECTOR_OF_GROWTH, 'still owned while paused');
+  // A clarification-held item still appears in the queue so it is not lost.
+  assert.deepEqual(growthQueue([clar]).map((r) => r.id), ['cl']);
+});
+
+test('growthStanding gives the Chief of Staff an honest at-a-glance count', () => {
+  const store = [
+    routedToGrowth('a'),                                          // awaiting
+    growthAccept(approvedToGrowth('b'), T),                       // accepted
+    growthStrategy(growthAccept(approvedToGrowth('c'), T), T),    // strategy
+    setBlocked(growthActive(growthReadyToLaunch(growthCampaignPlanning(growthResearch(growthStrategy(growthAccept(approvedToGrowth('d'), T), T), T), T), T), T), true, T), // active + blocked
+    growthRequestClarification(growthAccept(approvedToGrowth('e'), T), 'n', T), // clarification (held)
+    growthComplete(growthMeasuring(growthActive(growthReadyToLaunch(growthCampaignPlanning(growthResearch(growthStrategy(growthAccept(approvedToGrowth('f'), T), T), T), T), T), T), T), T), // complete
+    triage(sub('x'), 'route', { ownerChairId: CHAIR_HEAD_OF_PRODUCTION }, T), // not Growth's
+  ];
+  const s = growthStanding(store);
+  assert.equal(s.awaiting, 1);
+  assert.equal(s.accepted, 1);
+  assert.equal(s.strategy, 1);
+  assert.equal(s.active, 1);
+  assert.equal(s.blocked, 1);
+  assert.equal(s.clarification, 1);
+  assert.equal(s.complete, 1);
+});
+
+test('a pre-12F record normalizes to growthStage null without data loss', () => {
+  const legacy = { ...routedToGrowth('leg') } as Recommendation;
+  delete (legacy as { growthStage?: unknown }).growthStage;
+  const n = normalizeRecommendation(legacy);
+  assert.equal(n.growthStage, null);
+  assert.equal(n.ownerChairId, CHAIR_DIRECTOR_OF_GROWTH);
+  const bad = normalizeRecommendation({ ...routedToGrowth('b2'), growthStage: 'nonsense' as never });
+  assert.equal(bad.growthStage, null, 'unknown stage dropped to safe default');
+});
+
+test('Production behaviour is preserved alongside Growth', () => {
+  // Production still works independently of growth — routed to Chair #003, its
+  // own annotation runs to complete without touching growthStage.
+  const routed = triage(sub('pp'), 'route', { ownerChairId: CHAIR_HEAD_OF_PRODUCTION }, T);
+  const p = productionComplete(productionDeliveryReady(productionInProduction(productionReady(productionPlanning(productionAccept(routed, T), T), T), T), T), T);
+  assert.equal(p.productionStage, 'complete');
+  assert.equal(p.growthStage, null, 'growth annotation untouched by production flow');
 });
