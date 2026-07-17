@@ -196,6 +196,10 @@ export interface Recommendation {
   /** Bounded question→answer consultations on this record (Sprint 12G). Ownership
       never changes; not a messaging thread. */
   consultations: Consultation[];
+  /** When this record was promoted from a Growth Intelligence opportunity, the id
+      of that originating intelligence record (Sprint 13A) — the durable link back
+      to its research provenance. Absent for work that did not begin as research. */
+  originIntelId?: string;
   /** ISO datetime created. */
   createdAt: string;
   /** ISO datetime last changed. */
@@ -249,6 +253,7 @@ export function makeRecommendation(
   input: {
     id: string; title: string; summary: string;
     type?: SubmissionType; ownerChairId?: string | null; priority?: Priority; visibility?: FounderVisibility;
+    originIntelId?: string;
   },
   now: Date = new Date(),
 ): Recommendation | null {
@@ -257,6 +262,7 @@ export function makeRecommendation(
   const ts = now.toISOString();
   return {
     id: input.id,
+    ...(input.originIntelId ? { originIntelId: input.originIntelId } : {}),
     type: input.type && SUBMISSION_TYPE_BY_ID.has(input.type) ? input.type : DEFAULT_TYPE,
     title: input.title.trim(),
     summary: input.summary.trim(),
@@ -285,13 +291,13 @@ export function makeRecommendation(
 export function makeSubmission(
   input: {
     id: string; type: SubmissionType; title: string; description: string;
-    priority?: Priority; ownerChairId?: string | null;
+    priority?: Priority; ownerChairId?: string | null; originIntelId?: string;
   },
   now: Date = new Date(),
 ): Recommendation | null {
   return makeRecommendation(
     { id: input.id, type: input.type, title: input.title, summary: input.description,
-      priority: input.priority, ownerChairId: input.ownerChairId },
+      priority: input.priority, ownerChairId: input.ownerChairId, originIntelId: input.originIntelId },
     now,
   );
 }

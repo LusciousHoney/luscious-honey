@@ -85,6 +85,16 @@ import {
   type Recommendation, type SubmissionType, type Priority, type TriageOutcome,
 } from './chief-of-staff-ops.ts';
 import { CHAIRS as EXECUTIVE_CHAIRS, CHAIR_CHIEF_OF_STAFF } from './executive-register.ts';
+import {
+  // Sprint 13A — Growth Intelligence (the Director of Growth's research desk)
+  INTEL_SOURCES, INTEL_CATEGORIES, INTEL_CONFIDENCES, INTEL_REVIEW_OUTCOMES,
+  intelSourceLabel, intelCategoryLabel, intelConfidenceLabel, intelStatusLabel, intelOutcomeLabel,
+  makeIntelligenceItem, reviewIntelligence, routeIntelligenceToWork,
+  loadIntelligence, saveIntelligence, upsertIntelligence,
+  intelIntakeQueue, growthCaptures, founderReadyPipeline, intelStanding, capturedByLabel,
+  type IntelligenceItem, type IntelSource, type IntelCategory, type IntelConfidence, type IntelReviewOutcome,
+  type IntelAttachment,
+} from './growth-intelligence.ts';
 
 /* --- small helpers ------------------------------------------------------- */
 
@@ -1069,6 +1079,8 @@ function renderGrowth(root: HTMLElement, room: Room): void {
 
   // The receiving queue — work routed to the Director of Growth (Sprint 12F).
   const intake = el('div', { class: 'hq-growth-intake' });
+  // The research desk — Growth Intelligence capture (Sprint 13A).
+  const desk = el('div', { class: 'hq-research' });
 
   // The correspondence: each relationship as a calm plaster card — a standing
   // conversation, never a statistic. Curated and spacious, a salon not a grid.
@@ -1107,12 +1119,145 @@ function renderGrowth(root: HTMLElement, room: Room): void {
         el('p', { class: 'hq-lede' }, SALON_LEDE),
       ),
       intake,
+      desk,
       salon,
     ),
   );
 
   root.replaceChildren(view);
   mountGrowthIntake(intake);
+  mountResearchDesk(desk);
+}
+
+/* --- THE RESEARCH DESK — Growth Intelligence capture (Sprint 13A) ----------
+   The Director of Growth's intake for external intelligence — opportunities the
+   Chair FINDS ("I found this"), captured fast and kept for the office to review.
+   Capture only: no publishing, no execution, no scraping. Repaints in place. */
+let researchNotice: string | null = null;
+
+function mountResearchDesk(host: HTMLElement): void {
+  const repaint = (): void => mountResearchDesk(host);
+  const section = el('section', { class: 'hq-research__desk', 'aria-label': 'Growth research desk' },
+    el('p', { class: 'hq-cos__eyebrow label' }, 'The research desk'),
+    el('p', { class: 'hq-cos__lead' }, 'Capture what you find — a trend, a search, a question the audience keeps asking. The office reviews and prioritises; you simply find it.'));
+
+  section.append(researchCaptureForm(repaint));
+
+  // What the Chair has found — the research log, newest first.
+  const found = growthCaptures(loadIntelligence());
+  const log = el('section', { class: 'hq-research__log', 'aria-label': 'What I have found' },
+    el('div', { class: 'hq-cos__block-head' },
+      el('h2', { class: 'hq-cos__block-title' }, 'What I’ve found'),
+      el('span', { class: 'hq-cos__count', 'aria-label': `${found.length} captured` }, String(found.length))));
+  if (found.length === 0) {
+    log.append(el('p', { class: 'hq-cos__quiet' }, 'Nothing captured yet. When you find an opportunity, it appears here for the office.'));
+  } else {
+    const list = el('div', { class: 'hq-cos__decisions' });
+    for (const i of found.slice(0, 12)) list.append(intelCaptureCard(i));
+    log.append(list);
+  }
+  section.append(log);
+  host.replaceChildren(section);
+}
+
+/** A labelled field wrapper for the capture form. */
+function deskField(id: string, label: string, control: HTMLElement): HTMLElement {
+  return el('div', { class: 'hq-research__field' },
+    el('label', { class: 'hq-cos__note-input-label label', for: id }, label), control);
+}
+function selectFrom(id: string, opts: { id: string; label: string }[]): HTMLSelectElement {
+  const s = el('select', { class: 'hq-cos__select', id }) as HTMLSelectElement;
+  for (const o of opts) s.append(el('option', { value: o.id }, o.label));
+  return s;
+}
+
+function researchCaptureForm(repaint: () => void): HTMLElement {
+  const form = el('form', { class: 'hq-research__form', 'aria-label': 'Capture an opportunity' }) as HTMLFormElement;
+
+  const title = el('input', { class: 'hq-research__input', id: 'ri_title', type: 'text', maxlength: '140', required: 'true', placeholder: 'What did you find?' }) as HTMLInputElement;
+  const summary = el('textarea', { class: 'hq-research__textarea', id: 'ri_summary', rows: '2', maxlength: '600', required: 'true', placeholder: 'In a sentence or two' }) as HTMLTextAreaElement;
+  const source = selectFrom('ri_source', INTEL_SOURCES);
+  const category = selectFrom('ri_category', INTEL_CATEGORIES);
+  const confidence = selectFrom('ri_confidence', INTEL_CONFIDENCES);
+  const why = el('textarea', { class: 'hq-research__textarea', id: 'ri_why', rows: '2', maxlength: '400', placeholder: 'Why it matters (optional)' }) as HTMLTextAreaElement;
+  const audience = el('input', { class: 'hq-research__input', id: 'ri_audience', type: 'text', maxlength: '120', placeholder: 'Who it’s for (optional)' }) as HTMLInputElement;
+  const links = el('textarea', { class: 'hq-research__textarea', id: 'ri_links', rows: '2', maxlength: '800', placeholder: 'Links — one per line (optional)' }) as HTMLTextAreaElement;
+  const notes = el('textarea', { class: 'hq-research__textarea', id: 'ri_notes', rows: '2', maxlength: '600', placeholder: 'Notes or pasted text (optional)' }) as HTMLTextAreaElement;
+  const shot = el('input', { class: 'hq-research__file', id: 'ri_shot', type: 'file', accept: 'image/*' }) as HTMLInputElement;
+
+  let pendingShot: IntelAttachment | null = null;
+  shot.addEventListener('change', () => {
+    const f = shot.files && shot.files[0];
+    if (!f) { pendingShot = null; return; }
+    const reader = new FileReader();
+    reader.onload = () => { pendingShot = { id: `att_${Date.now()}`, name: f.name, dataUrl: String(reader.result) }; };
+    reader.readAsDataURL(f);
+  });
+
+  const notice = el('p', { class: 'hq-cos__notice', role: 'status', 'aria-live': 'polite' });
+  if (researchNotice) { notice.classList.add('is-ok'); notice.append(el('span', { class: 'hq-cos__notice-mark', 'aria-hidden': 'true' }, '✓'), el('span', {}, researchNotice)); }
+
+  const submit = el('button', { class: 'hq-cos__response hq-research__submit', type: 'submit' }, 'Capture') as HTMLButtonElement;
+
+  form.append(
+    deskField('ri_title', 'Title', title),
+    deskField('ri_summary', 'Summary', summary),
+    el('div', { class: 'hq-research__row' },
+      deskField('ri_source', 'Source', source),
+      deskField('ri_category', 'Category', category),
+      deskField('ri_confidence', 'Confidence', confidence)),
+    deskField('ri_why', 'Why it matters', why),
+    deskField('ri_audience', 'Audience', audience),
+    deskField('ri_links', 'Links', links),
+    deskField('ri_notes', 'Notes', notes),
+    deskField('ri_shot', 'Screenshot', shot),
+    notice, submit,
+  );
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const item = makeIntelligenceItem({
+      id: `intel_${Date.now()}`,
+      title: title.value, summary: summary.value,
+      source: source.value as IntelSource, category: category.value as IntelCategory,
+      confidence: confidence.value as IntelConfidence,
+      whyItMatters: why.value, audience: audience.value,
+      links: links.value.split(/[\n,]/).map((l) => l.trim()).filter(Boolean),
+      attachments: pendingShot ? [pendingShot] : [],
+      notes: notes.value,
+    });
+    if (!item) { researchNotice = null; return; }
+    saveIntelligence(upsertIntelligence(loadIntelligence(), item));
+    researchNotice = 'Captured — the office will review it.';
+    repaint();
+  });
+  return form;
+}
+
+/** A compact card for one captured opportunity in the Growth log. */
+function intelCaptureCard(i: IntelligenceItem): HTMLElement {
+  const card = el('article', { class: 'hq-cos__decision' });
+  card.append(
+    el('div', { class: 'hq-cos__chair-head' },
+      el('h3', { class: 'hq-cos__decision-title' }, i.title),
+      el('span', { class: 'hq-cos__tag label', 'data-status': i.status }, intelStatusLabel(i.status))),
+    el('p', { class: 'hq-cos__decision-summary' },
+      `${intelSourceLabel(i.source)} · ${intelCategoryLabel(i.category)} · ${intelConfidenceLabel(i.confidence)} confidence · ${formatWhen(i.capturedAt)}`),
+    el('p', { class: 'hq-cos__field-body' }, i.summary),
+  );
+  if (i.whyItMatters) card.append(cosField('Why it matters', i.whyItMatters));
+  if (i.links.length) card.append(intelLinks(i.links));
+  if (i.review) card.append(el('p', { class: 'hq-cos__quiet' }, `Office: ${intelOutcomeLabel(i.review.outcome)}${i.review.note ? ` — “${i.review.note}”` : ''}`));
+  return card;
+}
+
+function intelLinks(links: string[]): HTMLElement {
+  const wrap = el('div', { class: 'hq-research__links' });
+  for (const l of links) {
+    const a = el('a', { class: 'hq-research__link', href: l, target: '_blank', rel: 'noreferrer noopener' }, l);
+    wrap.append(a);
+  }
+  return wrap;
 }
 
 /* --- The Director of Growth's receiving queue (Sprint 12F) -----------------
@@ -1333,6 +1478,7 @@ function cosSectionView(section: CosSectionId, repaint: () => void): HTMLElement
     case 'decisions':  return cosDecisions(repaint);
     case 'docket':     return cosDocket();
     case 'brokerage':  return cosBrokerage(repaint);
+    case 'opportunities': return cosOpportunities(repaint);
     case 'chairs':     return cosChairs();
     case 'leadership': return cosLeadership();
     case 'archive':    return cosArchive();
@@ -2212,6 +2358,119 @@ function collaborationEventLine(e: CollaborationEvent): string {
     return `${verb[c.status] ?? 'Consultation'} · ${chairLabel(c.owningChairId)} ↔ ${chairLabel(c.consultedChairId)}`;
   }
   return 'Collaboration event';
+}
+
+/* --- 3e. OPPORTUNITIES — the office prioritises Growth's intelligence (13A) --
+   The Chief of Staff reviews what the Director of Growth has found and disposes:
+   research further, recommend, route to work, archive, or ignore. Growth presents;
+   the office prioritises; the Founder sees only what is recommended. Routing an
+   opportunity promotes it into the Executive Inbox — the one store for work. */
+let opportunitiesNotice: string | null = null;
+
+function cosOpportunities(repaint: () => void): HTMLElement {
+  const items = loadIntelligence();
+  const queue = intelIntakeQueue(items);
+  const pipeline = founderReadyPipeline(items);
+  const s = intelStanding(items);
+
+  const section = el('div', { class: 'hq-cos__section' },
+    cosIntro('Opportunities', 'What the Director of Growth has found, for you to prioritise. The Founder sees only what you recommend — never raw research.'));
+
+  const standingBits: string[] = [];
+  if (s.captured) standingBits.push(`${s.captured} newly captured`);
+  if (s.underReview) standingBits.push(`${s.underReview} under review`);
+  if (s.researching) standingBits.push(`${s.researching} researching`);
+  if (s.recommended) standingBits.push(`${s.recommended} recommended`);
+  if (s.routed) standingBits.push(`${s.routed} routed to work`);
+  if (standingBits.length) section.append(el('p', { class: 'hq-cos__line' }, standingBits.join(' · ')));
+
+  const notice = el('p', { class: 'hq-cos__notice', role: 'status', 'aria-live': 'polite' });
+  if (opportunitiesNotice) {
+    notice.classList.add('is-ok');
+    notice.append(el('span', { class: 'hq-cos__notice-mark', 'aria-hidden': 'true' }, '✓'), el('span', {}, opportunitiesNotice));
+  }
+  section.append(notice);
+
+  // The intake queue — awaiting the office's prioritisation.
+  const queueBlock = el('section', { class: 'hq-cos__block' },
+    el('div', { class: 'hq-cos__block-head' },
+      el('h2', { class: 'hq-cos__block-title' }, 'For Prioritisation'),
+      el('span', { class: 'hq-cos__count', 'aria-label': `${queue.length} awaiting` }, String(queue.length))),
+    el('p', { class: 'hq-cos__block-note' }, 'Found by Growth, awaiting your decision.'));
+  if (queue.length === 0) {
+    queueBlock.append(el('p', { class: 'hq-cos__quiet' }, 'Nothing is waiting. When Growth captures an opportunity, it appears here.'));
+  } else {
+    const list = el('div', { class: 'hq-cos__decisions' });
+    for (const i of queue) list.append(opportunityReviewCard(i, repaint));
+    queueBlock.append(list);
+  }
+  section.append(queueBlock);
+
+  // The Founder-ready pipeline — recommended opportunities (foundation only).
+  const pipeBlock = el('section', { class: 'hq-cos__block' },
+    el('div', { class: 'hq-cos__block-head' },
+      el('h2', { class: 'hq-cos__block-title' }, 'Founder-Ready Pipeline'),
+      el('span', { class: 'hq-cos__count', 'aria-label': `${pipeline.length} recommended` }, String(pipeline.length))),
+    el('p', { class: 'hq-cos__block-note' }, 'Curated opportunities you have recommended — the foundation of what the Founder will see.'));
+  if (pipeline.length === 0) {
+    pipeBlock.append(el('p', { class: 'hq-cos__quiet' }, 'Nothing recommended yet.'));
+  } else {
+    const list = el('div', { class: 'hq-cos__decisions' });
+    for (const i of pipeline) list.append(intelCaptureCard(i));
+    pipeBlock.append(list);
+  }
+  section.append(pipeBlock);
+  return section;
+}
+
+function opportunityReviewCard(i: IntelligenceItem, repaint: () => void): HTMLElement {
+  const card = el('article', { class: 'hq-cos__decision' });
+  card.append(
+    el('div', { class: 'hq-cos__chair-head' },
+      el('h3', { class: 'hq-cos__decision-title' }, i.title),
+      el('span', { class: 'hq-cos__tag label', 'data-status': i.status }, intelStatusLabel(i.status))),
+    el('p', { class: 'hq-cos__decision-summary' },
+      `${intelSourceLabel(i.source)} · ${intelCategoryLabel(i.category)} · ${intelConfidenceLabel(i.confidence)} confidence · ${capturedByLabel(i)} · ${formatWhen(i.capturedAt)}`),
+    el('p', { class: 'hq-cos__field-body' }, i.summary),
+  );
+  if (i.whyItMatters) card.append(cosField('Why it matters', i.whyItMatters));
+  if (i.audience) card.append(cosField('Audience', i.audience));
+  if (i.notes) card.append(cosField('Notes', i.notes));
+  if (i.links.length) card.append(intelLinks(i.links));
+
+  const noteId = `intel_note_${i.id.replace(/[^a-z0-9]/gi, '')}`;
+  const note = el('input', { class: 'hq-cos__note-input', id: noteId, type: 'text', maxlength: '200', placeholder: 'A note for the record (optional)' }) as HTMLInputElement;
+  card.append(el('div', { class: 'hq-cos__note-field' },
+    el('label', { class: 'hq-cos__note-input-label label', for: noteId }, 'Prioritisation note'), note));
+
+  const group = el('div', { class: 'hq-cos__responses', role: 'group', 'aria-label': `Prioritise “${i.title}”` });
+  const decide = (outcome: IntelReviewOutcome): void => {
+    // Routing promotes the opportunity into the Executive Inbox — the one store for
+    // executive work — with a durable, bidirectional provenance link. Idempotent:
+    // it never forks a second recommendation. The Founder is not involved; this is
+    // office coordination, and the created record enters the normal lifecycle.
+    if (outcome === 'route') {
+      const result = routeIntelligenceToWork(i, loadRecommendations());
+      saveRecommendations(result.recommendations);
+      saveIntelligence(upsertIntelligence(loadIntelligence(), result.item));
+      opportunitiesNotice = result.created
+        ? `${i.title} — routed to work.`
+        : `${i.title} — already routed; the existing work was kept.`;
+      repaint();
+      return;
+    }
+    const reviewed = reviewIntelligence(i, outcome, note.value);
+    saveIntelligence(upsertIntelligence(loadIntelligence(), reviewed));
+    opportunitiesNotice = `${i.title} — ${intelOutcomeLabel(outcome)}.`;
+    repaint();
+  };
+  for (const o of INTEL_REVIEW_OUTCOMES) {
+    const b = el('button', { class: o.id === 'ignore' || o.id === 'archive' ? 'hq-cos__withdraw' : 'hq-cos__response', type: 'button' }, o.label) as HTMLButtonElement;
+    b.addEventListener('click', () => decide(o.id));
+    group.append(b);
+  }
+  card.append(group);
+  return card;
 }
 
 /* --- 4. Open Chairs — derived from the Executive Register ----------------- */
