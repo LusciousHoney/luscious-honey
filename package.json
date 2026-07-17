@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test tests/logic.test.ts tests/governance.test.ts tests/office.test.ts tests/access.test.mjs tests/guestbook.test.mjs tests/headquarters.test.ts tests/briefing.test.mjs tests/operations.test.ts tests/creative.test.ts tests/production.test.ts tests/growth.test.ts tests/business.test.ts tests/living-systems.test.ts tests/chief-of-staff.test.ts tests/executive-register.test.ts tests/executive-integration.test.ts tests/chief-of-staff-ops.test.ts tests/collaboration.test.ts tests/brokerage.test.ts tests/growth-intelligence.test.ts tests/content-opportunity.test.ts",
+    "test": "node --test tests/logic.test.ts tests/governance.test.ts tests/office.test.ts tests/access.test.mjs tests/guestbook.test.mjs tests/headquarters.test.ts tests/briefing.test.mjs tests/operations.test.ts tests/creative.test.ts tests/production.test.ts tests/growth.test.ts tests/business.test.ts tests/living-systems.test.ts tests/chief-of-staff.test.ts tests/executive-register.test.ts tests/executive-integration.test.ts tests/chief-of-staff-ops.test.ts tests/collaboration.test.ts tests/brokerage.test.ts tests/growth-intelligence.test.ts tests/content-opportunity.test.ts tests/creative-assignment.test.ts",
     "check:prod": "node scripts/check-prod-safety.mjs",
     "verify": "npm run build && npm test && npm run check:prod",
     "deploy": "npm run verify && wrangler pages deploy",

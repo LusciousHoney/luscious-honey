@@ -106,6 +106,17 @@ import {
   draftOpportunities, opportunitiesForReview, founderReadyOpportunities, opportunityStanding, opportunityAuthorLabel,
   type ContentOpportunity, type ContentProperty, type OpportunityType, type Rating, type OpportunitySignals,
 } from './content-opportunity.ts';
+import {
+  // Sprint 13C — Creative Assignment Pack (the Creative Director's planning layer)
+  CONTENT_PLATFORMS, TIKTOK_FORMATS, SUBSTACK_KINDS,
+  contentPlatformLabel, tiktokFormatLabel, substackKindLabel, assignmentStatusLabel, assignmentPropertyLabel,
+  makeCreativeAssignment, updateAssignment, isOpportunityEligibleForAssignment,
+  markAssignmentReady, approveAssignment, returnAssignmentForRevision, holdAssignment, declineAssignment,
+  routeAssignmentToWork, founderAssignment, isAssignmentRoutable, assignmentAuthorLabel, crossPropertyReasons,
+  loadAssignments, saveAssignments, upsertAssignment,
+  draftAssignments, assignmentsForReview, approvedAssignments, assignmentStanding,
+  type CreativeAssignment, type ContentPlatform, type TikTokFormat, type SubstackKind,
+} from './creative-assignment.ts';
 
 /* --- small helpers ------------------------------------------------------- */
 
@@ -551,6 +562,8 @@ function renderCreative(root: HTMLElement, room: Room): void {
     el('p', { class: 'hq-state__lede' }, 'Opening the archive…'));
   // The receiving queue — work routed to the Creative Director (Sprint 12D).
   const intake = el('div', { class: 'hq-creative-intake' });
+  // The Assignment Desk — Creative turns approved briefs into assignment packs (13C).
+  const assignments = el('div', { class: 'hq-assign' });
 
   const view = el(
     'section',
@@ -572,6 +585,7 @@ function renderCreative(root: HTMLElement, room: Room): void {
         el('p', { class: 'hq-lede' }, 'A private library where the making lives. The work is alive and waiting — kept warm for whenever you return to it.'),
       ),
       intake,
+      assignments,
       el(
         'div',
         { class: 'hq-library' },
@@ -584,7 +598,173 @@ function renderCreative(root: HTMLElement, room: Room): void {
 
   root.replaceChildren(view);
   mountCreativeIntake(intake);
+  mountAssignmentDesk(assignments);
   void mountLibrary(manuscript, archive);
+}
+
+/* --- THE ASSIGNMENT DESK — Creative's planning surface (Sprint 13C) ---------
+   Turn an approved Content Opportunity brief into a Creative Assignment Pack: the
+   hook, the central idea, the format, the cross-property strategy. Planning only —
+   no scripts, no publishing. Separate from research intake and the Growth brief
+   form; connected by provenance. Repaints in place. */
+let assignNotice: string | null = null;
+
+function mountAssignmentDesk(host: HTMLElement): void {
+  const repaint = (): void => mountAssignmentDesk(host);
+  const opps = loadOpportunities();
+  const list = loadAssignments();
+
+  const section = el('section', { class: 'hq-assign__desk', 'aria-label': 'Creative assignment desk' },
+    el('p', { class: 'hq-cos__eyebrow label' }, 'Assignment Desk'),
+    el('p', { class: 'hq-cos__lead' }, 'Turn an approved opportunity into a creative assignment — the hook, the message, the format, and how it travels across the House.'));
+
+  const notice = el('p', { class: 'hq-cos__notice', role: 'status', 'aria-live': 'polite' });
+  if (assignNotice) { notice.classList.add('is-ok'); notice.append(el('span', { class: 'hq-cos__notice-mark', 'aria-hidden': 'true' }, '✓'), el('span', {}, assignNotice)); }
+  section.append(notice);
+
+  const eligible = opps.filter(isOpportunityEligibleForAssignment);
+  if (eligible.length === 0) {
+    section.append(el('p', { class: 'hq-cos__quiet' }, 'No approved opportunity briefs yet. When the Chief of Staff recommends one, it can become an assignment here.'));
+  } else {
+    const sel = el('select', { class: 'hq-cos__select', id: 'assign_from', 'aria-label': 'Opportunity to develop' }) as HTMLSelectElement;
+    for (const o of eligible) sel.append(el('option', { value: o.id }, o.title));
+    const start = el('button', { class: 'hq-cos__response', type: 'button' }, 'Create assignment') as HTMLButtonElement;
+    start.addEventListener('click', () => {
+      const src = eligible.find((o) => o.id === sel.value);
+      if (!src) return;
+      const a = makeCreativeAssignment({
+        id: `asn_${Date.now()}`, originOpportunityId: src.id, originIntelId: src.intelId,
+        title: src.title, properties: src.properties, centralIdea: src.summary, targetAudience: src.audience, audienceNeed: src.audienceNeed,
+      });
+      if (!a) return;
+      saveAssignments(upsertAssignment(loadAssignments(), a));
+      assignNotice = `Assignment started from “${src.title}”.`;
+      repaint();
+    });
+    section.append(el('div', { class: 'hq-briefs__start' },
+      el('label', { class: 'hq-cos__note-input-label label', for: 'assign_from' }, 'Develop an approved opportunity'),
+      el('div', { class: 'hq-cos__route-row' }, sel, start)));
+  }
+
+  const drafts = draftAssignments(list);
+  const draftBlock = el('section', { class: 'hq-cos__block' },
+    el('div', { class: 'hq-cos__block-head' },
+      el('h2', { class: 'hq-cos__block-title' }, 'In Development'),
+      el('span', { class: 'hq-cos__count', 'aria-label': `${drafts.length} in development` }, String(drafts.length))));
+  if (drafts.length === 0) draftBlock.append(el('p', { class: 'hq-cos__quiet' }, 'No assignments in development.'));
+  else { const l = el('div', { class: 'hq-cos__decisions' }); for (const a of drafts) l.append(assignmentEditorCard(a, repaint)); draftBlock.append(l); }
+  section.append(draftBlock);
+
+  const others = list.filter((a) => !['draft', 'in_development', 'returned_for_revision'].includes(a.status))
+    .sort((x, y) => y.updatedAt.localeCompare(x.updatedAt));
+  if (others.length) {
+    const log = el('section', { class: 'hq-cos__block' },
+      el('div', { class: 'hq-cos__block-head' },
+        el('h2', { class: 'hq-cos__block-title' }, 'Submitted Assignments'),
+        el('span', { class: 'hq-cos__count', 'aria-label': `${others.length} submitted` }, String(others.length))));
+    const l = el('div', { class: 'hq-cos__decisions' });
+    for (const a of others.slice(0, 10)) l.append(assignmentSummaryCard(a));
+    log.append(l); section.append(log);
+  }
+  host.replaceChildren(section);
+}
+
+function platformSelect(id: string, value: ContentPlatform | '', allowNone: boolean): HTMLSelectElement {
+  const s = el('select', { class: 'hq-cos__select', id }) as HTMLSelectElement;
+  if (allowNone) s.append(el('option', { value: '', ...(value === '' ? { selected: 'selected' } : {}) }, 'None'));
+  for (const p of CONTENT_PLATFORMS) s.append(el('option', { value: p.id, ...(p.id === value ? { selected: 'selected' } : {}) }, p.label));
+  return s;
+}
+
+function assignmentEditorCard(a: CreativeAssignment, repaint: () => void): HTMLElement {
+  let draft = a;
+  const card = el('article', { class: 'hq-cos__decision hq-assign__editor' });
+  const persist = (next: CreativeAssignment, notice: string): void => {
+    saveAssignments(upsertAssignment(loadAssignments(), next)); assignNotice = notice; repaint();
+  };
+  const input = (id: string, val: string, ph: string): HTMLInputElement =>
+    el('input', { class: 'hq-research__input', id, type: 'text', maxlength: '200', value: val, placeholder: ph }) as HTMLInputElement;
+  const textarea = (id: string, val: string, ph: string): HTMLTextAreaElement => {
+    const t = el('textarea', { class: 'hq-research__textarea', id, rows: '2', maxlength: '500', placeholder: ph }) as HTMLTextAreaElement;
+    t.value = val; return t;
+  };
+
+  const title = input(`at_${a.id}`, a.title, 'Assignment title');
+  const hook = input(`ah_${a.id}`, a.hook, 'The opening hook');
+  const first = input(`af_${a.id}`, a.firstSentence, 'The first sentence');
+  const central = textarea(`ac_${a.id}`, a.centralIdea, 'The central idea');
+  const points = textarea(`ap_${a.id}`, a.talkingPoints.join('\n'), 'Talking points — one per line (3–5)');
+  const tone = input(`ao_${a.id}`, a.tone, 'Emotional tone');
+  const voice = input(`av_${a.id}`, a.voiceGuidance, 'Voice guidance');
+  const cta = input(`acta_${a.id}`, a.callToAction, 'Call to action');
+  const primary = platformSelect(`apl_${a.id}`, a.primaryPlatform, false);
+  const secondary = platformSelect(`asl_${a.id}`, a.secondaryPlatform, true);
+  const tkFormat = el('select', { class: 'hq-cos__select', id: `atf_${a.id}` }) as HTMLSelectElement;
+  tkFormat.append(el('option', { value: '', ...(a.tiktokFormat === '' ? { selected: 'selected' } : {}) }, 'Not set'));
+  for (const f of TIKTOK_FORMATS) tkFormat.append(el('option', { value: f.id, ...(f.id === a.tiktokFormat ? { selected: 'selected' } : {}) }, f.label));
+  const ssKind = el('select', { class: 'hq-cos__select', id: `ask_${a.id}` }) as HTMLSelectElement;
+  for (const k of SUBSTACK_KINDS) ssKind.append(el('option', { value: k.id, ...(k.id === a.substackKind ? { selected: 'selected' } : {}) }, k.label));
+  const ssConn = input(`asc_${a.id}`, a.substackConnection, 'How it connects to Substack');
+  const tkConn = input(`atc_${a.id}`, a.tiktokConnection, 'How it connects to TikTok / Founder platform');
+
+  card.append(
+    el('div', { class: 'hq-cos__chair-head' },
+      el('h3', { class: 'hq-cos__decision-title' }, `Assignment — ${a.title}`),
+      el('span', { class: 'hq-cos__tag label', 'data-status': a.status }, assignmentStatusLabel(a.status))),
+  );
+  if (a.revisionNote) card.append(cosField('Revision requested', a.revisionNote));
+  card.append(
+    deskField(title.id, 'Title', title),
+    briefFieldLabel('Properties'),
+    chipSet<ContentProperty>('AssignProps', CONTENT_PROPERTIES, draft.properties, (next) => { draft = { ...draft, properties: next }; }),
+    el('div', { class: 'hq-research__row' },
+      deskField(primary.id, 'Primary platform', primary),
+      deskField(secondary.id, 'Secondary platform', secondary),
+      deskField(tkFormat.id, 'TikTok format', tkFormat)),
+    deskField(hook.id, 'Hook', hook),
+    deskField(first.id, 'First sentence', first),
+    deskField(central.id, 'Central idea', central),
+    deskField(points.id, 'Talking points', points),
+    el('div', { class: 'hq-research__row' },
+      deskField(tone.id, 'Tone', tone),
+      deskField(voice.id, 'Voice', voice),
+      deskField(cta.id, 'Call to action', cta)),
+    briefFieldLabel('Substack'),
+    el('div', { class: 'hq-research__row' },
+      deskField(ssKind.id, 'Substack', ssKind),
+      deskField(ssConn.id, 'Substack connection', ssConn),
+      deskField(tkConn.id, 'TikTok connection', tkConn)),
+  );
+
+  const collect = (): CreativeAssignment => updateAssignment(draft, {
+    title: title.value, hook: hook.value, firstSentence: first.value, centralIdea: central.value,
+    talkingPoints: points.value.split('\n').map((p) => p.trim()).filter(Boolean),
+    tone: tone.value, voiceGuidance: voice.value, callToAction: cta.value,
+    primaryPlatform: (primary.value || undefined) as ContentPlatform | undefined,
+    secondaryPlatform: (secondary.value || undefined) as ContentPlatform | undefined,
+    tiktokFormat: (tkFormat.value || undefined) as TikTokFormat | undefined,
+    substackKind: ssKind.value as SubstackKind,
+    substackConnection: ssConn.value, tiktokConnection: tkConn.value,
+    properties: draft.properties,
+  });
+
+  const group = el('div', { class: 'hq-cos__responses', role: 'group', 'aria-label': `Actions for assignment “${a.title}”` });
+  const save = el('button', { class: 'hq-cos__response', type: 'button' }, 'Save draft') as HTMLButtonElement;
+  save.addEventListener('click', () => persist(collect(), 'Draft saved.'));
+  const ready = el('button', { class: 'hq-cos__response', type: 'button' }, 'Mark ready for review') as HTMLButtonElement;
+  ready.addEventListener('click', () => persist(markAssignmentReady(collect()), 'Sent to the Chief of Staff for review.'));
+  group.append(save, ready);
+  card.append(group);
+  return card;
+}
+
+function assignmentSummaryCard(a: CreativeAssignment): HTMLElement {
+  return el('article', { class: 'hq-cos__decision' },
+    el('div', { class: 'hq-cos__chair-head' },
+      el('h3', { class: 'hq-cos__decision-title' }, a.title),
+      el('span', { class: 'hq-cos__tag label', 'data-status': a.status }, assignmentStatusLabel(a.status))),
+    el('p', { class: 'hq-cos__decision-summary' },
+      `${assignmentPropertyLabel(a)} · ${contentPlatformLabel(a.primaryPlatform)}${a.hook ? ` · “${a.hook}”` : ''}`));
 }
 
 /* --- The Creative Director's receiving queue (Sprint 12D) ------------------
@@ -2667,7 +2847,121 @@ function cosOpportunities(repaint: () => void): HTMLElement {
     founderBlock.append(list);
   }
   section.append(founderBlock);
+
+  // Creative Assignment Packs (Sprint 13C) — Creative's planning, reviewed here.
+  const assignments = loadAssignments();
+  const asnReview = assignmentsForReview(assignments);
+  const asnApproved = approvedAssignments(assignments);
+  const as = assignmentStanding(assignments);
+  const asnBits: string[] = [];
+  if (as.draft || as.inDevelopment || as.returned) asnBits.push(`${as.draft + as.inDevelopment + as.returned} in development`);
+  if (as.readyForReview) asnBits.push(`${as.readyForReview} ready for review`);
+  if (as.approved) asnBits.push(`${as.approved} approved`);
+  if (as.routed) asnBits.push(`${as.routed} routed to work`);
+
+  const asnBlock = el('section', { class: 'hq-cos__block' },
+    el('div', { class: 'hq-cos__block-head' },
+      el('h2', { class: 'hq-cos__block-title' }, 'Creative Assignments — For Review'),
+      el('span', { class: 'hq-cos__count', 'aria-label': `${asnReview.length} for review` }, String(asnReview.length))),
+    el('p', { class: 'hq-cos__block-note' }, 'Creative Assignment Packs from the Creative Director, awaiting your approval.'));
+  if (asnBits.length) asnBlock.append(el('p', { class: 'hq-cos__line' }, asnBits.join(' · ')));
+  if (asnReview.length === 0) asnBlock.append(el('p', { class: 'hq-cos__quiet' }, 'No assignments are ready for review.'));
+  else { const l = el('div', { class: 'hq-cos__decisions' }); for (const a of asnReview) l.append(assignmentReviewCard(a, repaint)); asnBlock.append(l); }
+  section.append(asnBlock);
+
+  // Founder-ready assignments — concise creative recommendations (approved packs).
+  const asnFounder = el('section', { class: 'hq-cos__block' },
+    el('div', { class: 'hq-cos__block-head' },
+      el('h2', { class: 'hq-cos__block-title' }, 'Founder-Ready Assignments'),
+      el('span', { class: 'hq-cos__count', 'aria-label': `${asnApproved.length} approved` }, String(asnApproved.length))),
+    el('p', { class: 'hq-cos__block-note' }, 'What the Founder sees — what to make, the hook, and one decision.'));
+  if (asnApproved.length === 0) asnFounder.append(el('p', { class: 'hq-cos__quiet' }, 'Nothing approved for the Founder yet.'));
+  else { const l = el('div', { class: 'hq-cos__decisions' }); for (const a of asnApproved) l.append(founderAssignmentCard(a, repaint)); asnFounder.append(l); }
+  section.append(asnFounder);
   return section;
+}
+
+/** The office reviews a Creative Assignment Pack — the creative direction and the
+    five actions. Route to Work reuses the idempotent promotion carrying the full
+    intelligence → opportunity → assignment → recommendation chain. */
+function assignmentReviewCard(a: CreativeAssignment, repaint: () => void): HTMLElement {
+  const card = el('article', { class: 'hq-cos__decision' });
+  card.append(
+    el('div', { class: 'hq-cos__chair-head' },
+      el('h3', { class: 'hq-cos__decision-title' }, a.title),
+      el('span', { class: 'hq-cos__tag label', 'data-status': 'open' }, assignmentStatusLabel(a.status))),
+    el('p', { class: 'hq-cos__decision-summary' },
+      `${assignmentPropertyLabel(a)} · ${contentPlatformLabel(a.primaryPlatform)}${a.tiktokFormat ? ` (${tiktokFormatLabel(a.tiktokFormat)})` : ''} · ${assignmentAuthorLabel(a)} · complexity ${a.complexity}`),
+  );
+  if (a.hook) card.append(cosField('Hook', a.hook));
+  if (a.centralIdea) card.append(cosField('Central idea', a.centralIdea));
+  if (a.talkingPoints.length) {
+    const ul = el('ul', { class: 'hq-cos__tradeoffs' });
+    for (const p of a.talkingPoints) ul.append(el('li', {}, p));
+    card.append(el('div', { class: 'hq-cos__field' }, el('p', { class: 'hq-cos__field-label label' }, 'Talking points'), ul));
+  }
+  if (a.substackKind !== 'none') card.append(cosField('Substack', `${substackKindLabel(a.substackKind)}${a.substackConnection ? ` — ${a.substackConnection}` : ''}`));
+  if (a.callToAction) card.append(cosField('Call to action', a.callToAction));
+  // cross-property reasons
+  const xr = crossPropertyReasons(a).filter((r) => r.reason);
+  if (xr.length) card.append(cosField('Cross-property', xr.map((r) => `${contentPropertyLabel(r.property)}: ${r.reason}`).join(' · ')));
+  if (a.cautions) card.append(cosField('Cautions', a.cautions));
+
+  const persist = (next: CreativeAssignment, notice: string): void => {
+    saveAssignments(upsertAssignment(loadAssignments(), next)); opportunitiesNotice = notice; repaint();
+  };
+  const group = el('div', { class: 'hq-cos__responses', role: 'group', 'aria-label': `Review assignment “${a.title}”` });
+  const act = (label: string, cls: string, fn: () => void): void => {
+    const b = el('button', { class: cls, type: 'button' }, label) as HTMLButtonElement; b.addEventListener('click', fn); group.append(b);
+  };
+  act('Approve Assignment', 'hq-cos__response', () => persist(approveAssignment(a), `${a.title} — approved.`));
+  act('Route to Work', 'hq-cos__response', () => {
+    const res = routeAssignmentToWork(a, loadRecommendations());
+    saveRecommendations(res.recommendations);
+    saveAssignments(upsertAssignment(loadAssignments(), res.assignment));
+    opportunitiesNotice = res.created ? `${a.title} — routed to work.` : `${a.title} — already routed; the existing work was kept.`;
+    repaint();
+  });
+  // Return for Revision with a concise instruction.
+  const noteId = `arev_${a.id.replace(/[^a-z0-9]/gi, '')}`;
+  const note = el('input', { class: 'hq-cos__note-input', id: noteId, type: 'text', maxlength: '200', placeholder: 'What to revise (optional)' }) as HTMLInputElement;
+  act('Return for Revision', 'hq-cos__withdraw', () => persist(returnAssignmentForRevision(a, note.value), `${a.title} — returned for revision.`));
+  act('Hold', 'hq-cos__withdraw', () => persist(holdAssignment(a), `${a.title} — held.`));
+  act('Decline', 'hq-cos__withdraw', () => persist(declineAssignment(a), `${a.title} — declined.`));
+  card.append(el('div', { class: 'hq-cos__note-field' },
+    el('label', { class: 'hq-cos__note-input-label label', for: noteId }, 'Revision instruction'), note), group);
+  return card;
+}
+
+/** The Founder-ready creative recommendation — concise, one decision requested. */
+function founderAssignmentCard(a: CreativeAssignment, repaint: () => void): HTMLElement {
+  const fa = founderAssignment(a);
+  const card = el('article', { class: 'hq-cos__decision hq-briefs__founder' });
+  card.append(
+    el('h3', { class: 'hq-cos__decision-title' }, a.title),
+    cosField('What to make', fa.make),
+    cosField('Why now', fa.whyNow),
+    cosField('Who it’s for', fa.who),
+    cosField('The hook', fa.hook),
+    cosField('The main point', fa.mainPoint),
+    cosField('Recommended format', fa.format),
+    cosField('Substack connection', fa.substackConnection),
+    cosField('Call to action', fa.cta),
+    cosField('Decision needed', fa.decision),
+  );
+  if (isAssignmentRoutable(a)) {
+    const group = el('div', { class: 'hq-cos__responses', role: 'group', 'aria-label': `Route assignment “${a.title}”` });
+    const b = el('button', { class: 'hq-cos__response', type: 'button' }, 'Route to Work') as HTMLButtonElement;
+    b.addEventListener('click', () => {
+      const res = routeAssignmentToWork(a, loadRecommendations());
+      saveRecommendations(res.recommendations);
+      saveAssignments(upsertAssignment(loadAssignments(), res.assignment));
+      opportunitiesNotice = res.created ? `${a.title} — routed to work.` : `${a.title} — already routed; the existing work was kept.`;
+      repaint();
+    });
+    group.append(b); card.append(group);
+  }
+  return card;
 }
 
 /** The office reviews a ranked content brief — score, explanation, and the five

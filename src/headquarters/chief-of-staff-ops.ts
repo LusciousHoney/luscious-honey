@@ -203,6 +203,9 @@ export interface Recommendation {
   /** When promoted from a Content Opportunity brief (Sprint 13B), the id of that
       brief — the middle link in intelligence → opportunity → recommendation. */
   originOpportunityId?: string;
+  /** When promoted from a Creative Assignment Pack (Sprint 13C), the id of that
+      assignment — completing intelligence → opportunity → assignment → recommendation. */
+  originAssignmentId?: string;
   /** ISO datetime created. */
   createdAt: string;
   /** ISO datetime last changed. */
@@ -256,7 +259,7 @@ export function makeRecommendation(
   input: {
     id: string; title: string; summary: string;
     type?: SubmissionType; ownerChairId?: string | null; priority?: Priority; visibility?: FounderVisibility;
-    originIntelId?: string; originOpportunityId?: string;
+    originIntelId?: string; originOpportunityId?: string; originAssignmentId?: string;
   },
   now: Date = new Date(),
 ): Recommendation | null {
@@ -267,6 +270,7 @@ export function makeRecommendation(
     id: input.id,
     ...(input.originIntelId ? { originIntelId: input.originIntelId } : {}),
     ...(input.originOpportunityId ? { originOpportunityId: input.originOpportunityId } : {}),
+    ...(input.originAssignmentId ? { originAssignmentId: input.originAssignmentId } : {}),
     type: input.type && SUBMISSION_TYPE_BY_ID.has(input.type) ? input.type : DEFAULT_TYPE,
     title: input.title.trim(),
     summary: input.summary.trim(),
@@ -295,14 +299,16 @@ export function makeRecommendation(
 export function makeSubmission(
   input: {
     id: string; type: SubmissionType; title: string; description: string;
-    priority?: Priority; ownerChairId?: string | null; originIntelId?: string; originOpportunityId?: string;
+    priority?: Priority; ownerChairId?: string | null;
+    originIntelId?: string; originOpportunityId?: string; originAssignmentId?: string;
   },
   now: Date = new Date(),
 ): Recommendation | null {
   return makeRecommendation(
     { id: input.id, type: input.type, title: input.title, summary: input.description,
       priority: input.priority, ownerChairId: input.ownerChairId,
-      originIntelId: input.originIntelId, originOpportunityId: input.originOpportunityId },
+      originIntelId: input.originIntelId, originOpportunityId: input.originOpportunityId,
+      originAssignmentId: input.originAssignmentId },
     now,
   );
 }
