@@ -122,6 +122,7 @@ export interface ExecutiveChair {
 export const CHAIR_CHIEF_OF_STAFF = 'chair_chief_of_staff';
 export const CHAIR_CREATIVE_DIRECTOR = 'chair_creative_director';
 export const CHAIR_HEAD_OF_PRODUCTION = 'chair_head_of_production';
+export const CHAIR_DIRECTOR_OF_GROWTH = 'chair_director_of_growth';
 
 export const CHAIRS: ExecutiveChair[] = [
   {
@@ -173,7 +174,7 @@ export const CHAIRS: ExecutiveChair[] = [
         nature: 'Order and taste in balance — the Chief of Staff protects the Founder’s attention while the Creative Director protects the Founder’s voice; the two coordinate so ambition and order reinforce one another.' },
       { withChairId: CHAIR_HEAD_OF_PRODUCTION, with: 'Head of Production',
         nature: 'The Chief of Staff sequences and coordinates; Production carries approved work to finished, trusting the office to keep the path clear.' },
-      { with: 'Director of Growth',
+      { withChairId: CHAIR_DIRECTOR_OF_GROWTH, with: 'Director of Growth',
         nature: 'The Chief of Staff keeps the House in order as Growth carries its work outward, so reaching further never disturbs the calm within.' },
     ],
     status: 'established',
@@ -227,7 +228,7 @@ export const CHAIRS: ExecutiveChair[] = [
         nature: 'Taste and order in balance — the Creative Director protects the Founder’s taste while the Chief of Staff protects the Founder’s attention.' },
       { withChairId: CHAIR_HEAD_OF_PRODUCTION, with: 'Head of Production',
         nature: 'The Creative Director sets the standard; Production realises it at scale and on schedule — the long dialogue between intention and execution.' },
-      { with: 'Director of Growth',
+      { withChairId: CHAIR_DIRECTOR_OF_GROWTH, with: 'Director of Growth',
         nature: 'Growth carries the voice outward; the Creative Director ensures what travels stays true to what it represents.' },
     ],
     status: 'established',
@@ -281,7 +282,61 @@ export const CHAIRS: ExecutiveChair[] = [
         nature: 'The Chief of Staff routes and coordinates; Production receives approved work and carries it to finished, returning status and clarification through the office — never around it.' },
       { withChairId: CHAIR_CREATIVE_DIRECTOR, with: 'Creative Director',
         nature: 'The Creative Director sets the standard; Production realises it faithfully, at scale and on schedule — intention met by execution.' },
-      { with: 'Director of Growth',
+      { withChairId: CHAIR_DIRECTOR_OF_GROWTH, with: 'Director of Growth',
+        nature: 'Production delivers finished work; Growth carries it to the world, each trusting the other to hold its own craft.' },
+    ],
+    status: 'established',
+  },
+  {
+    id: CHAIR_DIRECTOR_OF_GROWTH,
+    ordinal: 4,
+    title: 'Director of Growth',
+    reasonForBeing:
+      'Finished work only matters if it reaches the people it is for. This Chair exists so the Founder never has to carry the House’s work outward herself — so reaching further never depends on her attention, and never disturbs the calm within.',
+    purpose:
+      'To carry the House’s finished work to the world and grow its audience — deliberately and to standard — so the institution’s reach widens without the Founder coordinating a single campaign.',
+    charge:
+      'Take finished work outward with intent: study where it resonates, plan how it travels, launch it, and measure what it earns — so growth is chosen, not left to chance.',
+    standingResponsibilities: [
+      'Own how the House’s finished work reaches the world, and how its audience grows.',
+      'Protect the voice and the standard of the House in everything that travels outward.',
+      'Study where the work resonates, and carry that understanding back to the House.',
+      'Surface a growth risk or opportunity early, before it reaches the Founder.',
+    ],
+    owns: [
+      'The outward reach of the institution’s finished work.',
+      'Audience growth and the relationships the House keeps with the world.',
+      'The planning and launch of campaigns, and the standard they hold to.',
+      'The measurement of what growth earns, honestly read.',
+    ],
+    prepares: [
+      'Growth strategy — how finished work will travel, and to whom.',
+      'Campaign plans, ready to launch, before anything reaches the world.',
+      'Honest measurement of what growth has earned, and what it has not.',
+    ],
+    authority: {
+      canDecide: [
+        'How finished work is carried outward, planned, and launched.',
+        'When a campaign is ready to launch and when it is complete.',
+        'The day-to-day handling of growth within the standard.',
+      ],
+      recommends: [
+        'Which audiences to reach for, and the sequencing of growth work.',
+        'Trade-offs between reach, voice, and timing when they arise.',
+        'When a growth opportunity or risk warrants the Founder’s attention.',
+      ],
+      mustEscalate: [
+        'Growth that cannot proceed to standard without a Founder decision.',
+        'A commitment to the world that would bind the Founder personally.',
+        'Anything the Founder has reserved as the Founder’s alone.',
+      ],
+    },
+    relationships: [
+      { withChairId: CHAIR_CHIEF_OF_STAFF, with: 'Chief of Staff',
+        nature: 'The Chief of Staff routes and coordinates; Growth receives finished work and carries it outward, returning status and clarification through the office — never around it.' },
+      { withChairId: CHAIR_CREATIVE_DIRECTOR, with: 'Creative Director',
+        nature: 'The Creative Director protects what the work says; Growth carries it outward, trusting the voice to stay true wherever it travels.' },
+      { withChairId: CHAIR_HEAD_OF_PRODUCTION, with: 'Head of Production',
         nature: 'Production delivers finished work; Growth carries it to the world, each trusting the other to hold its own craft.' },
     ],
     status: 'established',
@@ -440,6 +495,14 @@ export const FOUNDING_REGISTER: RegisterEntry[] = [
     event: 'The Chair of the Head of Production was established as the third seat of the Executive Team.',
     on: '2026-07-16',
     recordedAt: '2026-07-16T00:00:01.000Z',
+  },
+  {
+    id: 'reg_founding_growth',
+    chairId: CHAIR_DIRECTOR_OF_GROWTH,
+    type: 'established',
+    event: 'The Chair of the Director of Growth was established as the fourth seat of the Executive Team, completing the Founding Executive Council.',
+    on: '2026-07-16',
+    recordedAt: '2026-07-16T00:00:02.000Z',
   },
 ];
 

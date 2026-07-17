@@ -35,8 +35,8 @@ test('no duplicate Chair source remains in the Chief of Staff module', () => {
 test('Open Chairs derives from the Executive Register (order, titles, ordinals)', () => {
   const views = openChairViews();
   // The approved Chairs are established-but-unseated → all are openings.
-  assert.deepEqual(views.map((v) => v.ordinal), [1, 2, 3]);
-  assert.deepEqual(views.map((v) => v.title), ['Chief of Staff', 'Creative Director', 'Head of Production']);
+  assert.deepEqual(views.map((v) => v.ordinal), [1, 2, 3, 4]);
+  assert.deepEqual(views.map((v) => v.title), ['Chief of Staff', 'Creative Director', 'Head of Production', 'Director of Growth']);
   for (const v of views) {
     assert.ok(v.purpose && v.charge && v.responsibilities.length > 0);
     assert.equal(v.statusLabel, 'Established');
@@ -60,7 +60,7 @@ test('a retired or seated Chair is not shown as an opening (derived filter)', ()
 test('Leadership Records shows truthful derived standing, not stored status', () => {
   // Default: all established, not appointed, not seated.
   const base = leadershipViews();
-  assert.equal(base.length, 3);
+  assert.equal(base.length, 4);
   for (const v of base) {
     assert.equal(v.standing, 'Established — not yet appointed');
     assert.equal(v.seated, false);
@@ -129,15 +129,15 @@ test('neutralizeCanon replaces canon language without leaving the word', () => {
 
 /* --- extensibility: more Chairs, same rendering logic --------------------- */
 test('additional Chairs flow through the derived selectors with no logic change', () => {
-  // A future, not-yet-established Chair (e.g. Director of Growth), appended to the
-  // real three — proving the selectors are count-agnostic.
-  const fourth: ExecutiveChair = { ...CHAIRS[1], id: 'chair_director_of_growth', ordinal: 4, title: 'Director of Growth', status: 'preparing' };
-  const chairs = [...CHAIRS, fourth];
+  // A future, not-yet-established Chair beyond the Founding Council, appended to
+  // the real four — proving the selectors stay count-agnostic as the House grows.
+  const fifth: ExecutiveChair = { ...CHAIRS[1], id: 'chair_future_seat', ordinal: 5, title: 'A Future Seat', status: 'preparing' };
+  const chairs = [...CHAIRS, fifth];
   const standings = chairStandings(chairs, { register: FOUNDING_REGISTER });
-  assert.deepEqual(standings.map((s) => s.chair.ordinal), [1, 2, 3, 4], 'ordered by ordinal, no fixed count');
-  // The fourth Chair has no establishment entry yet → falls back to its charter status.
-  assert.equal(standings.find((s) => s.chair.ordinal === 4)!.status, 'preparing');
-  assert.equal(openChairStandings(chairs, { register: FOUNDING_REGISTER }).length, 4, 'all four are openings');
+  assert.deepEqual(standings.map((s) => s.chair.ordinal), [1, 2, 3, 4, 5], 'ordered by ordinal, no fixed count');
+  // The fifth Chair has no establishment entry yet → falls back to its charter status.
+  assert.equal(standings.find((s) => s.chair.ordinal === 5)!.status, 'preparing');
+  assert.equal(openChairStandings(chairs, { register: FOUNDING_REGISTER }).length, 5, 'all five are openings');
 });
 
 /* --- Headquarters architecture + Decision System unchanged ---------------- */
