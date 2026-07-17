@@ -68,6 +68,9 @@ import {
   decisionsForFounder,
   creativeQueue, creativeAccept, creativeStart, creativeComplete, creativeReturn,
   creativeRequestClarification, creativeStageLabel, creativeStanding,
+  productionQueue, productionAccept, productionPlanning, productionReady, productionInProduction,
+  productionDeliveryReady, productionComplete, productionReturn, productionRequestClarification,
+  productionStageLabel, isProductionEligible, productionStanding, decisionLabel,
   SUBMISSION_TYPES, PRIORITIES, TRIAGE_OUTCOMES,
   recStatusLabel, priorityLabel, ownerLabel, typeLabel as recTypeLabel, visibilityLabel,
   triageStateLabel,
@@ -831,6 +834,8 @@ function renderProduction(root: HTMLElement, room: Room): void {
   const sprint = el('section', { class: 'hq-sprint', 'aria-label': 'In the studio', 'aria-busy': 'true' },
     el('p', { class: 'hq-sprint__eyebrow label' }, 'In the studio'),
     el('p', { class: 'hq-state__lede' }, 'Looking in on the studio…'));
+  // The receiving queue — work routed to the Head of Production (Sprint 12E).
+  const intake = el('div', { class: 'hq-production-intake' });
 
   const view = el(
     'section',
@@ -851,6 +856,7 @@ function renderProduction(root: HTMLElement, room: Room): void {
         el('h1', { class: 'hq-title hq-title--seated' }, room.name),
         el('p', { class: 'hq-lede' }, 'A glass studio for momentum without noise. Capable, and in motion — where cleared work is narrated, shaped, and finished.'),
       ),
+      intake,
       el(
         'div',
         { class: 'hq-studio' },
@@ -861,7 +867,103 @@ function renderProduction(root: HTMLElement, room: Room): void {
   );
 
   root.replaceChildren(view);
+  mountProductionIntake(intake);
   void mountSprint(sprint);
+}
+
+/* --- The Head of Production's receiving queue (Sprint 12E) -----------------
+   Work routed here by the Chief of Staff — ONLY items owned by Chair #003.
+   Production takes up only eligible work (approved/decided or validly routed for
+   execution); a clarification returns to the Chief of Staff, never the Founder.
+   Renders synchronously from the client store and repaints itself in place. */
+function mountProductionIntake(host: HTMLElement): void {
+  const repaint = (): void => mountProductionIntake(host);
+  const queue = productionQueue(loadRecommendations());
+
+  const section = el('section', { class: 'hq-cos__section', 'aria-label': 'Work from the Chief of Staff' },
+    el('p', { class: 'hq-cos__eyebrow label' }, 'From the Chief of Staff'),
+    el('p', { class: 'hq-cos__lead' }, 'Work routed to the Head of Production. Everything here arrives through the Chief of Staff — the delivery is yours to carry.'));
+
+  if (queue.length === 0) {
+    section.append(el('p', { class: 'hq-cos__quiet' },
+      'Nothing has been routed to you yet. When the Chief of Staff sends approved work, it appears here.'));
+  } else {
+    const list = el('div', { class: 'hq-cos__decisions' });
+    for (const r of queue) list.append(cosProductionCard(r, repaint));
+    section.append(list);
+  }
+  host.replaceChildren(section);
+}
+
+function cosProductionCard(r: Recommendation, repaint: () => void): HTMLElement {
+  const persist = (next: Recommendation): void => {
+    saveRecommendations(upsertRecommendation(loadRecommendations(), next));
+    repaint();
+  };
+  const card = el('article', { class: 'hq-cos__decision' });
+  card.append(
+    el('div', { class: 'hq-cos__chair-head' },
+      el('h3', { class: 'hq-cos__decision-title' }, r.title),
+      el('span', { class: 'hq-cos__tag label', 'data-status': r.priority }, priorityLabel(r.priority))),
+    el('p', { class: 'hq-cos__decision-summary' },
+      `${recTypeLabel(r)} · ${recStatusLabel(r.status)} · ${productionStageLabel(r.productionStage)}${r.blocked ? ' · Blocked' : ''} · ${visibilityLabel(r.visibility)}`),
+    el('p', { class: 'hq-cos__decision-summary' },
+      `${ownerLabel(r)} · recorded ${formatWhen(r.createdAt)}${r.preparation ? ` · prepared ${formatWhen(r.preparation.preparedAt)}` : ''}${r.founderDecision !== 'pending' ? ` · Founder: ${decisionLabel(r)}` : ''}`),
+  );
+  if (r.summary) card.append(el('p', { class: 'hq-cos__field-body' }, r.summary));
+  if (r.preparation?.recommendation) card.append(cosField('Chief of Staff’s note', r.preparation.recommendation));
+  if (r.productionNote) card.append(cosField('Clarification requested (with the Chief of Staff)', r.productionNote));
+
+  // Eligibility guard — Production only takes up genuinely ready work.
+  if (r.productionStage === null && !isProductionEligible(r)) {
+    card.append(el('p', { class: 'hq-cos__quiet' },
+      'Awaiting a Founder decision — this cannot enter production yet. The Chief of Staff will route it when it is ready.'));
+    // Still allow returning it to the office.
+    card.append(cosReturnButton(r, persist, productionReturn));
+    return card;
+  }
+
+  const group = el('div', { class: 'hq-cos__responses', role: 'group', 'aria-label': `Production of “${r.title}”` });
+  const act = (label: string, fn: () => Recommendation): void => {
+    const b = el('button', { class: 'hq-cos__response', type: 'button' }, label) as HTMLButtonElement;
+    b.addEventListener('click', () => persist(fn()));
+    group.append(b);
+  };
+  const st = r.productionStage;
+  if (st === null) act('Accept for Production', () => productionAccept(r));
+  if (st === 'accepted') act('Begin Production Planning', () => productionPlanning(r));
+  if (st === 'planning') act('Mark Ready for Production', () => productionReady(r));
+  if (st === 'ready') act('Mark In Production', () => productionInProduction(r));
+  if (st === 'in_production') act('Mark Delivery Ready', () => productionDeliveryReady(r));
+  if (st === 'delivery_ready') act('Mark Production Complete', () => productionComplete(r));
+  if (st !== null) act(r.blocked ? 'Unblock' : 'Mark Blocked', () => setBlocked(r, !r.blocked));
+  card.append(group);
+
+  card.append(cosReturnButton(r, persist, productionReturn));
+
+  // Request clarification — routed BACK through the Chief of Staff.
+  const noteId = `pnote_${r.id.replace(/[^a-z0-9]/gi, '')}`;
+  const note = el('input', {
+    class: 'hq-cos__note-input', id: noteId, type: 'text', maxlength: '200',
+    placeholder: 'What needs clarifying?',
+    ...(r.productionNote ? { value: r.productionNote } : {}),
+  }) as HTMLInputElement;
+  const clarify = el('button', { class: 'hq-cos__withdraw', type: 'button' },
+    'Request clarification (via Chief of Staff)') as HTMLButtonElement;
+  clarify.addEventListener('click', () => persist(productionRequestClarification(r, note.value)));
+  card.append(el('div', { class: 'hq-cos__note-field' },
+    el('label', { class: 'hq-cos__note-input-label label', for: noteId }, 'Clarification note'), note, clarify));
+
+  return card;
+}
+
+/** A shared "Return to Chief of Staff" button for a receiving Chair. */
+function cosReturnButton(
+  r: Recommendation, persist: (n: Recommendation) => void, returnFn: (rec: Recommendation) => Recommendation,
+): HTMLElement {
+  const b = el('button', { class: 'hq-cos__withdraw', type: 'button' }, 'Return to Chief of Staff') as HTMLButtonElement;
+  b.addEventListener('click', () => persist(returnFn(r)));
+  return b;
 }
 
 /**
@@ -1274,6 +1376,24 @@ function cosOperational(): HTMLElement {
     block.append(
       el('h3', { class: 'hq-cos__field-label label' }, 'Creative Director'),
       el('p', { class: 'hq-cos__line' }, cdParts.join(' · ')));
+  }
+
+  // The Head of Production's standing (Sprint 12E).
+  const hp = productionStanding(loadRecommendations());
+  const hpParts: string[] = [];
+  if (hp.awaiting) hpParts.push(`${hp.awaiting} awaiting acceptance`);
+  if (hp.accepted) hpParts.push(`${hp.accepted} accepted`);
+  if (hp.planning) hpParts.push(`${hp.planning} planning`);
+  if (hp.ready) hpParts.push(`${hp.ready} ready`);
+  if (hp.inProduction) hpParts.push(`${hp.inProduction} in production`);
+  if (hp.blocked) hpParts.push(`${hp.blocked} blocked`);
+  if (hp.clarification) hpParts.push(`${hp.clarification} needing clarification`);
+  if (hp.deliveryReady) hpParts.push(`${hp.deliveryReady} delivery ready`);
+  if (hp.complete) hpParts.push(`${hp.complete} complete`);
+  if (hpParts.length > 0) {
+    block.append(
+      el('h3', { class: 'hq-cos__field-label label' }, 'Head of Production'),
+      el('p', { class: 'hq-cos__line' }, hpParts.join(' · ')));
   }
 
   return block;
