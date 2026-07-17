@@ -121,6 +121,7 @@ export interface ExecutiveChair {
 
 export const CHAIR_CHIEF_OF_STAFF = 'chair_chief_of_staff';
 export const CHAIR_CREATIVE_DIRECTOR = 'chair_creative_director';
+export const CHAIR_HEAD_OF_PRODUCTION = 'chair_head_of_production';
 
 export const CHAIRS: ExecutiveChair[] = [
   {
@@ -170,7 +171,7 @@ export const CHAIRS: ExecutiveChair[] = [
     relationships: [
       { withChairId: CHAIR_CREATIVE_DIRECTOR, with: 'Creative Director',
         nature: 'Order and taste in balance — the Chief of Staff protects the Founder’s attention while the Creative Director protects the Founder’s voice; the two coordinate so ambition and order reinforce one another.' },
-      { with: 'Head of Production',
+      { withChairId: CHAIR_HEAD_OF_PRODUCTION, with: 'Head of Production',
         nature: 'The Chief of Staff sequences and coordinates; Production carries approved work to finished, trusting the office to keep the path clear.' },
       { with: 'Director of Growth',
         nature: 'The Chief of Staff keeps the House in order as Growth carries its work outward, so reaching further never disturbs the calm within.' },
@@ -224,10 +225,64 @@ export const CHAIRS: ExecutiveChair[] = [
     relationships: [
       { withChairId: CHAIR_CHIEF_OF_STAFF, with: 'Chief of Staff',
         nature: 'Taste and order in balance — the Creative Director protects the Founder’s taste while the Chief of Staff protects the Founder’s attention.' },
-      { with: 'Head of Production',
+      { withChairId: CHAIR_HEAD_OF_PRODUCTION, with: 'Head of Production',
         nature: 'The Creative Director sets the standard; Production realises it at scale and on schedule — the long dialogue between intention and execution.' },
       { with: 'Director of Growth',
         nature: 'Growth carries the voice outward; the Creative Director ensures what travels stays true to what it represents.' },
+    ],
+    status: 'established',
+  },
+  {
+    id: CHAIR_HEAD_OF_PRODUCTION,
+    ordinal: 3,
+    title: 'Head of Production',
+    reasonForBeing:
+      'Between an approved idea and a finished, delivered work lies a chain of moving parts. This Chair exists so the Founder never carries execution — so approved work becomes finished work without her coordinating a single hand-off.',
+    purpose:
+      'To turn approved and directed work into finished, delivered work — reliably and to standard — so nothing unfinished reaches the Founder and no execution detail requires her attention.',
+    charge:
+      'Carry work from decision to delivery with discipline: plan it, produce it, and see it finished on a cadence the House can rely on.',
+    standingResponsibilities: [
+      'Own delivery from approved to finished across the institution’s work.',
+      'Protect the quality and the schedule of what is produced.',
+      'Keep the path from decision to delivery clear, and hand-offs clean.',
+      'Surface risk to delivery early, before it reaches the Founder.',
+    ],
+    owns: [
+      'The production of approved and directed work.',
+      'Delivery readiness and the standard of the finished result.',
+      'The cadence and reliability of execution.',
+      'The health of work in progress, and what is blocking it.',
+    ],
+    prepares: [
+      'Delivery plans — how approved work will be carried to finished.',
+      'Readiness assessments before production begins.',
+      'Honest status of what is in production, and what stands in its way.',
+    ],
+    authority: {
+      canDecide: [
+        'How approved work is planned, sequenced, and produced.',
+        'When work is ready for production and when it is delivery-ready.',
+        'The day-to-day handling of production within the standard.',
+      ],
+      recommends: [
+        'Delivery cadence and the order in which approved work is produced.',
+        'Trade-offs between scope, quality, and time when they arise.',
+        'When a delivery risk warrants the Founder’s attention.',
+      ],
+      mustEscalate: [
+        'Work that cannot be delivered to standard without a Founder decision.',
+        'A delivery risk that would affect a commitment the Founder has made.',
+        'Anything the Founder has reserved as the Founder’s alone.',
+      ],
+    },
+    relationships: [
+      { withChairId: CHAIR_CHIEF_OF_STAFF, with: 'Chief of Staff',
+        nature: 'The Chief of Staff routes and coordinates; Production receives approved work and carries it to finished, returning status and clarification through the office — never around it.' },
+      { withChairId: CHAIR_CREATIVE_DIRECTOR, with: 'Creative Director',
+        nature: 'The Creative Director sets the standard; Production realises it faithfully, at scale and on schedule — intention met by execution.' },
+      { with: 'Director of Growth',
+        nature: 'Production delivers finished work; Growth carries it to the world, each trusting the other to hold its own craft.' },
     ],
     status: 'established',
   },
@@ -377,6 +432,14 @@ export const FOUNDING_REGISTER: RegisterEntry[] = [
     event: 'The Chair of the Creative Director was established as the second seat of the Executive Team.',
     on: '2026-07-16',
     recordedAt: '2026-07-16T00:00:00.000Z',
+  },
+  {
+    id: 'reg_founding_production',
+    chairId: CHAIR_HEAD_OF_PRODUCTION,
+    type: 'established',
+    event: 'The Chair of the Head of Production was established as the third seat of the Executive Team.',
+    on: '2026-07-16',
+    recordedAt: '2026-07-16T00:00:01.000Z',
   },
 ];
 

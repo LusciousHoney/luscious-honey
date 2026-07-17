@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import {
   // Phase 1
   CHAIRS, CHAIR_STATUSES, chairStatusLabel, getChair, nextOrdinal,
-  CHAIR_CHIEF_OF_STAFF, CHAIR_CREATIVE_DIRECTOR,
+  CHAIR_CHIEF_OF_STAFF, CHAIR_CREATIVE_DIRECTOR, CHAIR_HEAD_OF_PRODUCTION,
   type ExecutiveChair,
   // Phase 2
   REGISTER_EVENTS, registerEventLabel, makeRegisterEntry, appendRegisterEntry,
@@ -34,12 +34,16 @@ import {
 } from '../src/headquarters/executive-register.ts';
 
 /* --- Phase 1: the Chairs -------------------------------------------------- */
-test('the two approved Chairs are established, numbered, and fully chartered', () => {
-  assert.equal(CHAIRS.length, 2);
+test('the approved Chairs are established, numbered, and fully chartered', () => {
+  assert.equal(CHAIRS.length, 3);
   const cos = getChair(CHAIR_CHIEF_OF_STAFF)!;
   const cd = getChair(CHAIR_CREATIVE_DIRECTOR)!;
+  const hp = getChair(CHAIR_HEAD_OF_PRODUCTION)!;
   assert.equal(cos.ordinal, 1);
   assert.equal(cd.ordinal, 2);
+  assert.equal(hp.ordinal, 3);
+  assert.equal(hp.title, 'Head of Production');
+  assert.equal(hp.status, 'established');
   for (const c of CHAIRS) {
     assert.ok(c.title && c.reasonForBeing && c.purpose && c.charge, `${c.id} carries its charter prose`);
     assert.ok(c.standingResponsibilities.length && c.owns.length && c.prepares.length);
@@ -55,13 +59,18 @@ test('the two seated Chairs know each other by id (a real relationship link)', (
   const cd = getChair(CHAIR_CREATIVE_DIRECTOR)!;
   assert.ok(cos.relationships.some((r) => r.withChairId === CHAIR_CREATIVE_DIRECTOR));
   assert.ok(cd.relationships.some((r) => r.withChairId === CHAIR_CHIEF_OF_STAFF));
-  // Future Chairs are named but not yet linked by id — honest.
-  assert.ok(cos.relationships.some((r) => r.with === 'Head of Production' && !r.withChairId));
+  // Head of Production is now established and linked by id (reciprocal).
+  assert.ok(cos.relationships.some((r) => r.withChairId === CHAIR_HEAD_OF_PRODUCTION));
+  assert.ok(cd.relationships.some((r) => r.withChairId === CHAIR_HEAD_OF_PRODUCTION));
+  const hp = getChair(CHAIR_HEAD_OF_PRODUCTION)!;
+  assert.ok(hp.relationships.some((r) => r.withChairId === CHAIR_CHIEF_OF_STAFF));
+  assert.ok(hp.relationships.some((r) => r.withChairId === CHAIR_CREATIVE_DIRECTOR));
+  // The Director of Growth remains named but unlinked — honest.
   assert.ok(cos.relationships.some((r) => r.with === 'Director of Growth' && !r.withChairId));
 });
 
 test('Chairs are identified, not enumerated — nextOrdinal keeps the sequence', () => {
-  assert.equal(nextOrdinal(CHAIRS), 3);
+  assert.equal(nextOrdinal(CHAIRS), 4);
   assert.equal(nextOrdinal([]), 1, 'an empty institution starts at #001');
   const withThird: ExecutiveChair[] = [...CHAIRS, { ...CHAIRS[0], id: 'chair_x', ordinal: 7 }];
   assert.equal(nextOrdinal(withThird), 8, 'the next ordinal follows the highest, not the count');
@@ -78,12 +87,12 @@ test('chair statuses are the four named standings', () => {
 });
 
 /* --- Phase 2: the Register (append-only, derived standing) ----------------- */
-test('the founding Register truthfully records the two establishments only', () => {
-  assert.equal(FOUNDING_REGISTER.length, 2);
+test('the founding Register truthfully records the three establishments only', () => {
+  assert.equal(FOUNDING_REGISTER.length, 3);
   assert.ok(FOUNDING_REGISTER.every((e) => e.type === 'established'));
   assert.deepEqual(
     FOUNDING_REGISTER.map((e) => e.chairId).sort(),
-    [CHAIR_CHIEF_OF_STAFF, CHAIR_CREATIVE_DIRECTOR].sort(),
+    [CHAIR_CHIEF_OF_STAFF, CHAIR_CREATIVE_DIRECTOR, CHAIR_HEAD_OF_PRODUCTION].sort(),
   );
 });
 

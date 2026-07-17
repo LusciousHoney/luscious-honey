@@ -34,9 +34,9 @@ test('no duplicate Chair source remains in the Chief of Staff module', () => {
 /* --- Open Chairs derives from the Register -------------------------------- */
 test('Open Chairs derives from the Executive Register (order, titles, ordinals)', () => {
   const views = openChairViews();
-  // Both approved Chairs are established-but-unseated → both are openings.
-  assert.deepEqual(views.map((v) => v.ordinal), [1, 2]);
-  assert.deepEqual(views.map((v) => v.title), ['Chief of Staff', 'Creative Director']);
+  // The approved Chairs are established-but-unseated → all are openings.
+  assert.deepEqual(views.map((v) => v.ordinal), [1, 2, 3]);
+  assert.deepEqual(views.map((v) => v.title), ['Chief of Staff', 'Creative Director', 'Head of Production']);
   for (const v of views) {
     assert.ok(v.purpose && v.charge && v.responsibilities.length > 0);
     assert.equal(v.statusLabel, 'Established');
@@ -58,9 +58,9 @@ test('a retired or seated Chair is not shown as an opening (derived filter)', ()
 
 /* --- Leadership Records derives from Register history ---------------------- */
 test('Leadership Records shows truthful derived standing, not stored status', () => {
-  // Default: both established, not appointed, not seated.
+  // Default: all established, not appointed, not seated.
   const base = leadershipViews();
-  assert.equal(base.length, 2);
+  assert.equal(base.length, 3);
   for (const v of base) {
     assert.equal(v.standing, 'Established — not yet appointed');
     assert.equal(v.seated, false);
@@ -129,13 +129,15 @@ test('neutralizeCanon replaces canon language without leaving the word', () => {
 
 /* --- extensibility: more Chairs, same rendering logic --------------------- */
 test('additional Chairs flow through the derived selectors with no logic change', () => {
-  const third: ExecutiveChair = { ...CHAIRS[1], id: 'chair_head_of_production', ordinal: 3, title: 'Head of Production', status: 'preparing' };
-  const chairs = [...CHAIRS, third];
+  // A future, not-yet-established Chair (e.g. Director of Growth), appended to the
+  // real three — proving the selectors are count-agnostic.
+  const fourth: ExecutiveChair = { ...CHAIRS[1], id: 'chair_director_of_growth', ordinal: 4, title: 'Director of Growth', status: 'preparing' };
+  const chairs = [...CHAIRS, fourth];
   const standings = chairStandings(chairs, { register: FOUNDING_REGISTER });
-  assert.deepEqual(standings.map((s) => s.chair.ordinal), [1, 2, 3], 'ordered by ordinal, no fixed count');
-  // The third Chair has no establishment entry yet → falls back to its charter status.
-  assert.equal(standings.find((s) => s.chair.ordinal === 3)!.status, 'preparing');
-  assert.equal(openChairStandings(chairs, { register: FOUNDING_REGISTER }).length, 3, 'all three are openings');
+  assert.deepEqual(standings.map((s) => s.chair.ordinal), [1, 2, 3, 4], 'ordered by ordinal, no fixed count');
+  // The fourth Chair has no establishment entry yet → falls back to its charter status.
+  assert.equal(standings.find((s) => s.chair.ordinal === 4)!.status, 'preparing');
+  assert.equal(openChairStandings(chairs, { register: FOUNDING_REGISTER }).length, 4, 'all four are openings');
 });
 
 /* --- Headquarters architecture + Decision System unchanged ---------------- */

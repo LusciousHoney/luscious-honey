@@ -32,9 +32,14 @@ import {
   CREATIVE_STAGES, creativeStageLabel,
   creativeAccept, creativeStart, creativeComplete, creativeReturn, creativeRequestClarification,
   creativeQueue, creativeStanding,
+  // Sprint 12E — Head of Production (receiving Chair)
+  PRODUCTION_STAGES, productionStageLabel, isProductionEligible, canAdvanceProductionStage,
+  productionAccept, productionPlanning, productionReady, productionInProduction,
+  productionDeliveryReady, productionComplete, productionReturn, productionRequestClarification,
+  productionQueue, productionStanding,
   type Recommendation,
 } from '../src/headquarters/chief-of-staff-ops.ts';
-import { CHAIR_CHIEF_OF_STAFF, CHAIR_CREATIVE_DIRECTOR, STORAGE_ROOT } from '../src/headquarters/executive-register.ts';
+import { CHAIR_CHIEF_OF_STAFF, CHAIR_CREATIVE_DIRECTOR, CHAIR_HEAD_OF_PRODUCTION, STORAGE_ROOT } from '../src/headquarters/executive-register.ts';
 
 const T = new Date('2026-07-16T09:00:00.000Z');
 function rec(over: Partial<Recommendation> = {}): Recommendation {
@@ -521,4 +526,143 @@ test('a pre-12D record normalizes to creativeStage null without data loss', () =
   assert.equal(n.ownerChairId, CHAIR_CREATIVE_DIRECTOR, 'ownership intact');
   const bad = normalizeRecommendation({ ...routedToCreative('b2'), creativeStage: 'nonsense' as never });
   assert.equal(bad.creativeStage, null, 'unknown stage dropped to safe default');
+});
+
+/* =============================================================================
+   SPRINT 12E — HEAD OF PRODUCTION (receiving Chair)
+   ============================================================================= */
+
+// An approved item routed to the Head of Production (decided → eligible).
+const approvedToProduction = (id: string): Recommendation => {
+  const waiting = presentToFounder(prepareRecommendation(sub(id), { recommendation: 'r', decisionRequested: 'd' }, T)!, T);
+  const decided = recordFounderDecision(waiting, 'approved', '', T);
+  return routeRecommendation(decided, CHAIR_HEAD_OF_PRODUCTION, T);
+};
+// A directly-routed operational item (triage route → executing, owned by #003).
+const routedToProduction = (id: string): Recommendation =>
+  triage(sub(id), 'route', { ownerChairId: CHAIR_HEAD_OF_PRODUCTION }, T);
+
+test('the production queue shows ONLY work routed to Chair #003', () => {
+  const mine = routedToProduction('p1');
+  const creative = triage(sub('c'), 'route', { ownerChairId: CHAIR_CREATIVE_DIRECTOR }, T);
+  const done = productionComplete(productionAccept(routedToProduction('p2'), T), T);
+  const q = productionQueue([mine, creative, done]);
+  assert.deepEqual(q.map((r) => r.id), ['p1'], 'other Chairs’ and completed work are not exposed');
+});
+
+test('the six production stages have labels; null reads as Awaiting Production', () => {
+  assert.deepEqual(PRODUCTION_STAGES.map((s) => s.id),
+    ['accepted', 'planning', 'ready', 'in_production', 'delivery_ready', 'complete']);
+  assert.equal(productionStageLabel(null), 'Awaiting Production');
+  assert.equal(productionStageLabel('in_production'), 'In Production');
+});
+
+test('eligibility: only approved (decided) or validly-routed (executing) work may proceed', () => {
+  assert.equal(isProductionEligible(approvedToProduction('a')), true, 'approved → eligible');
+  assert.equal(isProductionEligible(routedToProduction('b')), true, 'routed for execution → eligible');
+  // Not eligible: preparing / awaiting_founder / held / withdrawn.
+  assert.equal(isProductionEligible(routeRecommendation(sub('c'), CHAIR_HEAD_OF_PRODUCTION, T)), false, 'preparing → not eligible');
+  const waiting = presentToFounder(prepareRecommendation(sub('d'), { recommendation: 'r', decisionRequested: 'x' }, T)!, T);
+  assert.equal(isProductionEligible(routeRecommendation(waiting, CHAIR_HEAD_OF_PRODUCTION, T)), false, 'awaiting Founder → not eligible');
+  const held = triage(sub('e'), 'hold', {}, T);
+  assert.equal(isProductionEligible(held), false, 'held → not eligible');
+});
+
+test('Accept only takes up eligible work; an ineligible item is left untouched', () => {
+  const ineligible = routeRecommendation(sub('x'), CHAIR_HEAD_OF_PRODUCTION, T); // preparing
+  assert.equal(productionAccept(ineligible, T).productionStage, null, 'ineligible → not accepted');
+  const accepted = productionAccept(approvedToProduction('y'), T);
+  assert.equal(accepted.productionStage, 'accepted');
+  assert.equal(accepted.status, 'executing');
+});
+
+test('valid production progression runs forward through every stage to complete', () => {
+  let r = productionAccept(approvedToProduction('prog'), T);
+  r = productionPlanning(r, T);      assert.equal(r.productionStage, 'planning');
+  r = productionReady(r, T);         assert.equal(r.productionStage, 'ready');
+  r = productionInProduction(r, T);  assert.equal(r.productionStage, 'in_production');
+  r = productionDeliveryReady(r, T); assert.equal(r.productionStage, 'delivery_ready');
+  r = productionComplete(r, T);      assert.equal(r.productionStage, 'complete');
+  assert.equal(r.status, 'complete', 'the same lifecycle carries it to complete');
+});
+
+test('invalid production progression (skipping or regressing) is refused', () => {
+  const accepted = productionAccept(approvedToProduction('inv'), T);
+  assert.ok(!canAdvanceProductionStage('accepted', 'accepted'), 'no same-stage move');
+  assert.ok(!canAdvanceProductionStage('in_production', 'planning'), 'no regress');
+  assert.ok(canAdvanceProductionStage('accepted', 'planning'));
+  // productionReady from 'accepted' skips 'planning' forward — allowed (forward);
+  // productionPlanning from a later stage is refused.
+  const inProd = productionInProduction(productionReady(productionPlanning(accepted, T), T), T);
+  assert.equal(productionPlanning(inProd, T).productionStage, 'in_production', 'cannot regress to planning');
+});
+
+test('Return to Chief of Staff clears production ownership and re-opens for triage', () => {
+  const accepted = productionAccept(approvedToProduction('ret'), T);
+  const returned = productionReturn(accepted, T);
+  assert.equal(returned.ownerChairId, null);
+  assert.equal(returned.productionStage, null);
+  assert.equal(returned.triage, null);
+  assert.equal(returned.status, 'preparing');
+  assert.deepEqual(productionQueue([returned]), []);
+});
+
+test('Mark Blocked toggles the shared flag without losing the stage', () => {
+  const inProd = productionInProduction(productionReady(productionPlanning(productionAccept(approvedToProduction('b'), T), T), T), T);
+  const blocked = setBlocked(inProd, true, T);
+  assert.equal(blocked.blocked, true);
+  assert.equal(blocked.productionStage, 'in_production', 'stage preserved while blocked');
+  assert.equal(setBlocked(blocked, false, T).blocked, false);
+});
+
+test('Request clarification pauses to held, preserves the stage, routes via the office', () => {
+  const planning = productionPlanning(productionAccept(approvedToProduction('cl'), T), T);
+  const clar = productionRequestClarification(planning, '  which format?  ', T);
+  assert.equal(clar.status, 'held', 'paused, not sent to the Founder');
+  assert.equal(clar.productionStage, 'planning', 'stage preserved (cleaner than creative)');
+  assert.equal(clar.productionNote, 'which format?');
+  assert.equal(clar.founderDecision, 'approved', 'the Founder is not re-addressed');
+  assert.equal(clar.ownerChairId, CHAIR_HEAD_OF_PRODUCTION, 'still owned while paused');
+  // A clarification-held item still appears in the queue so it is not lost.
+  assert.deepEqual(productionQueue([clar]).map((r) => r.id), ['cl']);
+});
+
+test('productionStanding gives the Chief of Staff an honest at-a-glance count', () => {
+  const store = [
+    routedToProduction('a'),                                              // awaiting
+    productionAccept(approvedToProduction('b'), T),                       // accepted
+    productionPlanning(productionAccept(approvedToProduction('c'), T), T),// planning
+    setBlocked(productionInProduction(productionReady(productionPlanning(productionAccept(approvedToProduction('d'), T), T), T), T), true, T), // in prod + blocked
+    productionRequestClarification(productionAccept(approvedToProduction('e'), T), 'n', T), // clarification (held)
+    productionComplete(productionDeliveryReady(productionInProduction(productionReady(productionPlanning(productionAccept(approvedToProduction('f'), T), T), T), T), T), T), // complete
+    triage(sub('x'), 'route', { ownerChairId: CHAIR_CREATIVE_DIRECTOR }, T), // not Production's
+  ];
+  const s = productionStanding(store);
+  assert.equal(s.awaiting, 1);
+  assert.equal(s.accepted, 1);
+  assert.equal(s.planning, 1);
+  assert.equal(s.inProduction, 1);
+  assert.equal(s.blocked, 1);
+  assert.equal(s.clarification, 1);
+  assert.equal(s.complete, 1);
+});
+
+test('a pre-12E record normalizes to productionStage null without data loss', () => {
+  const legacy = { ...routedToProduction('leg') } as Recommendation;
+  delete (legacy as { productionStage?: unknown }).productionStage;
+  const n = normalizeRecommendation(legacy);
+  assert.equal(n.productionStage, null);
+  assert.equal(n.ownerChairId, CHAIR_HEAD_OF_PRODUCTION);
+  const bad = normalizeRecommendation({ ...routedToProduction('b2'), productionStage: 'nonsense' as never });
+  assert.equal(bad.productionStage, null, 'unknown stage dropped to safe default');
+});
+
+test('Creative Director behaviour and the Founder decision loop are preserved', () => {
+  // Creative still works independently of production.
+  const c = creativeComplete(creativeStart(creativeAccept(triage(sub('cc'), 'route', { ownerChairId: CHAIR_CREATIVE_DIRECTOR }, T), T), T), T);
+  assert.equal(c.creativeStage, 'complete');
+  assert.equal(c.productionStage, null, 'production annotation untouched by creative flow');
+  // Founder loop still routes decisions correctly.
+  const waiting = presentToFounder(prepareRecommendation(sub('fl'), { recommendation: 'r', decisionRequested: 'd' }, T)!, T);
+  assert.equal(recordFounderDecision(waiting, 'approved', '', T).status, 'decided');
 });

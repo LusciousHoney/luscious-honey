@@ -24,7 +24,7 @@
 
 import {
   STORAGE_ROOT, loadCollection, saveCollection,
-  CHAIRS, getChair, CHAIR_CREATIVE_DIRECTOR,
+  CHAIRS, getChair, CHAIR_CREATIVE_DIRECTOR, CHAIR_HEAD_OF_PRODUCTION,
   founderDecisionLabel,
   type ExecutiveChair, type FounderDecision,
 } from './executive-register.ts';
@@ -182,6 +182,10 @@ export interface Recommendation {
   creativeStage: CreativeStage | null;
   /** A note the receiving Chair sends back through the Chief of Staff. */
   creativeNote?: string;
+  /** The Head of Production's progression on this item, or null until accepted. */
+  productionStage: ProductionStage | null;
+  /** A note Production sends back through the Chief of Staff. */
+  productionNote?: string;
   /** ISO datetime created. */
   createdAt: string;
   /** ISO datetime last changed. */
@@ -255,6 +259,7 @@ export function makeRecommendation(
     preparation: null,
     blocked: false,
     creativeStage: null,
+    productionStage: null,
     createdAt: ts,
     updatedAt: ts,
   };
@@ -512,6 +517,133 @@ export function creativeStanding(recs: Recommendation[]): CreativeStanding {
 }
 
 /* -----------------------------------------------------------------------------
+   RECEIVING CHAIR — HEAD OF PRODUCTION (Sprint 12E). The Head of Production works
+   only on items the Chief of Staff has routed to Chair #003. `productionStage` is
+   the Chair's own progression annotation beside the shared lifecycle — NOT a
+   second engine; every action updates the same recommendation record. The Chair
+   never speaks to the Founder directly: a clarification returns to the office.
+
+   Eligibility: Production may only take up work that is genuinely ready — approved
+   (decided) or validly routed for execution (executing). Held, withdrawn,
+   awaiting-Founder, or still-in-preparation work must never silently enter
+   Production. Blocked reuses the shared `blocked` flag; clarification pauses the
+   item (held) while PRESERVING its stage, which is cleaner than the creative
+   pattern and safe because only Production items carry a productionStage/Note.
+   --------------------------------------------------------------------------- */
+export type ProductionStage =
+  | 'accepted' | 'planning' | 'ready' | 'in_production' | 'delivery_ready' | 'complete';
+
+export interface ProductionStageKind { id: ProductionStage; label: string; }
+export const PRODUCTION_STAGES: ProductionStageKind[] = [
+  { id: 'accepted',       label: 'Accepted' },
+  { id: 'planning',       label: 'Planning' },
+  { id: 'ready',          label: 'Ready for Production' },
+  { id: 'in_production',  label: 'In Production' },
+  { id: 'delivery_ready', label: 'Delivery Ready' },
+  { id: 'complete',       label: 'Production Complete' },
+];
+const PRODUCTION_STAGE_BY_ID = new Map(PRODUCTION_STAGES.map((s) => [s.id, s]));
+const PRODUCTION_STAGE_ORDER: ProductionStage[] = PRODUCTION_STAGES.map((s) => s.id);
+function productionStageIndex(s: ProductionStage | null): number {
+  return s ? PRODUCTION_STAGE_ORDER.indexOf(s) : -1;
+}
+
+/** The label for a production stage; null (routed, not accepted) → "Awaiting Production". */
+export function productionStageLabel(stage: ProductionStage | null): string {
+  return stage ? (PRODUCTION_STAGE_BY_ID.get(stage)?.label ?? stage) : 'Awaiting Production';
+}
+
+/** Whether Production may take up this item: approved (decided) or validly routed
+    for execution (executing). Never held / withdrawn / awaiting-Founder / preparing. */
+export function isProductionEligible(rec: Recommendation): boolean {
+  return rec.status === 'decided' || rec.status === 'executing';
+}
+
+/** A production stage move is valid only forward along the sequence (no regress,
+    from null only to accepted). */
+export function canAdvanceProductionStage(from: ProductionStage | null, to: ProductionStage): boolean {
+  if (!PRODUCTION_STAGE_BY_ID.has(to)) return false;
+  return productionStageIndex(to) > productionStageIndex(from);
+}
+
+/** Advance the production stage, forward-only. Keeps the item in execution
+    (advancing there when eligible) until it reaches complete. Returns unchanged
+    on an invalid (backward/unknown) move — the progression holds. */
+export function advanceProduction(rec: Recommendation, to: ProductionStage, now: Date = new Date()): Recommendation {
+  if (!canAdvanceProductionStage(rec.productionStage, to)) return rec;
+  const status = to === 'complete'
+    ? (canTransition(rec.status, 'complete') ? 'complete' : rec.status)
+    : (canTransition(rec.status, 'executing') ? 'executing' : rec.status);
+  return { ...rec, productionStage: to, status, updatedAt: now.toISOString() };
+}
+
+/** Accept a routed item for Production — only when it is genuinely eligible. */
+export function productionAccept(rec: Recommendation, now: Date = new Date()): Recommendation {
+  if (!isProductionEligible(rec)) return rec;
+  return advanceProduction(rec, 'accepted', now);
+}
+export const productionPlanning = (rec: Recommendation, now?: Date): Recommendation => advanceProduction(rec, 'planning', now);
+export const productionReady = (rec: Recommendation, now?: Date): Recommendation => advanceProduction(rec, 'ready', now);
+export const productionInProduction = (rec: Recommendation, now?: Date): Recommendation => advanceProduction(rec, 'in_production', now);
+export const productionDeliveryReady = (rec: Recommendation, now?: Date): Recommendation => advanceProduction(rec, 'delivery_ready', now);
+export const productionComplete = (rec: Recommendation, now?: Date): Recommendation => advanceProduction(rec, 'complete', now);
+
+/** Return the work to the Chief of Staff — ownership and production annotations
+    cleared; it re-enters the office untriaged. */
+export function productionReturn(rec: Recommendation, now: Date = new Date()): Recommendation {
+  const status = canTransition(rec.status, 'preparing') ? 'preparing' : rec.status;
+  return {
+    ...rec, ownerChairId: null, productionStage: null, productionNote: undefined,
+    triage: null, status, updatedAt: now.toISOString(),
+  };
+}
+
+/** Request clarification — routed BACK through the Chief of Staff, never to the
+    Founder. The item pauses (held) with its stage preserved and the note kept. */
+export function productionRequestClarification(rec: Recommendation, note: string = '', now: Date = new Date()): Recommendation {
+  const status = canTransition(rec.status, 'held') ? 'held' : rec.status;
+  const trimmed = note.trim();
+  return { ...rec, productionNote: trimmed || undefined, status, updatedAt: now.toISOString() };
+}
+
+/** The Head of Production's queue — work routed to Chair #003 that is active, or
+    paused for clarification. Work owned by other Chairs is never exposed here. */
+export function productionQueue(recs: Recommendation[]): Recommendation[] {
+  return recs
+    .filter((r) => r.ownerChairId === CHAIR_HEAD_OF_PRODUCTION
+      && (isActiveStatus(r.status) || (r.status === 'held' && !!r.productionNote)))
+    .sort((a, b) => (priorityRank(a.priority) - priorityRank(b.priority)) || b.updatedAt.localeCompare(a.updatedAt));
+}
+
+/** What the Chief of Staff needs to know about Production at a glance. */
+export interface ProductionStanding {
+  awaiting: number;      // routed, not yet accepted
+  accepted: number;
+  planning: number;
+  ready: number;
+  inProduction: number;
+  blocked: number;
+  clarification: number; // paused, needs the office to carry a clarification
+  deliveryReady: number;
+  complete: number;
+}
+export function productionStanding(recs: Recommendation[]): ProductionStanding {
+  const owned = recs.filter((r) => r.ownerChairId === CHAIR_HEAD_OF_PRODUCTION);
+  const active = owned.filter((r) => isActiveStatus(r.status));
+  return {
+    awaiting: active.filter((r) => r.productionStage === null).length,
+    accepted: active.filter((r) => r.productionStage === 'accepted').length,
+    planning: active.filter((r) => r.productionStage === 'planning').length,
+    ready: active.filter((r) => r.productionStage === 'ready').length,
+    inProduction: active.filter((r) => r.productionStage === 'in_production').length,
+    blocked: active.filter((r) => r.blocked).length,
+    clarification: owned.filter((r) => r.status === 'held' && !!r.productionNote).length,
+    deliveryReady: active.filter((r) => r.productionStage === 'delivery_ready').length,
+    complete: owned.filter((r) => r.productionStage === 'complete').length,
+  };
+}
+
+/* -----------------------------------------------------------------------------
    DERIVED VIEWS — the honest, computed picture of the operational record.
    --------------------------------------------------------------------------- */
 
@@ -728,10 +860,11 @@ export function normalizeRecommendation(rec: Recommendation): Recommendation {
   const preparation = rec.preparation ?? null;
   const blocked = rec.blocked === true;
   const creativeStage = rec.creativeStage && CREATIVE_STAGE_BY_ID.has(rec.creativeStage) ? rec.creativeStage : null;
+  const productionStage = rec.productionStage && PRODUCTION_STAGE_BY_ID.has(rec.productionStage) ? rec.productionStage : null;
   const unchanged = rec.type === type && rec.visibility === visibility
     && rec.triage === triage && rec.preparation === preparation && rec.blocked === blocked
-    && rec.creativeStage === creativeStage;
-  return unchanged ? rec : { ...rec, type, visibility, triage, preparation, blocked, creativeStage };
+    && rec.creativeStage === creativeStage && rec.productionStage === productionStage;
+  return unchanged ? rec : { ...rec, type, visibility, triage, preparation, blocked, creativeStage, productionStage };
 }
 
 export function loadRecommendations(): Recommendation[] {
