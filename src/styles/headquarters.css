@@ -1408,6 +1408,46 @@
 }
 .hq-research__link:hover, .hq-research__link:focus-visible { color: var(--terracotta); outline: none; border-color: var(--brass); }
 
+/* Opportunity Briefs — the analysis layer (Sprint 13B). Reuses the plaster cards
+   and form controls; adds chip multi-selects, a signal grid, and a score readout. */
+.hq-briefs__desk { display: grid; gap: var(--s-4); margin: var(--s-6) 0; }
+.hq-briefs__start { display: grid; gap: var(--s-2); max-width: 60ch; }
+.hq-briefs__editor { gap: var(--s-3); }
+.hq-briefs__section-label { margin-top: var(--s-2); }
+.hq-briefs__chips { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.hq-briefs__chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--sans); font-size: var(--fs-label); color: var(--hq-ink);
+  border: 1px solid var(--hq-brass-hair); border-radius: 999px; padding: 6px 12px; cursor: pointer;
+  min-height: 36px;
+}
+.hq-briefs__chip:hover { border-color: var(--brass); }
+.hq-briefs__chip-input { accent-color: var(--brass); width: 15px; height: 15px; }
+.hq-briefs__chip-input:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+.hq-briefs__signals {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--s-2) var(--s-3);
+}
+.hq-briefs__signal { display: grid; gap: 4px; }
+.hq-briefs__rating { min-height: 40px; }
+.hq-briefs__score-preview {
+  display: grid; gap: 4px; padding: var(--s-3);
+  border: 1px solid var(--hq-brass-hair); border-radius: var(--radius); background: rgba(var(--ink-rgb), 0.015);
+}
+.hq-briefs__score-line { margin: 0; font-family: var(--serif); font-size: var(--fs-body); color: var(--hq-ink); }
+.hq-briefs__score {
+  font-family: var(--sans); font-weight: 700; font-size: 1.3em; color: var(--brass);
+  font-variant-numeric: tabular-nums; margin-right: 4px;
+}
+.hq-briefs__factors { list-style: none; margin: var(--s-2) 0 0; padding: 0; display: grid; gap: 6px; }
+.hq-briefs__factors li {
+  display: grid; grid-template-columns: minmax(9em, auto) 1fr; gap: var(--s-2);
+  font-family: var(--serif); font-size: var(--fs-body-sm); color: var(--hq-ink);
+}
+.hq-briefs__factor-label { color: var(--umber); font-family: var(--sans); font-size: var(--fs-label); }
+.hq-briefs__founder {
+  border-left: 2px solid var(--brass);
+}
+
 /* The six responses — quiet plaster buttons; the recorded one is marked. */
 .hq-cos__responses { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 .hq-cos__response {

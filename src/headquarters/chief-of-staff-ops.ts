@@ -200,6 +200,9 @@ export interface Recommendation {
       of that originating intelligence record (Sprint 13A) — the durable link back
       to its research provenance. Absent for work that did not begin as research. */
   originIntelId?: string;
+  /** When promoted from a Content Opportunity brief (Sprint 13B), the id of that
+      brief — the middle link in intelligence → opportunity → recommendation. */
+  originOpportunityId?: string;
   /** ISO datetime created. */
   createdAt: string;
   /** ISO datetime last changed. */
@@ -253,7 +256,7 @@ export function makeRecommendation(
   input: {
     id: string; title: string; summary: string;
     type?: SubmissionType; ownerChairId?: string | null; priority?: Priority; visibility?: FounderVisibility;
-    originIntelId?: string;
+    originIntelId?: string; originOpportunityId?: string;
   },
   now: Date = new Date(),
 ): Recommendation | null {
@@ -263,6 +266,7 @@ export function makeRecommendation(
   return {
     id: input.id,
     ...(input.originIntelId ? { originIntelId: input.originIntelId } : {}),
+    ...(input.originOpportunityId ? { originOpportunityId: input.originOpportunityId } : {}),
     type: input.type && SUBMISSION_TYPE_BY_ID.has(input.type) ? input.type : DEFAULT_TYPE,
     title: input.title.trim(),
     summary: input.summary.trim(),
@@ -291,13 +295,14 @@ export function makeRecommendation(
 export function makeSubmission(
   input: {
     id: string; type: SubmissionType; title: string; description: string;
-    priority?: Priority; ownerChairId?: string | null; originIntelId?: string;
+    priority?: Priority; ownerChairId?: string | null; originIntelId?: string; originOpportunityId?: string;
   },
   now: Date = new Date(),
 ): Recommendation | null {
   return makeRecommendation(
     { id: input.id, type: input.type, title: input.title, summary: input.description,
-      priority: input.priority, ownerChairId: input.ownerChairId, originIntelId: input.originIntelId },
+      priority: input.priority, ownerChairId: input.ownerChairId,
+      originIntelId: input.originIntelId, originOpportunityId: input.originOpportunityId },
     now,
   );
 }
