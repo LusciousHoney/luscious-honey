@@ -1097,6 +1097,27 @@ export function declinedHandoffsForOffice(recs: Recommendation[]): HandoffView[]
   return collectHandoffs(recs, (h) => h.status === 'declined')
     .sort((a, b) => (a.handoff.resolvedAt ?? '').localeCompare(b.handoff.resolvedAt ?? ''));
 }
+
+/** The most recently created handoff on a record, or null. */
+export function latestHandoff(rec: Recommendation): Handoff | null {
+  return rec.collaborationTrail.length ? rec.collaborationTrail[rec.collaborationTrail.length - 1] : null;
+}
+
+/** Records genuinely awaiting the office's hand after a decline: unowned, re-opened
+    (`preparing`), and whose latest handoff was declined. Once the office re-routes,
+    holds, or withdraws the work, it leaves this queue — so "Returned to the Office"
+    only ever shows what still needs the office to act. The declined handoff itself
+    is never removed from the trail; it remains as provenance. */
+export function handoffsReturnedToOffice(recs: Recommendation[]): HandoffView[] {
+  const out: HandoffView[] = [];
+  for (const rec of recs) {
+    const last = latestHandoff(rec);
+    if (rec.ownerChairId === null && rec.status === 'preparing' && last && last.status === 'declined') {
+      out.push({ rec, handoff: last });
+    }
+  }
+  return out.sort((a, b) => (a.handoff.resolvedAt ?? '').localeCompare(b.handoff.resolvedAt ?? ''));
+}
 /** Open consultations awaiting the consulted Chair's answer. */
 export function unansweredConsultations(recs: Recommendation[]): ConsultationView[] {
   const out: ConsultationView[] = [];
@@ -1180,6 +1201,11 @@ export function unassigned(recs: Recommendation[]): Recommendation[] {
 /** The label for a recommendation's owning Chair (or an honest "Unassigned"). */
 export function ownerLabel(rec: Recommendation): string {
   return rec.ownerChairId ? (getChair(rec.ownerChairId)?.title ?? rec.ownerChairId) : 'Unassigned';
+}
+
+/** A Chair's institutional title from its Register id (falls back to the raw id). */
+export function chairLabel(chairId: string | null | undefined): string {
+  return chairId ? (getChair(chairId)?.title ?? chairId) : 'Unassigned';
 }
 
 /** The label for a recommendation's Founder decision. */

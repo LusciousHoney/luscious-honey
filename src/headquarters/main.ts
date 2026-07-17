@@ -74,12 +74,17 @@ import {
   growthQueue, growthAccept, growthStrategy, growthResearch, growthCampaignPlanning,
   growthReadyToLaunch, growthActive, growthMeasuring, growthComplete, growthReturn,
   growthRequestClarification, growthStageLabel, isGrowthEligible, growthStanding,
+  // Sprint 12H — The Brokerage (office view over the 12G collaboration model)
+  pendingHandoffProposals, handoffsAwaitingAcceptance, handoffsReturnedToOffice,
+  unansweredConsultations, collaborationHistory,
+  authorizeHandoff, withdrawHandoff, chairLabel, OFFICE_BROKER,
+  type HandoffView, type ConsultationView, type CollaborationEvent, type CollaborationResult, type CollaborationDenial,
   SUBMISSION_TYPES, PRIORITIES, TRIAGE_OUTCOMES,
   recStatusLabel, priorityLabel, ownerLabel, typeLabel as recTypeLabel, visibilityLabel,
   triageStateLabel,
   type Recommendation, type SubmissionType, type Priority, type TriageOutcome,
 } from './chief-of-staff-ops.ts';
-import { CHAIRS as EXECUTIVE_CHAIRS } from './executive-register.ts';
+import { CHAIRS as EXECUTIVE_CHAIRS, CHAIR_CHIEF_OF_STAFF } from './executive-register.ts';
 
 /* --- small helpers ------------------------------------------------------- */
 
@@ -1327,6 +1332,7 @@ function cosSectionView(section: CosSectionId, repaint: () => void): HTMLElement
     case 'inbox':      return cosInbox(repaint);
     case 'decisions':  return cosDecisions(repaint);
     case 'docket':     return cosDocket();
+    case 'brokerage':  return cosBrokerage(repaint);
     case 'chairs':     return cosChairs();
     case 'leadership': return cosLeadership();
     case 'archive':    return cosArchive();
@@ -1954,6 +1960,258 @@ function cosDocket(): HTMLElement {
   return el('div', { class: 'hq-cos__section' },
     cosIntro('Docket', 'The active questions before the House — matters that want leadership consideration, not tasks to complete.'),
     list);
+}
+
+/* --- 3d. THE BROKERAGE — the office's collaboration desk (Sprint 12H) -------
+   The Chief of Staff's surface for brokering Chair-to-Chair collaboration built on
+   the 12G model: four honest queues over the pure derived views, office actions
+   that only ever call the guarded collaboration functions, and a compact history
+   from the append-only trail. No messaging, no new store — the office disposes.
+   "The Chair proposes; the office disposes." ------------------------------- */
+
+interface BrokerageNotice { kind: 'ok' | 'error'; text: string; }
+/** The last brokerage action's outcome, shown in the section's live region. Held
+    at module scope so it survives the section repaint; cleared on the next action. */
+let brokerageNotice: BrokerageNotice | null = null;
+
+/** Human, calm wording for each guard refusal — never a raw reason code. */
+function collaborationDenialText(reason: CollaborationDenial): string {
+  const map: Record<CollaborationDenial, string> = {
+    unknown_chair: 'That Chair is not on the Register.',
+    self_handoff: 'A Chair cannot hand work to itself.',
+    self_consultation: 'A Chair cannot consult itself.',
+    not_owner: 'Only the Chair that owns the work may do that.',
+    record_not_collaborable: 'This work is not in a state the office can broker right now.',
+    existing_open_handoff: 'There is already an open handoff on this work.',
+    handoff_not_found: 'That handoff could no longer be found.',
+    handoff_wrong_state: 'That handoff has already moved on.',
+    not_authorized: 'The office must authorize this before it can move.',
+    not_receiving_chair: 'Only the receiving Chair may answer for that handoff.',
+    not_proposer_or_office: 'Only the proposing Chair or the office may withdraw this.',
+    consultation_not_found: 'That consultation could no longer be found.',
+    consultation_wrong_state: 'That consultation has already been answered or withdrawn.',
+    not_consulted_chair: 'Only the consulted Chair may answer.',
+    empty_question: 'A consultation needs a question.',
+    empty_answer: 'An answer cannot be empty.',
+  };
+  return map[reason] ?? 'That action could not be completed.';
+}
+
+/** The Chairs the office may route work to — every established Chair except the
+    office itself, derived from the Register (never hardcoded). */
+function receivingChairs(): { id: string; title: string }[] {
+  return EXECUTIVE_CHAIRS
+    .filter((c) => c.id !== CHAIR_CHIEF_OF_STAFF && c.status === 'established')
+    .map((c) => ({ id: c.id, title: c.title }));
+}
+
+function cosBrokerage(repaint: () => void): HTMLElement {
+  const recs = loadRecommendations();
+  const proposed = pendingHandoffProposals(recs);
+  const awaiting = handoffsAwaitingAcceptance(recs);
+  const returned = handoffsReturnedToOffice(recs);
+  const consultations = unansweredConsultations(recs);
+
+  const persist = (next: Recommendation): void => {
+    saveRecommendations(upsertRecommendation(loadRecommendations(), next));
+  };
+  // Run a guarded collaboration action; show explicit success/failure, then repaint.
+  const act = (okText: string, fn: () => CollaborationResult): void => {
+    const res = fn();
+    if (res.ok) { persist(res.rec); brokerageNotice = { kind: 'ok', text: okText }; }
+    else { brokerageNotice = { kind: 'error', text: collaborationDenialText(res.reason) }; }
+    repaint();
+  };
+  // Lifecycle re-brokering after a decline (route/hold/withdraw) returns a record.
+  const actRec = (okText: string, fn: () => Recommendation): void => {
+    persist(fn()); brokerageNotice = { kind: 'ok', text: okText }; repaint();
+  };
+
+  const section = el('div', { class: 'hq-cos__section' },
+    cosIntro('The Brokerage', 'Where the office brokers collaboration between the Chairs. The Chair proposes; the office disposes — every transfer is authorized and recorded here.'));
+
+  // The live region — announces the outcome of the last action to everyone.
+  const notice = el('p', { class: 'hq-cos__notice', role: 'status', 'aria-live': 'polite' });
+  if (brokerageNotice) {
+    notice.classList.add(brokerageNotice.kind === 'ok' ? 'is-ok' : 'is-error');
+    notice.append(
+      el('span', { class: 'hq-cos__notice-mark', 'aria-hidden': 'true' }, brokerageNotice.kind === 'ok' ? '✓' : '!'),
+      el('span', {}, brokerageNotice.text));
+  }
+  section.append(notice);
+
+  section.append(
+    brokerageBlock('Proposed Handoffs', 'Handoffs a Chair has proposed, awaiting the office to authorize.',
+      proposed, 'No handoffs are awaiting your authorization.',
+      (v) => proposedHandoffCard(v, act)),
+    brokerageBlock('Awaiting Acceptance', 'Authorized by the office — with the receiving Chair now.',
+      awaiting, 'Nothing is waiting on a receiving Chair.',
+      (v) => awaitingHandoffCard(v)),
+    brokerageBlock('Returned to the Office', 'Declined by the receiving Chair and back with the office to re-broker.',
+      returned, 'No declined work is waiting on the office.',
+      (v) => returnedHandoffCard(v, act, actRec)),
+    brokerageConsultations(consultations),
+  );
+  return section;
+}
+
+/** A titled queue block with a live count and an honest empty state. */
+function brokerageBlock<T>(
+  title: string, note: string, items: T[], emptyText: string, render: (item: T) => HTMLElement,
+): HTMLElement {
+  const block = el('section', { class: 'hq-cos__block' },
+    el('div', { class: 'hq-cos__block-head' },
+      el('h2', { class: 'hq-cos__block-title' }, title),
+      el('span', { class: 'hq-cos__count', 'aria-label': `${items.length} in this queue` }, String(items.length))),
+    el('p', { class: 'hq-cos__block-note' }, note));
+  if (items.length === 0) {
+    block.append(el('p', { class: 'hq-cos__quiet' }, emptyText));
+  } else {
+    const list = el('div', { class: 'hq-cos__decisions' });
+    for (const item of items) list.append(render(item));
+    block.append(list);
+  }
+  return block;
+}
+
+/** Shared context lines for a handoff card. */
+function handoffContext(v: HandoffView): HTMLElement {
+  const r = v.rec; const h = v.handoff;
+  const card = el('article', { class: 'hq-cos__decision' });
+  card.append(
+    el('div', { class: 'hq-cos__chair-head' },
+      el('h3', { class: 'hq-cos__decision-title' }, r.title),
+      el('span', { class: 'hq-cos__tag label', 'data-status': r.priority }, priorityLabel(r.priority))),
+    el('p', { class: 'hq-cos__decision-summary' },
+      `${chairLabel(h.fromChairId)} → ${chairLabel(h.toChairId)} · ${recTypeLabel(r)} · ${recStatusLabel(r.status)}${r.blocked ? ' · Blocked' : ''}`),
+    el('p', { class: 'hq-cos__decision-summary' },
+      `Owner ${ownerLabel(r)} · proposed ${formatWhen(h.createdAt)}${r.founderDecision !== 'pending' ? ` · Founder: ${decisionLabel(r)}` : ''}${h.fromStageAtProposal ? ` · from stage: ${h.fromStageAtProposal}` : ''}`),
+    el('p', { class: 'hq-cos__field-label label' }, `#${r.id}`),
+  );
+  if (h.reason) card.append(cosField('Purpose', h.reason));
+  if (h.declineReason) card.append(cosField('Reason returned', h.declineReason));
+  return card;
+}
+
+function proposedHandoffCard(v: HandoffView, act: (t: string, f: () => CollaborationResult) => void): HTMLElement {
+  const card = handoffContext(v);
+  const group = el('div', { class: 'hq-cos__responses', role: 'group', 'aria-label': `Broker the handoff of “${v.rec.title}”` });
+  const button = (label: string, cls: string, run: () => void): void => {
+    const b = el('button', { class: cls, type: 'button' }, label) as HTMLButtonElement;
+    b.addEventListener('click', run);
+    group.append(b);
+  };
+  button('Authorize Handoff', 'hq-cos__response', () =>
+    act(`Authorized — ${chairLabel(v.handoff.toChairId)} may now accept.`, () => authorizeHandoff(v.rec, v.handoff.id)));
+  button('Decline Proposal', 'hq-cos__withdraw', () =>
+    act('Proposal declined; the work stays where it is.', () => withdrawHandoff(v.rec, v.handoff.id, OFFICE_BROKER)));
+  card.append(group, historyDetails(v.rec));
+  return card;
+}
+
+function awaitingHandoffCard(v: HandoffView): HTMLElement {
+  const card = handoffContext(v);
+  card.append(el('p', { class: 'hq-cos__quiet' },
+    `Authorized ${v.handoff.authorizedAt ? formatWhen(v.handoff.authorizedAt) : ''} — now with ${chairLabel(v.handoff.toChairId)}. Acceptance happens in the receiving Chair's room; the office does not accept on a Chair's behalf.`));
+  card.append(historyDetails(v.rec));
+  return card;
+}
+
+function returnedHandoffCard(
+  v: HandoffView,
+  _act: (t: string, f: () => CollaborationResult) => void,
+  actRec: (t: string, f: () => Recommendation) => void,
+): HTMLElement {
+  const card = handoffContext(v);
+  const r = v.rec;
+  const group = el('div', { class: 'hq-cos__responses', role: 'group', 'aria-label': `Re-broker “${r.title}”` });
+
+  // Route to another Chair — the office assigns the unowned, declined work.
+  const selectId = `route_${r.id.replace(/[^a-z0-9]/gi, '')}`;
+  const select = el('select', { class: 'hq-cos__select', id: selectId }) as HTMLSelectElement;
+  for (const c of receivingChairs()) select.append(el('option', { value: c.id }, c.title));
+  const routeBtn = el('button', { class: 'hq-cos__response', type: 'button' }, 'Route to Chair') as HTMLButtonElement;
+  routeBtn.addEventListener('click', () => {
+    const to = select.value;
+    actRec(`Routed to ${chairLabel(to)}.`, () => advance(routeRecommendation(r, to), 'executing'));
+  });
+  const routeField = el('div', { class: 'hq-cos__route-field' },
+    el('label', { class: 'hq-cos__note-input-label label', for: selectId }, 'Route the returned work to'),
+    el('div', { class: 'hq-cos__route-row' }, select, routeBtn));
+
+  const holdBtn = el('button', { class: 'hq-cos__withdraw', type: 'button' }, 'Hold for now') as HTMLButtonElement;
+  holdBtn.addEventListener('click', () => actRec('Held by the office.', () => advance(r, 'held')));
+  const withdrawBtn = el('button', { class: 'hq-cos__withdraw', type: 'button' }, 'Withdraw the work') as HTMLButtonElement;
+  withdrawBtn.addEventListener('click', () => actRec('Withdrawn from the active record.', () => advance(r, 'withdrawn')));
+  group.append(holdBtn, withdrawBtn);
+
+  card.append(routeField, group, historyDetails(r));
+  return card;
+}
+
+function brokerageConsultations(views: ConsultationView[]): HTMLElement {
+  const block = el('section', { class: 'hq-cos__block' },
+    el('div', { class: 'hq-cos__block-head' },
+      el('h2', { class: 'hq-cos__block-title' }, 'Open Consultations'),
+      el('span', { class: 'hq-cos__count', 'aria-label': `${views.length} in this queue` }, String(views.length))),
+    el('p', { class: 'hq-cos__block-note' }, 'A Chair has asked another a focused question; the answer is awaited.'));
+  if (views.length === 0) {
+    block.append(el('p', { class: 'hq-cos__quiet' }, 'No consultations are open.'));
+    return block;
+  }
+  const list = el('div', { class: 'hq-cos__decisions' });
+  for (const v of views) {
+    const c = v.consultation;
+    const card = el('article', { class: 'hq-cos__decision' },
+      el('div', { class: 'hq-cos__chair-head' },
+        el('h3', { class: 'hq-cos__decision-title' }, v.rec.title),
+        el('span', { class: 'hq-cos__tag label' }, 'Awaiting answer')),
+      el('p', { class: 'hq-cos__decision-summary' },
+        `${chairLabel(c.owningChairId)} asked ${chairLabel(c.consultedChairId)} · requested ${formatWhen(c.requestedAt)}`),
+      cosField('Question', c.question),
+      el('p', { class: 'hq-cos__quiet' },
+        `Awaiting ${chairLabel(c.consultedChairId)}'s answer, which is recorded in that Chair's room. The office is not a message channel.`),
+      historyDetails(v.rec));
+    list.append(card);
+  }
+  block.append(list);
+  return block;
+}
+
+/** A compact, collapsible collaboration history for one record — straight from the
+    append-only annotations, never a second log. */
+function historyDetails(rec: Recommendation): HTMLElement {
+  const events = collaborationHistory(rec);
+  const details = el('details', { class: 'hq-cos__history' });
+  details.append(el('summary', { class: 'hq-cos__history-summary' }, `Collaboration history (${events.length})`));
+  if (events.length === 0) {
+    details.append(el('p', { class: 'hq-cos__quiet' }, 'No collaboration recorded yet.'));
+    return details;
+  }
+  const ol = el('ol', { class: 'hq-cos__history-list' });
+  for (const e of events) ol.append(el('li', { class: 'hq-cos__history-item' },
+    el('span', { class: 'hq-cos__history-when' }, formatWhen(e.at)),
+    el('span', {}, collaborationEventLine(e))));
+  details.append(ol);
+  return details;
+}
+
+function collaborationEventLine(e: CollaborationEvent): string {
+  if (e.kind === 'handoff' && e.handoff) {
+    const h = e.handoff;
+    const verb: Record<string, string> = {
+      proposed: 'Handoff proposed', authorized: 'Handoff authorized by the office',
+      accepted: 'Handoff accepted — ownership moved', declined: 'Handoff declined — returned to the office',
+      withdrawn: 'Handoff withdrawn',
+    };
+    return `${verb[h.status] ?? 'Handoff'} · ${chairLabel(h.fromChairId)} → ${chairLabel(h.toChairId)}`;
+  }
+  if (e.kind === 'consultation' && e.consultation) {
+    const c = e.consultation;
+    const verb: Record<string, string> = { open: 'Consultation requested', answered: 'Consultation answered', withdrawn: 'Consultation withdrawn' };
+    return `${verb[c.status] ?? 'Consultation'} · ${chairLabel(c.owningChairId)} ↔ ${chairLabel(c.consultedChairId)}`;
+  }
+  return 'Collaboration event';
 }
 
 /* --- 4. Open Chairs — derived from the Executive Register ----------------- */

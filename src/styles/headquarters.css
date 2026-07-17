@@ -1367,6 +1367,65 @@
 }
 .hq-cos__withdraw:hover, .hq-cos__withdraw:focus-visible { color: var(--terracotta); outline: none; }
 
+/* The Brokerage (Sprint 12H) — the office's collaboration desk. Reuses the plaster
+   decision cards; adds only a live region, queue heads, a route control, and a
+   collapsible history. No redesign of the workspace. */
+.hq-cos__notice:empty { display: none; }
+.hq-cos__notice {
+  display: flex; align-items: baseline; gap: var(--s-2);
+  font-family: var(--sans); font-size: var(--fs-body-sm); line-height: 1.45;
+  padding: var(--s-3) var(--s-4); border-radius: var(--radius);
+  border: 1px solid var(--hq-brass-hair); color: var(--hq-ink);
+}
+.hq-cos__notice.is-ok { border-color: var(--brass); }
+.hq-cos__notice.is-error { border-color: var(--terracotta); }
+.hq-cos__notice-mark {
+  font-weight: 700; line-height: 1;
+  width: 1.3em; height: 1.3em; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px; font-size: 0.85em;
+}
+.hq-cos__notice.is-ok .hq-cos__notice-mark { color: var(--brass); border: 1px solid var(--brass); }
+.hq-cos__notice.is-error .hq-cos__notice-mark { color: var(--terracotta); border: 1px solid var(--terracotta); }
+
+.hq-cos__block-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--s-3); flex-wrap: wrap;
+}
+.hq-cos__count {
+  font-family: var(--sans); font-size: var(--fs-label); letter-spacing: 0.04em;
+  color: var(--umber); min-width: 1.8em; text-align: center;
+  padding: 2px 8px; border: 1px solid var(--hq-brass-hair); border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+.hq-cos__block-note {
+  font-family: var(--serif); font-style: italic; font-size: var(--fs-body-sm);
+  color: var(--umber); margin: 0; max-width: 60ch;
+}
+.hq-cos__route-field { display: grid; gap: var(--s-2); }
+.hq-cos__route-row { display: flex; gap: var(--s-2); flex-wrap: wrap; align-items: center; }
+.hq-cos__select {
+  font-family: var(--sans); font-size: var(--fs-label); color: var(--hq-ink);
+  background: transparent; min-height: 44px; padding: 8px var(--s-3);
+  border: 1px solid var(--hq-brass-hair); border-radius: var(--radius); cursor: pointer;
+}
+.hq-cos__select:focus-visible { border-color: var(--brass); outline: none; }
+
+.hq-cos__history { margin-top: var(--s-1); }
+.hq-cos__history-summary {
+  font-family: var(--sans); font-size: var(--fs-label); letter-spacing: 0.03em;
+  color: var(--umber); cursor: pointer; padding: 4px 0;
+}
+.hq-cos__history-summary:focus-visible { outline: none; color: var(--brass); }
+.hq-cos__history-list {
+  list-style: none; margin: var(--s-2) 0 0; padding: 0; display: grid; gap: 6px;
+}
+.hq-cos__history-item {
+  display: grid; grid-template-columns: minmax(6.5em, auto) 1fr; gap: var(--s-2);
+  font-family: var(--serif); font-size: var(--fs-body-sm); line-height: 1.4; color: var(--hq-ink);
+}
+.hq-cos__history-when { color: var(--umber); font-family: var(--sans); font-size: var(--fs-label); }
+
 /* Docket & Chairs — plaster cards with a quiet status tag. */
 .hq-cos__docket, .hq-cos__chairs { display: grid; gap: var(--s-4); }
 .hq-cos__docket-item, .hq-cos__chair {
