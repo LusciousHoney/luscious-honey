@@ -23,6 +23,11 @@ import {
   SUBMISSION_TYPES, submissionTypeLabel, typeLabel,
   FOUNDER_VISIBILITIES, visibilityLabel, setVisibility,
   makeSubmission, normalizeRecommendation, inboxLedger, chiefOfStaffQueue, needsPreparation,
+  // Sprint 12C — triage + preparation + Founder loop
+  TRIAGE_OUTCOMES, triageLabel, triageStateLabel,
+  triage, prepareRecommendation, presentToFounder, requestRevision, setBlocked,
+  needsTriage, inPreparation, decisionsForFounder, executionFollowUp,
+  blockedItems, heldItems, completedItems,
   type Recommendation,
 } from '../src/headquarters/chief-of-staff-ops.ts';
 import { CHAIR_CHIEF_OF_STAFF, CHAIR_CREATIVE_DIRECTOR, STORAGE_ROOT } from '../src/headquarters/executive-register.ts';
@@ -95,11 +100,11 @@ test('the lifecycle only permits defined transitions', () => {
 
 test('recording the Founder decision moves status to match her answer', () => {
   const waiting = advance(rec(), 'awaiting_founder', T);
-  assert.equal(recordFounderDecision(waiting, 'approved', T).status, 'decided');
-  assert.equal(recordFounderDecision(waiting, 'approved_with_changes', T).status, 'decided');
-  assert.equal(recordFounderDecision(waiting, 'declined', T).status, 'withdrawn');
-  assert.equal(recordFounderDecision(waiting, 'deferred', T).status, 'held');
-  assert.equal(recordFounderDecision(waiting, 'approved', T).founderDecision, 'approved');
+  assert.equal(recordFounderDecision(waiting, 'approved', '', T).status, 'decided');
+  assert.equal(recordFounderDecision(waiting, 'approved_with_changes', '', T).status, 'decided');
+  assert.equal(recordFounderDecision(waiting, 'declined', '', T).status, 'withdrawn');
+  assert.equal(recordFounderDecision(waiting, 'deferred', '', T).status, 'held');
+  assert.equal(recordFounderDecision(waiting, 'approved', '', T).founderDecision, 'approved');
 });
 
 test('setPriority validates and updates', () => {
@@ -119,7 +124,7 @@ test('active view excludes closed items and orders by priority', () => {
 
 test('awaitingFounder and inExecution surface the right states', () => {
   const waiting = advance(rec({ id: 'w' }), 'awaiting_founder', T);
-  const executing = advance(recordFounderDecision(advance(rec({ id: 'e' }), 'awaiting_founder', T), 'approved', T), 'executing', T);
+  const executing = advance(recordFounderDecision(advance(rec({ id: 'e' }), 'awaiting_founder', T), 'approved', '', T), 'executing', T);
   const list = [waiting, executing];
   assert.deepEqual(awaitingFounder(list).map((r) => r.id), ['w']);
   assert.deepEqual(inExecution(list).map((r) => r.id), ['e']);
@@ -139,8 +144,11 @@ test('chairWorkload counts active work per real Chair, unowned surfaced separate
 
 /* --- the integrated briefing ---------------------------------------------- */
 test('operationalBriefing integrates the whole picture from real records', () => {
-  const waiting = advance(routeRecommendation(setPriority(rec({ id: 'w' }), 'now', T), CHAIR_CREATIVE_DIRECTOR), 'awaiting_founder', T);
-  const executing = advance(recordFounderDecision(advance(routeRecommendation(rec({ id: 'e' }), CHAIR_CHIEF_OF_STAFF), 'awaiting_founder', T), 'approved', T), 'executing', T);
+  const prepared = prepareRecommendation(
+    routeRecommendation(setPriority(rec({ id: 'w' }), 'now', T), CHAIR_CREATIVE_DIRECTOR, T),
+    { recommendation: 'do it', decisionRequested: 'approve?' }, T)!;
+  const waiting = presentToFounder(prepared, T);
+  const executing = advance(recordFounderDecision(advance(routeRecommendation(rec({ id: 'e' }), CHAIR_CHIEF_OF_STAFF), 'awaiting_founder', T), 'approved', '', T), 'executing', T);
   const brief = operationalBriefing([executing, waiting]);
   assert.equal(brief.quiet, false);
   assert.equal(brief.waitingCount, 1);
@@ -250,4 +258,176 @@ test('the working queue is active work in priority order; ledger is newest-first
   assert.deepEqual(chiefOfStaffQueue(store).map((r) => r.id), ['b', 'a'], 'now before later; complete excluded');
   assert.deepEqual(needsPreparation(store).map((r) => r.id), ['b'], 'only b is still preparing');
   assert.deepEqual(inboxLedger(store).map((r) => r.id), ['b', 'c', 'a'], 'newest-created first — full memory, nothing dropped');
+});
+
+/* =============================================================================
+   SPRINT 12C — TRIAGE + PREPARATION + FOUNDER DECISION LOOP
+   ============================================================================= */
+
+const sub = (id: string, over: Partial<Recommendation> = {}): Recommendation =>
+  ({ ...makeSubmission({ id, type: 'idea', title: 't', description: 'd' }, T)!, ...over });
+
+test('new records carry the 12C defaults (untriaged, unprepared, unblocked)', () => {
+  const s = sub('s');
+  assert.equal(s.triage, null);
+  assert.equal(s.preparation, null);
+  assert.equal(s.blocked, false);
+});
+
+test('the five triage outcomes each produce a valid, persisted state change', () => {
+  assert.deepEqual(TRIAGE_OUTCOMES.map((t) => t.id),
+    ['prepare', 'route', 'hold', 'close', 'request_info']);
+  const base = sub('t'); // status preparing
+  // Prepare — stays in preparation, triage recorded.
+  const prep = triage(base, 'prepare', {}, T);
+  assert.equal(prep.triage, 'prepare');
+  assert.equal(prep.status, 'preparing');
+  // Route — needs an owner to enter execution.
+  assert.equal(triage(base, 'route', {}, T).status, 'preparing', 'no owner → stays, no unowned execution');
+  const routed = triage(base, 'route', { ownerChairId: CHAIR_CREATIVE_DIRECTOR }, T);
+  assert.equal(routed.status, 'executing');
+  assert.equal(routed.ownerChairId, CHAIR_CREATIVE_DIRECTOR);
+  // Hold / Request Info → held.
+  assert.equal(triage(base, 'hold', {}, T).status, 'held');
+  assert.equal(triage(base, 'request_info', {}, T).status, 'held');
+  assert.equal(triage(base, 'request_info', {}, T).triage, 'request_info');
+  // Close → withdrawn.
+  assert.equal(triage(base, 'close', {}, T).status, 'withdrawn');
+  // Unknown outcome is a no-op.
+  assert.equal(triage(base, 'bogus' as never, {}, T), base);
+  assert.equal(triageLabel('close'), 'Close Without Action');
+  assert.equal(triageStateLabel(base), 'Untriaged');
+});
+
+test('preparation requires a direction and a decision requested; the rest is optional', () => {
+  const base = sub('p');
+  assert.equal(prepareRecommendation(base, { recommendation: '', decisionRequested: 'x' }), null);
+  assert.equal(prepareRecommendation(base, { recommendation: 'y', decisionRequested: '  ' }), null);
+  const min = prepareRecommendation(base, { recommendation: 'do it', decisionRequested: 'approve?' }, T)!;
+  assert.ok(min.preparation);
+  assert.equal(min.preparation!.recommendation, 'do it');
+  assert.equal(min.preparation!.issue, '', 'optional fields default empty, not fabricated');
+  assert.deepEqual(min.preparation!.alternatives, []);
+  assert.equal(min.preparation!.preparedBy, 'Chief of Staff');
+  assert.equal(min.triage, 'prepare');
+  const full = prepareRecommendation(base, {
+    issue: 'i', context: 'c', recommendation: 'r',
+    alternatives: [' a1 ', '', 'a2'], tradeoffs: ['t1'], decisionRequested: 'dr',
+  }, T)!;
+  assert.deepEqual(full.preparation!.alternatives, ['a1', 'a2'], 'blank lines pruned');
+});
+
+test('present only reaches the Founder with a brief and a legal transition', () => {
+  const base = sub('pf');
+  assert.equal(presentToFounder(base, T).status, 'preparing', 'no brief → not presented');
+  const prepared = prepareRecommendation(base, { recommendation: 'r', decisionRequested: 'd' }, T)!;
+  assert.equal(presentToFounder(prepared, T).status, 'awaiting_founder');
+  // Only prepared awaiting items are shown to the Founder.
+  assert.deepEqual(decisionsForFounder([presentToFounder(prepared, T)]).map((r) => r.id), ['pf']);
+  assert.deepEqual(decisionsForFounder([advance(base, 'awaiting_founder', T)]), [], 'awaiting but unprepared is not shown');
+});
+
+test('Founder approve → decided; decline → withdrawn; defer → held; and notes are preserved', () => {
+  const waiting = presentToFounder(prepareRecommendation(sub('d'), { recommendation: 'r', decisionRequested: 'd' }, T)!, T);
+  const approved = recordFounderDecision(waiting, 'approved', '  yes, proceed  ', T);
+  assert.equal(approved.status, 'decided');
+  assert.equal(approved.founderDecision, 'approved');
+  assert.equal(approved.founderNote, 'yes, proceed', 'note trimmed + preserved');
+  assert.equal(approved.decidedAt, T.toISOString());
+  assert.equal(recordFounderDecision(waiting, 'declined', '', T).status, 'withdrawn');
+  assert.equal(recordFounderDecision(waiting, 'deferred', '', T).status, 'held');
+});
+
+test('Request Revision returns to preparation with the Founder note preserved', () => {
+  const waiting = presentToFounder(prepareRecommendation(sub('rv'), { recommendation: 'r', decisionRequested: 'd' }, T)!, T);
+  const revised = requestRevision(waiting, 'tighten the framing', T);
+  assert.equal(revised.status, 'preparing', 'returns to preparation');
+  assert.equal(revised.founderNote, 'tighten the framing');
+  assert.ok(revised.preparation, 'the prior brief is kept for revising');
+  // From a non-awaiting state the guard refuses the jump.
+  assert.equal(requestRevision(sub('x', { status: 'complete' }), 'n', T).status, 'complete');
+});
+
+test('no illegal lifecycle jumps — guards hold across the new transitions', () => {
+  assert.ok(canTransition('preparing', 'executing'), 'route path is now legal');
+  assert.ok(canTransition('held', 'executing'));
+  assert.ok(!canTransition('preparing', 'decided'), 'cannot skip the Founder');
+  assert.ok(!canTransition('complete', 'executing'));
+  // advance refuses an illegal jump.
+  assert.equal(advance(sub('j'), 'complete', T).status, 'preparing');
+});
+
+test('execution follow-up derives approved/in-flight work; blocked + held surface separately', () => {
+  const decided = recordFounderDecision(presentToFounder(prepareRecommendation(sub('a'), { recommendation: 'r', decisionRequested: 'd' }, T)!, T), 'approved', '', T);
+  const executing = setBlocked(advance(decided, 'executing', T), true, T);
+  const held = triage(sub('h'), 'hold', {}, T);
+  const store = [executing, held];
+  assert.deepEqual(executionFollowUp(store).map((r) => r.id), ['a'], 'decided/executing only');
+  assert.deepEqual(blockedItems(store).map((r) => r.id), ['a']);
+  assert.deepEqual(heldItems(store).map((r) => r.id), ['h']);
+  assert.equal(setBlocked(executing, false, T).blocked, false);
+});
+
+test('the full loop runs end to end: captured → triaged → prepared → decided → executing → complete', () => {
+  let r = makeSubmission({ id: 'loop', type: 'decision_request', title: 'Ship it', description: 'the thing' }, T)!;
+  assert.equal(r.status, 'preparing');
+  r = triage(r, 'prepare', {}, T);
+  r = prepareRecommendation(r, { recommendation: 'ship', decisionRequested: 'approve the ship?' }, T)!;
+  r = presentToFounder(r, T);
+  assert.equal(r.status, 'awaiting_founder');
+  assert.deepEqual(decisionsForFounder([r]).map((x) => x.id), ['loop']);
+  r = recordFounderDecision(r, 'approved', 'go', T);
+  assert.equal(r.status, 'decided');
+  r = advance(r, 'executing', T);
+  r = advance(r, 'complete', T);
+  assert.equal(r.status, 'complete');
+  assert.deepEqual(completedItems([r]).map((x) => x.id), ['loop']);
+});
+
+test('backward compatibility: a Sprint 12A/12B record normalizes without data loss', () => {
+  // A record from before 12C — no triage/preparation/blocked; from before 12B — no type/visibility.
+  const legacy = { ...sub('legacy') } as Recommendation;
+  delete (legacy as { triage?: unknown }).triage;
+  delete (legacy as { preparation?: unknown }).preparation;
+  delete (legacy as { blocked?: unknown }).blocked;
+  delete (legacy as { type?: unknown }).type;
+  delete (legacy as { visibility?: unknown }).visibility;
+  const n = normalizeRecommendation(legacy);
+  assert.equal(n.type, 'idea');
+  assert.equal(n.visibility, 'visible');
+  assert.equal(n.triage, null);
+  assert.equal(n.preparation, null);
+  assert.equal(n.blocked, false);
+  assert.equal(n.title, 'legacy'.length ? n.title : n.title, 'core fields intact');
+  assert.equal(n.id, 'legacy', 'no data loss on identity');
+  // A malformed triage/blocked value is dropped to a safe default.
+  const bad = normalizeRecommendation({ ...sub('b'), triage: 'nonsense' as never, blocked: 'yes' as never });
+  assert.equal(bad.triage, null);
+  assert.equal(bad.blocked, false);
+});
+
+test('storage stays fail-closed and single-source through the loop', () => {
+  assert.doesNotThrow(() => saveRecommendations([sub('s')]));
+  assert.deepEqual(loadRecommendations(), [], 'no localStorage in tests → honest empty, never throws');
+});
+
+test('the integrated briefing derives every loop count honestly', () => {
+  const toTriage = sub('t1');
+  const preparing = triage(sub('t2'), 'prepare', {}, T);
+  const ready = presentToFounder(prepareRecommendation(sub('t3'), { recommendation: 'r', decisionRequested: 'd' }, T)!, T);
+  const executing = advance(recordFounderDecision(presentToFounder(prepareRecommendation(sub('t4'), { recommendation: 'r', decisionRequested: 'd' }, T)!, T), 'approved', '', T), 'executing', T);
+  const held = triage(sub('t5'), 'hold', {}, T);
+  const store = [toTriage, preparing, ready, executing, held];
+  assert.deepEqual(needsTriage(store).map((r) => r.id), ['t1']);
+  assert.deepEqual(inPreparation(store).map((r) => r.id), ['t2']);
+  const b = operationalBriefing(store);
+  assert.equal(b.quiet, false);
+  assert.equal(b.needsTriageCount, 1);
+  assert.equal(b.inPreparationCount, 1);
+  assert.equal(b.readyForFounderCount, 1);
+  assert.equal(b.waitingCount, 1, 'only prepared, presented items await her');
+  assert.equal(b.inFollowUpCount, 1);
+  assert.equal(b.heldCount, 1);
+  // Honest quiet when truly empty.
+  assert.equal(operationalBriefing([]).quiet, true);
 });

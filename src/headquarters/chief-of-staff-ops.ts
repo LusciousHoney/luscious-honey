@@ -82,12 +82,14 @@ export function isActiveStatus(id: RecStatus): boolean { return !!REC_STATUS_BY_
 
 /** The permitted progressions — the lifecycle can never jump arbitrarily. */
 const TRANSITIONS: Record<RecStatus, RecStatus[]> = {
-  preparing:        ['awaiting_founder', 'held', 'withdrawn'],
+  // 'executing' added to preparing/held so the Chief of Staff can route work
+  // straight to a Chair (Route for Executive Work) without a Founder decision.
+  preparing:        ['awaiting_founder', 'executing', 'held', 'withdrawn'],
   awaiting_founder: ['decided', 'preparing', 'held', 'withdrawn'],
   decided:          ['executing', 'complete', 'withdrawn'],
-  executing:        ['complete', 'held'],
+  executing:        ['complete', 'held', 'withdrawn'],
   complete:         [],
-  held:             ['preparing', 'awaiting_founder', 'withdrawn'],
+  held:             ['preparing', 'awaiting_founder', 'executing', 'withdrawn'],
   withdrawn:        [],
 };
 export function canTransition(from: RecStatus, to: RecStatus): boolean {
@@ -164,10 +166,61 @@ export interface Recommendation {
   visibility: FounderVisibility;
   /** The Founder's recorded decision (pending until she answers). */
   founderDecision: FounderDecision;
+  /** The Chief of Staff's triage outcome for this item, or null until triaged. */
+  triage: TriageOutcome | null;
+  /** The prepared decision brief, or null until the office prepares it. */
+  preparation: Preparation | null;
+  /** The Founder's note left with her decision or revision request, if any. */
+  founderNote?: string;
+  /** ISO datetime the Founder decided (or requested revision), if any. */
+  decidedAt?: string;
+  /** Whether the item is blocked in execution (a lightweight follow-up flag). */
+  blocked: boolean;
   /** ISO datetime created. */
   createdAt: string;
   /** ISO datetime last changed. */
   updatedAt: string;
+}
+
+/* -----------------------------------------------------------------------------
+   TRIAGE — the Chief of Staff's decision about what happens to an incoming item.
+   Triage is a routing intent recorded ALONGSIDE the lifecycle status (it is not a
+   second status system); each triage action also applies a real, guarded status
+   transition where one is warranted.
+   --------------------------------------------------------------------------- */
+export type TriageOutcome = 'prepare' | 'route' | 'hold' | 'close' | 'request_info';
+
+export interface TriageOutcomeKind { id: TriageOutcome; label: string; }
+export const TRIAGE_OUTCOMES: TriageOutcomeKind[] = [
+  { id: 'prepare',      label: 'Prepare for Founder Decision' },
+  { id: 'route',        label: 'Route for Executive Work' },
+  { id: 'hold',         label: 'Hold for Later' },
+  { id: 'close',        label: 'Close Without Action' },
+  { id: 'request_info', label: 'Request More Information' },
+];
+const TRIAGE_BY_ID = new Map(TRIAGE_OUTCOMES.map((t) => [t.id, t]));
+export function triageLabel(id: TriageOutcome): string { return TRIAGE_BY_ID.get(id)?.label ?? id; }
+
+/** The prepared decision brief — the Chief of Staff's work, so the Founder never
+    receives a raw problem. Only the recommended direction and the decision
+    requested are required; the rest are optional, to keep preparation concise. */
+export interface Preparation {
+  /** Concise issue summary (the decision title is the record's own title). */
+  issue: string;
+  /** Relevant context behind the decision. */
+  context: string;
+  /** The Chief of Staff's recommended direction (required). */
+  recommendation: string;
+  /** Meaningful alternatives, when there are any. */
+  alternatives: string[];
+  /** Risks or trade-offs, named honestly. */
+  tradeoffs: string[];
+  /** The single, specific decision requested of the Founder (required). */
+  decisionRequested: string;
+  /** ISO datetime prepared. */
+  preparedAt: string;
+  /** Who prepared it (the office). */
+  preparedBy: string;
 }
 
 /** Build a recommendation from a sketch. Requires a title and summary; defaults
@@ -192,6 +245,9 @@ export function makeRecommendation(
     status: 'preparing',
     visibility: input.visibility && VISIBILITY_BY_ID.has(input.visibility) ? input.visibility : DEFAULT_VISIBILITY,
     founderDecision: 'pending',
+    triage: null,
+    preparation: null,
+    blocked: false,
     createdAt: ts,
     updatedAt: ts,
   };
@@ -246,7 +302,7 @@ export function advance(rec: Recommendation, to: RecStatus, now: Date = new Date
     deferred → held; pending leaves it awaiting. The record is never fabricated —
     only the Founder's real answer is stored. */
 export function recordFounderDecision(
-  rec: Recommendation, decision: FounderDecision, now: Date = new Date(),
+  rec: Recommendation, decision: FounderDecision, note: string = '', now: Date = new Date(),
 ): Recommendation {
   const ts = now.toISOString();
   let status: RecStatus = rec.status;
@@ -254,7 +310,107 @@ export function recordFounderDecision(
   else if (decision === 'declined') status = 'withdrawn';
   else if (decision === 'deferred') status = 'held';
   else status = 'awaiting_founder';
-  return { ...rec, founderDecision: decision, status, updatedAt: ts };
+  const trimmed = note.trim();
+  return {
+    ...rec,
+    founderDecision: decision,
+    status,
+    founderNote: trimmed || undefined,
+    decidedAt: ts,
+    updatedAt: ts,
+  };
+}
+
+/* -----------------------------------------------------------------------------
+   TRIAGE + PREPARATION + FOUNDER LOOP (Sprint 12C) — the Chief of Staff turns raw
+   incoming work into a decision-ready recommendation, the Founder answers once,
+   and the office carries the result forward. All status changes go through the
+   guarded lifecycle; no invalid jump is ever made.
+   --------------------------------------------------------------------------- */
+
+/** Apply a triage outcome. Records the routing intent AND the matching guarded
+    status change: prepare keeps it in preparation; route (needs an owner) sends
+    it to a Chair to execute; hold/request_info park it; close withdraws it. An
+    illegal status move is refused, but the triage intent is still recorded. */
+export function triage(
+  rec: Recommendation, outcome: TriageOutcome,
+  opts: { ownerChairId?: string | null; note?: string } = {}, now: Date = new Date(),
+): Recommendation {
+  if (!TRIAGE_BY_ID.has(outcome)) return rec;
+  const ts = now.toISOString();
+  let next: Recommendation = { ...rec, triage: outcome, updatedAt: ts };
+  if (outcome === 'route') {
+    // Route only moves work into execution once it has a real owner — nothing
+    // enters execution unowned.
+    const owner = opts.ownerChairId ?? rec.ownerChairId;
+    if (owner && getChair(owner)) {
+      next = { ...next, ownerChairId: owner };
+      if (canTransition(next.status, 'executing')) next = { ...next, status: 'executing' };
+    }
+  } else if (outcome === 'prepare') {
+    // Stays in preparation (or returns there from held), ready for the brief.
+    if (rec.status === 'held' && canTransition('held', 'preparing')) next = { ...next, status: 'preparing' };
+  } else if (outcome === 'hold' || outcome === 'request_info') {
+    if (canTransition(next.status, 'held')) next = { ...next, status: 'held' };
+  } else if (outcome === 'close') {
+    if (canTransition(next.status, 'withdrawn')) next = { ...next, status: 'withdrawn' };
+  }
+  return next;
+}
+
+/** Attach a prepared decision brief. Requires a recommended direction and a
+    decision requested; the rest is optional to keep preparation concise. Returns
+    null if the required fields are empty (a clear failure the caller surfaces). */
+export function prepareRecommendation(
+  rec: Recommendation,
+  input: {
+    issue?: string; context?: string; recommendation: string;
+    alternatives?: string[]; tradeoffs?: string[]; decisionRequested: string; preparedBy?: string;
+  },
+  now: Date = new Date(),
+): Recommendation | null {
+  if (!input.recommendation.trim() || !input.decisionRequested.trim()) return null;
+  const ts = now.toISOString();
+  const clean = (xs?: string[]): string[] => (xs ?? []).map((s) => s.trim()).filter(Boolean);
+  const preparation: Preparation = {
+    issue: (input.issue ?? '').trim(),
+    context: (input.context ?? '').trim(),
+    recommendation: input.recommendation.trim(),
+    alternatives: clean(input.alternatives),
+    tradeoffs: clean(input.tradeoffs),
+    decisionRequested: input.decisionRequested.trim(),
+    preparedAt: ts,
+    preparedBy: (input.preparedBy || 'Chief of Staff').trim(),
+  };
+  return { ...rec, preparation, triage: 'prepare', updatedAt: ts };
+}
+
+/** Present a prepared item to the Founder — moves it to awaiting_founder. Only
+    succeeds when a brief exists and the transition is legal; otherwise unchanged. */
+export function presentToFounder(rec: Recommendation, now: Date = new Date()): Recommendation {
+  if (!rec.preparation) return rec;
+  if (!canTransition(rec.status, 'awaiting_founder')) return rec;
+  return { ...rec, status: 'awaiting_founder', updatedAt: now.toISOString() };
+}
+
+/** The Founder asks for a revision — returns the item to preparation with her
+    note preserved, so the office can revise. A guarded transition. */
+export function requestRevision(rec: Recommendation, note: string = '', now: Date = new Date()): Recommendation {
+  if (!canTransition(rec.status, 'preparing')) return rec;
+  const ts = now.toISOString();
+  const trimmed = note.trim();
+  return {
+    ...rec,
+    status: 'preparing',
+    founderNote: trimmed || rec.founderNote,
+    decidedAt: ts,
+    updatedAt: ts,
+  };
+}
+
+/** Set (or clear) the execution "blocked" follow-up flag. */
+export function setBlocked(rec: Recommendation, blocked: boolean, now: Date = new Date()): Recommendation {
+  return { ...rec, blocked, updatedAt: now.toISOString() };
 }
 
 /* -----------------------------------------------------------------------------
@@ -345,6 +501,49 @@ export function needsPreparation(recs: Recommendation[]): Recommendation[] {
   return activeRecommendations(recs).filter((r) => r.status === 'preparing');
 }
 
+/* --- Sprint 12C: the full loop's derived views ---------------------------- */
+
+/** Untriaged incoming work — the Chief of Staff has not yet decided its path. */
+export function needsTriage(recs: Recommendation[]): Recommendation[] {
+  return activeRecommendations(recs).filter((r) => r.status === 'preparing' && r.triage === null);
+}
+
+/** Triaged to a Founder decision and being prepared, not yet presented. */
+export function inPreparation(recs: Recommendation[]): Recommendation[] {
+  return activeRecommendations(recs).filter((r) => r.status === 'preparing' && r.triage === 'prepare');
+}
+
+/** Prepared decisions ready for the Founder — the ONLY items she should see. */
+export function decisionsForFounder(recs: Recommendation[]): Recommendation[] {
+  return awaitingFounder(recs).filter((r) => r.preparation !== null);
+}
+
+/** Approved work being carried out — the execution-follow-up view (decided or in
+    execution). The Founder never chases these; the Chief of Staff tracks them. */
+export function executionFollowUp(recs: Recommendation[]): Recommendation[] {
+  return activeRecommendations(recs).filter((r) => r.status === 'decided' || r.status === 'executing');
+}
+
+/** Active work flagged blocked in execution. */
+export function blockedItems(recs: Recommendation[]): Recommendation[] {
+  return activeRecommendations(recs).filter((r) => r.blocked);
+}
+
+/** Items deliberately held (parked or awaiting more information). */
+export function heldItems(recs: Recommendation[]): Recommendation[] {
+  return recs.filter((r) => r.status === 'held');
+}
+
+/** Completed work — kept for the record. */
+export function completedItems(recs: Recommendation[]): Recommendation[] {
+  return recs.filter((r) => r.status === 'complete');
+}
+
+/** The label for a recommendation's triage outcome (or "Untriaged"). */
+export function triageStateLabel(rec: Recommendation): string {
+  return rec.triage ? triageLabel(rec.triage) : 'Untriaged';
+}
+
 /* -----------------------------------------------------------------------------
    THE INTEGRATED OPERATIONAL BRIEFING — one honest picture for the Founder.
 
@@ -367,6 +566,19 @@ export interface OperationalBriefing {
   unassigned: Recommendation[];
   /** Per-Chair live workload. */
   workload: ChairWorkload[];
+  /* --- Sprint 12C: loop counts (summary only; the surfaces hold the detail). */
+  /** Untriaged incoming work the Chief of Staff must review. */
+  needsTriageCount: number;
+  /** Items being prepared into a decision brief. */
+  inPreparationCount: number;
+  /** Prepared decisions genuinely ready for the Founder. */
+  readyForFounderCount: number;
+  /** Approved work in follow-up (decided or executing). */
+  inFollowUpCount: number;
+  /** Work flagged blocked. */
+  blockedCount: number;
+  /** Work held for later or pending information. */
+  heldCount: number;
 }
 
 export function operationalBriefing(
@@ -374,13 +586,19 @@ export function operationalBriefing(
 ): OperationalBriefing {
   const active = activeRecommendations(recs);
   return {
-    quiet: active.length === 0,
-    waiting: awaitingFounder(recs),
-    waitingCount: awaitingFounder(recs).length,
+    quiet: active.length === 0 && heldItems(recs).length === 0,
+    waiting: decisionsForFounder(recs),
+    waitingCount: decisionsForFounder(recs).length,
     priorities: active,
     inExecution: inExecution(recs),
     unassigned: unassigned(recs),
     workload: chairWorkload(recs, chairs),
+    needsTriageCount: needsTriage(recs).length,
+    inPreparationCount: inPreparation(recs).length,
+    readyForFounderCount: decisionsForFounder(recs).length,
+    inFollowUpCount: executionFollowUp(recs).length,
+    blockedCount: blockedItems(recs).length,
+    heldCount: heldItems(recs).length,
   };
 }
 
@@ -400,13 +618,19 @@ export function isRecommendation(x: unknown): x is Recommendation {
     && typeof o.createdAt === 'string' && typeof o.updatedAt === 'string';
 }
 
-/** Fill the Inbox fields (type, visibility) with honest defaults when a stored
-    record predates them or carries an unknown value — so old records stay valid
-    without a store migration. */
+/** Fill fields that a stored record may predate (Inbox type/visibility from 12B;
+    triage/preparation/blocked from 12C) with honest defaults, and drop unknown
+    enum values — so Sprint 12A and 12B records stay valid without a migration and
+    without silent data loss. Well-formed records pass through unchanged. */
 export function normalizeRecommendation(rec: Recommendation): Recommendation {
   const type = SUBMISSION_TYPE_BY_ID.has(rec.type) ? rec.type : DEFAULT_TYPE;
   const visibility = VISIBILITY_BY_ID.has(rec.visibility) ? rec.visibility : DEFAULT_VISIBILITY;
-  return rec.type === type && rec.visibility === visibility ? rec : { ...rec, type, visibility };
+  const triage = rec.triage && TRIAGE_BY_ID.has(rec.triage) ? rec.triage : null;
+  const preparation = rec.preparation ?? null;
+  const blocked = rec.blocked === true;
+  const unchanged = rec.type === type && rec.visibility === visibility
+    && rec.triage === triage && rec.preparation === preparation && rec.blocked === blocked;
+  return unchanged ? rec : { ...rec, type, visibility, triage, preparation, blocked };
 }
 
 export function loadRecommendations(): Recommendation[] {
