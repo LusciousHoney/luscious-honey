@@ -117,6 +117,17 @@ import {
   draftAssignments, assignmentsForReview, approvedAssignments, assignmentStanding,
   type CreativeAssignment, type ContentPlatform, type TikTokFormat, type SubstackKind,
 } from './creative-assignment.ts';
+import {
+  // Sprint 13D — Creative Drafting Assistant (controlled, AI-assisted staff layer)
+  DRAFT_TYPES, VOICE_DIRECTIONS, draftTypeLabel, draftStatusLabel,
+  buildDraftContext, deterministicDraftProvider, makeCreativeDraft, generateDraft,
+  requestDraftRevision, holdDraft, declineDraft, approveDraft, retryDraft,
+  isAssignmentEligibleForDraft, draftCautions, founderDraftView,
+  routeDraftToWork, isDraftRoutable,
+  draftsInProgress, draftsForFounder, draftStanding, draftAuthorLabel,
+  loadDrafts, saveDrafts, upsertDraft,
+  type CreativeDraft, type DraftType, type DraftProvider, type DraftContent,
+} from './creative-draft.ts';
 
 /* --- small helpers ------------------------------------------------------- */
 
@@ -564,6 +575,8 @@ function renderCreative(root: HTMLElement, room: Room): void {
   const intake = el('div', { class: 'hq-creative-intake' });
   // The Assignment Desk — Creative turns approved briefs into assignment packs (13C).
   const assignments = el('div', { class: 'hq-assign' });
+  // The Drafting Room — controlled AI-assisted first drafts (Sprint 13D).
+  const drafting = el('div', { class: 'hq-draft' });
 
   const view = el(
     'section',
@@ -586,6 +599,7 @@ function renderCreative(root: HTMLElement, room: Room): void {
       ),
       intake,
       assignments,
+      drafting,
       el(
         'div',
         { class: 'hq-library' },
@@ -599,7 +613,196 @@ function renderCreative(root: HTMLElement, room: Room): void {
   root.replaceChildren(view);
   mountCreativeIntake(intake);
   mountAssignmentDesk(assignments);
+  mountDraftingRoom(drafting);
   void mountLibrary(manuscript, archive);
+}
+
+/* --- THE DRAFTING ROOM — controlled AI-assisted first drafts (Sprint 13D) ---
+   Creative turns an APPROVED assignment into reviewable draft content. Draft
+   preparation only — nothing publishes, nothing self-approves, the Founder stays
+   the editorial authority. Generation runs only on an explicit request, through a
+   provider-agnostic boundary; DEV uses a clearly-labelled offline stub, and drafts
+   are marked unverified until approved. Repaints in place. */
+let draftNotice: string | null = null;
+
+/** The provider for this environment: an offline preview stub in DEV, the server-
+    backed endpoint in production (honest "not configured" when no key is set). */
+function draftingProvider(): DraftProvider {
+  if (import.meta.env.DEV) return deterministicDraftProvider;
+  return {
+    name: 'server',
+    async draft(req) {
+      try {
+        const r = await fetch('/api/draft', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(req) });
+        if (!r.ok) { const j = await r.json().catch(() => ({})); return { ok: false, reason: (j.reason as 'not_configured') || 'error' }; }
+        const j = await r.json();
+        return { ok: true, content: j.content, meta: j.meta };
+      } catch { return { ok: false, reason: 'error' }; }
+    },
+  };
+}
+
+function mountDraftingRoom(host: HTMLElement): void {
+  const repaint = (): void => mountDraftingRoom(host);
+  const provider = draftingProvider();
+  const assignments = loadAssignments();
+  const drafts = loadDrafts();
+
+  const section = el('section', { class: 'hq-draft__room', 'aria-label': 'Creative drafting room' },
+    el('p', { class: 'hq-cos__eyebrow label' }, 'Drafting Room'),
+    el('p', { class: 'hq-cos__lead' }, 'Prepare a first draft from an approved assignment — reviewable material for TikTok and Substack. A draft, never the final word.'));
+
+  // Honest provider status.
+  const isStub = provider.name === 'stub-preview';
+  section.append(el('p', { class: 'hq-draft__provider' },
+    isStub
+      ? 'Drafting provider: offline preview (stub). Drafts here are templated previews for review — not live AI output.'
+      : 'Drafting provider: server-backed. If it is not configured, requests fail honestly and no draft is invented.'));
+
+  const notice = el('p', { class: 'hq-cos__notice', role: 'status', 'aria-live': 'polite' });
+  if (draftNotice) { notice.classList.add('is-ok'); notice.append(el('span', { class: 'hq-cos__notice-mark', 'aria-hidden': 'true' }, '✓'), el('span', {}, draftNotice)); }
+  section.append(notice);
+
+  // Request a draft from an eligible approved assignment.
+  const eligible = assignments.filter(isAssignmentEligibleForDraft);
+  if (eligible.length === 0) {
+    section.append(el('p', { class: 'hq-cos__quiet' }, 'No approved assignments to draft yet. Approve one on the Assignment Desk first.'));
+  } else {
+    section.append(draftRequestForm(eligible, provider, repaint));
+  }
+
+  // Drafts in progress — generated content, revision, hold, decline.
+  const inProgress = draftsInProgress(drafts);
+  const block = el('section', { class: 'hq-cos__block' },
+    el('div', { class: 'hq-cos__block-head' },
+      el('h2', { class: 'hq-cos__block-title' }, 'Drafts in Progress'),
+      el('span', { class: 'hq-cos__count', 'aria-label': `${inProgress.length} drafts` }, String(inProgress.length))));
+  if (inProgress.length === 0) block.append(el('p', { class: 'hq-cos__quiet' }, 'No drafts in progress.'));
+  else { const l = el('div', { class: 'hq-cos__decisions' }); for (const d of inProgress) l.append(draftWorkCard(d, provider, repaint)); block.append(l); }
+  section.append(block);
+  host.replaceChildren(section);
+}
+
+function draftRequestForm(eligible: CreativeAssignment[], provider: DraftProvider, repaint: () => void): HTMLElement {
+  const asnSel = el('select', { class: 'hq-cos__select', id: 'draft_from', 'aria-label': 'Approved assignment' }) as HTMLSelectElement;
+  for (const a of eligible) asnSel.append(el('option', { value: a.id }, a.title));
+  const typeSel = el('select', { class: 'hq-cos__select', id: 'draft_type', 'aria-label': 'Draft type' }) as HTMLSelectElement;
+  for (const t of DRAFT_TYPES) typeSel.append(el('option', { value: t.id }, t.label));
+  const voiceSel = el('select', { class: 'hq-cos__select', id: 'draft_voice', 'aria-label': 'Voice direction' }) as HTMLSelectElement;
+  voiceSel.append(el('option', { value: '' }, 'Voice: default'));
+  for (const v of VOICE_DIRECTIONS) voiceSel.append(el('option', { value: v }, v));
+  const instr = el('input', { class: 'hq-research__input', id: 'draft_instr', type: 'text', maxlength: '200', placeholder: 'A narrow drafting instruction (optional)' }) as HTMLInputElement;
+
+  const go = el('button', { class: 'hq-cos__response', type: 'button' }, 'Request draft') as HTMLButtonElement;
+  go.addEventListener('click', () => {
+    const a = eligible.find((x) => x.id === asnSel.value);
+    if (!a) return;
+    const context = buildDraftContext(a, loadOpportunities().find((o) => o.id === a.originOpportunityId) ?? null, loadIntelligence().find((i) => i.id === a.originIntelId) ?? null);
+    const created = makeCreativeDraft({ id: `draft_${Date.now()}`, assignment: a, type: typeSel.value as DraftType, instruction: instr.value, voice: voiceSel.value, context });
+    if (!created) return;
+    saveDrafts(upsertDraft(loadDrafts(), created));
+    // Generate immediately through the provider (explicit, authorised request).
+    go.disabled = true; go.textContent = 'Generating…';
+    void generateDraft(created, provider).then((done) => {
+      saveDrafts(upsertDraft(loadDrafts(), done));
+      draftNotice = done.status === 'draft_ready' ? `Draft ready — ${draftTypeLabel(done.type)}.` : `Generation ${done.status === 'generation_failed' ? 'failed' : 'done'}.`;
+      repaint();
+    });
+  });
+
+  return el('div', { class: 'hq-draft__form' },
+    el('div', { class: 'hq-research__row' },
+      deskField('draft_from', 'Approved assignment', asnSel),
+      deskField('draft_type', 'Output type', typeSel),
+      deskField('draft_voice', 'Voice', voiceSel)),
+    deskField('draft_instr', 'Drafting instruction', instr),
+    go);
+}
+
+function draftWorkCard(d: CreativeDraft, provider: DraftProvider, repaint: () => void): HTMLElement {
+  const persist = (next: CreativeDraft, notice: string): void => { saveDrafts(upsertDraft(loadDrafts(), next)); draftNotice = notice; repaint(); };
+  const card = el('article', { class: 'hq-cos__decision' });
+  card.append(
+    el('div', { class: 'hq-cos__chair-head' },
+      el('h3', { class: 'hq-cos__decision-title' }, `${draftTypeLabel(d.type)} — ${d.context.centralIdea || 'draft'}`),
+      el('span', { class: 'hq-cos__tag label', 'data-status': d.status === 'generation_failed' ? 'low' : 'open' }, draftStatusLabel(d.status))),
+    el('p', { class: 'hq-cos__decision-summary' }, `${d.properties.map((p) => contentPropertyLabel(p as ContentProperty)).join(', ') || 'No property'} · ${draftAuthorLabel(d)}${d.providerMeta ? ` · ${d.providerMeta.provider}/${d.providerMeta.model}` : ''}`),
+  );
+
+  if (d.status === 'generation_failed') {
+    card.append(el('p', { class: 'hq-cos__quiet' }, `Generation failed (${d.failureReason ?? 'error'}). No draft was invented.`));
+    const retry = el('button', { class: 'hq-cos__response', type: 'button' }, 'Retry') as HTMLButtonElement;
+    retry.addEventListener('click', () => {
+      const req = retryDraft(d); saveDrafts(upsertDraft(loadDrafts(), req));
+      retry.disabled = true; retry.textContent = 'Generating…';
+      void generateDraft(req, provider).then((done) => persist(done, done.status === 'draft_ready' ? 'Draft ready.' : 'Generation failed again.'));
+    });
+    card.append(retry);
+    return card;
+  }
+
+  if (d.content) {
+    card.append(draftContentView(d.content));
+    // truthfulness cautions — always shown.
+    const cautions = draftCautions(d);
+    const cl = el('ul', { class: 'hq-draft__cautions' });
+    for (const c of cautions) cl.append(el('li', {}, c));
+    card.append(el('div', { class: 'hq-cos__field' }, el('p', { class: 'hq-cos__field-label label' }, 'Cautions'), cl));
+  }
+
+  // Creative's own review actions before the Founder.
+  const group = el('div', { class: 'hq-cos__responses', role: 'group', 'aria-label': `Draft actions for ${draftTypeLabel(d.type)}` });
+  const revId = `drev_${d.id.replace(/[^a-z0-9]/gi, '')}`;
+  const rev = el('input', { class: 'hq-cos__note-input', id: revId, type: 'text', maxlength: '200', placeholder: 'One concise revision (optional)' }) as HTMLInputElement;
+  const revBtn = el('button', { class: 'hq-cos__response', type: 'button' }, 'Request revision') as HTMLButtonElement;
+  revBtn.addEventListener('click', () => {
+    const req = requestDraftRevision(d, rev.value); saveDrafts(upsertDraft(loadDrafts(), req));
+    revBtn.disabled = true; revBtn.textContent = 'Revising…';
+    void generateDraft(req, provider).then((done) => persist(done, 'Revised draft ready.'));
+  });
+  const hold = el('button', { class: 'hq-cos__withdraw', type: 'button' }, 'Hold') as HTMLButtonElement;
+  hold.addEventListener('click', () => persist(holdDraft(d), 'Draft held.'));
+  const decline = el('button', { class: 'hq-cos__withdraw', type: 'button' }, 'Decline') as HTMLButtonElement;
+  decline.addEventListener('click', () => persist(declineDraft(d), 'Draft declined.'));
+  group.append(hold, decline);
+  card.append(el('div', { class: 'hq-cos__note-field' }, el('label', { class: 'hq-cos__note-input-label label', for: revId }, 'Revision instruction'), rev, revBtn), group);
+  card.append(el('p', { class: 'hq-cos__quiet' }, 'When ready, this draft appears for the Founder in the Chief of Staff’s Opportunities.'));
+  return card;
+}
+
+/** Render generated draft content readably and copy-friendly. */
+function draftContentView(c: DraftContent): HTMLElement {
+  const wrap = el('div', { class: 'hq-draft__content' });
+  const field = (label: string, value?: string): void => { if (value) wrap.append(cosField(label, value)); };
+  const list = (label: string, items?: string[]): void => {
+    if (!items || !items.length) return;
+    const ul = el('ul', { class: 'hq-cos__tradeoffs' });
+    for (const i of items) ul.append(el('li', {}, i));
+    wrap.append(el('div', { class: 'hq-cos__field' }, el('p', { class: 'hq-cos__field-label label' }, label), ul));
+  };
+  list('Hook options', c.hookOptions);
+  field('Recommended hook', c.recommendedHook);
+  field('First sentence', c.firstSentence);
+  list('Outline', c.outline);
+  field('Note copy', c.noteCopy);
+  field('LIVE title', c.liveTitle);
+  field('Primary question', c.primaryQuestion);
+  list('Discussion beats', c.discussionBeats);
+  list('Engagement prompts', c.engagementPrompts);
+  list('Headline options', c.headlineOptions);
+  field('Thesis', c.thesis);
+  field('Premise', c.premise);
+  list('Sections', c.sections);
+  field('Reader promise', c.readerPromise);
+  list('Talking points', c.talkingPoints);
+  field('Closing line', c.closingLine);
+  field('CTA', c.cta);
+  field('Caption direction', c.captionDirection);
+  field('Visual', c.visual);
+  field('Substack bridge', c.substackBridge);
+  field('Transition', c.transition);
+  field('Promotion angle', c.promotionAngle);
+  return wrap;
 }
 
 /* --- THE ASSIGNMENT DESK — Creative's planning surface (Sprint 13C) ---------
@@ -2878,7 +3081,108 @@ function cosOpportunities(repaint: () => void): HTMLElement {
   if (asnApproved.length === 0) asnFounder.append(el('p', { class: 'hq-cos__quiet' }, 'Nothing approved for the Founder yet.'));
   else { const l = el('div', { class: 'hq-cos__decisions' }); for (const a of asnApproved) l.append(founderAssignmentCard(a, repaint)); asnFounder.append(l); }
   section.append(asnFounder);
+
+  // Creative Drafts (Sprint 13D) — Chief of Staff status visibility + Founder review.
+  const drafts = loadDrafts();
+  const ds = draftStanding(drafts);
+  const founderDrafts = draftsForFounder(drafts);
+  const dsBits: string[] = [];
+  if (ds.requested + ds.generating) dsBits.push(`${ds.requested + ds.generating} requested`);
+  if (ds.failed) dsBits.push(`${ds.failed} generation failed`);
+  if (ds.ready) dsBits.push(`${ds.ready} ready for review`);
+  if (ds.revisionRequested) dsBits.push(`${ds.revisionRequested} revision requested`);
+  if (ds.approved) dsBits.push(`${ds.approved} approved`);
+
+  const draftBlock = el('section', { class: 'hq-cos__block' },
+    el('div', { class: 'hq-cos__block-head' },
+      el('h2', { class: 'hq-cos__block-title' }, 'Creative Drafts — Founder Review'),
+      el('span', { class: 'hq-cos__count', 'aria-label': `${founderDrafts.length} for review` }, String(founderDrafts.length))),
+    el('p', { class: 'hq-cos__block-note' }, 'AI-assisted drafts prepared by Creative. You are the final editorial authority — approve, edit, revise, hold, or decline.'));
+  if (dsBits.length) draftBlock.append(el('p', { class: 'hq-cos__line' }, `Status: ${dsBits.join(' · ')}`));
+  // Ready/revised drafts await a decision; approved drafts stay visible to route to work.
+  const reviewList = [...founderDrafts, ...drafts.filter((d) => d.status === 'approved')];
+  if (reviewList.length === 0) {
+    draftBlock.append(el('p', { class: 'hq-cos__quiet' }, 'No drafts are ready for your review.'));
+  } else {
+    const l = el('div', { class: 'hq-cos__decisions' });
+    for (const d of reviewList) l.append(founderDraftCard(d, repaint));
+    draftBlock.append(l);
+  }
+  section.append(draftBlock);
   return section;
+}
+
+/** The Founder's concise draft review — the projection, the cautions, an editable
+    hook, and the four decisions. Approval only ever comes from the Founder; the AI
+    never self-approves, and nothing publishes. */
+function founderDraftCard(d: CreativeDraft, repaint: () => void): HTMLElement {
+  const fv = founderDraftView(d);
+  const card = el('article', { class: 'hq-cos__decision hq-briefs__founder' });
+  card.append(
+    el('div', { class: 'hq-cos__chair-head' },
+      el('h3', { class: 'hq-cos__decision-title' }, `${fv.draftType}`),
+      el('span', { class: 'hq-cos__tag label', 'data-status': 'open' }, fv.platform)),
+    cosField('What it’s for', fv.forWhat),
+    cosField('Audience', fv.audience),
+    cosField('From opportunity', fv.opportunity),
+  );
+  for (const h of fv.highlights) card.append(cosField(h.label, h.value));
+  card.append(cosField('Connection', fv.connection), cosField('Call to action', fv.cta));
+  const cl = el('ul', { class: 'hq-draft__cautions' });
+  for (const c of fv.cautions) cl.append(el('li', {}, c));
+  card.append(el('div', { class: 'hq-cos__field' }, el('p', { class: 'hq-cos__field-label label' }, 'Cautions'), cl));
+
+  const persist = (next: CreativeDraft, notice: string): void => { saveDrafts(upsertDraft(loadDrafts(), next)); opportunitiesNotice = notice; repaint(); };
+
+  // An already-approved draft: it is the Founder's; the only remaining office step
+  // is to route it into work. No further editorial decision is offered.
+  if (d.status === 'approved') {
+    card.append(el('p', { class: 'hq-cos__quiet' }, 'Approved by you — nothing publishes. The office can route it into work.'));
+    if (isDraftRoutable(d)) {
+      const rg = el('div', { class: 'hq-cos__responses', role: 'group', 'aria-label': 'Route draft to work' });
+      const b = el('button', { class: 'hq-cos__response', type: 'button' }, 'Route to Work') as HTMLButtonElement;
+      b.addEventListener('click', () => {
+        const res = routeDraftToWork(d, loadRecommendations());
+        saveRecommendations(res.recommendations);
+        saveDrafts(upsertDraft(loadDrafts(), res.draft));
+        opportunitiesNotice = res.created ? 'Draft routed to work.' : 'Already routed; existing work kept.';
+        repaint();
+      });
+      rg.append(b); card.append(rg);
+    } else {
+      card.append(el('p', { class: 'hq-cos__quiet' }, `Routed to work — recommendation ${d.promotedRecommendationId}.`));
+    }
+    return card;
+  }
+
+  // The Founder may edit the final copy (the recommended hook / note) before approving.
+  const editId = `fedit_${d.id.replace(/[^a-z0-9]/gi, '')}`;
+  const current = (d.content && (d.content.recommendedHook || d.content.noteCopy)) || '';
+  const edit = el('input', { class: 'hq-cos__note-input', id: editId, type: 'text', maxlength: '280', value: current, placeholder: 'Edit the final copy before approving (optional)' }) as HTMLInputElement;
+  card.append(el('div', { class: 'hq-cos__note-field' }, el('label', { class: 'hq-cos__note-input-label label', for: editId }, 'Final copy (editable)'), edit));
+
+  const group = el('div', { class: 'hq-cos__responses', role: 'group', 'aria-label': `Your decision on the ${fv.draftType}` });
+  const approve = el('button', { class: 'hq-cos__response', type: 'button' }, 'Approve') as HTMLButtonElement;
+  approve.addEventListener('click', () => {
+    let finalContent: DraftContent | null = null;
+    if (d.content && edit.value.trim() && edit.value.trim() !== current) {
+      finalContent = { ...d.content };
+      if (d.content.recommendedHook) finalContent.recommendedHook = edit.value.trim();
+      else if (d.content.noteCopy) finalContent.noteCopy = edit.value.trim();
+    }
+    persist(approveDraft(d, finalContent), 'Draft approved. It is yours now — nothing publishes.');
+  });
+  const reviseId = `frev_${d.id.replace(/[^a-z0-9]/gi, '')}`;
+  const revNote = el('input', { class: 'hq-cos__note-input', id: reviseId, type: 'text', maxlength: '200', placeholder: 'What to change (optional)' }) as HTMLInputElement;
+  const revise = el('button', { class: 'hq-cos__withdraw', type: 'button' }, 'Request Revision') as HTMLButtonElement;
+  revise.addEventListener('click', () => persist(requestDraftRevision(d, revNote.value), 'Revision requested — back to Creative.'));
+  const hold = el('button', { class: 'hq-cos__withdraw', type: 'button' }, 'Hold') as HTMLButtonElement;
+  hold.addEventListener('click', () => persist(holdDraft(d), 'Draft held.'));
+  const decline = el('button', { class: 'hq-cos__withdraw', type: 'button' }, 'Decline') as HTMLButtonElement;
+  decline.addEventListener('click', () => persist(declineDraft(d), 'Draft declined.'));
+  group.append(approve, hold, decline);
+  card.append(el('div', { class: 'hq-cos__note-field' }, el('label', { class: 'hq-cos__note-input-label label', for: reviseId }, 'Revision instruction'), revNote, revise), group);
+  return card;
 }
 
 /** The office reviews a Creative Assignment Pack — the creative direction and the

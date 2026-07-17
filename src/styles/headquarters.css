@@ -1453,6 +1453,30 @@
 .hq-assign__desk { display: grid; gap: var(--s-4); margin: var(--s-6) 0; }
 .hq-assign__editor { gap: var(--s-3); }
 
+/* The Drafting Room (Sprint 13D) — reuses the plaster cards and form controls;
+   adds a provider banner, a readable draft-content block, and caution list. */
+.hq-draft__room { display: grid; gap: var(--s-4); margin: var(--s-6) 0; }
+.hq-draft__form { display: grid; gap: var(--s-3); max-width: 62ch; }
+.hq-draft__provider {
+  font-family: var(--sans); font-size: var(--fs-label); letter-spacing: 0.02em;
+  color: var(--umber); margin: 0; padding: var(--s-2) var(--s-3);
+  border: 1px dashed var(--hq-brass-hair); border-radius: var(--radius);
+}
+.hq-draft__content {
+  display: grid; gap: var(--s-2); padding: var(--s-4);
+  border: 1px solid var(--hq-brass-hair); border-radius: var(--radius);
+  background: rgba(var(--ink-rgb), 0.015);
+  user-select: text; -webkit-user-select: text;
+}
+.hq-draft__cautions {
+  list-style: none; margin: 0; padding: 0; display: grid; gap: 4px;
+}
+.hq-draft__cautions li {
+  font-family: var(--serif); font-style: italic; font-size: var(--fs-body-sm);
+  color: var(--umber); line-height: 1.4; padding-left: var(--s-3);
+  border-left: 2px solid var(--terracotta);
+}
+
 /* The six responses — quiet plaster buttons; the recorded one is marked. */
 .hq-cos__responses { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 .hq-cos__response {

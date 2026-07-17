@@ -206,6 +206,9 @@ export interface Recommendation {
   /** When promoted from a Creative Assignment Pack (Sprint 13C), the id of that
       assignment — completing intelligence → opportunity → assignment → recommendation. */
   originAssignmentId?: string;
+  /** When promoted from an approved Creative Draft (Sprint 13D), the id of that
+      draft — the last link in intelligence → opportunity → assignment → draft → recommendation. */
+  originDraftId?: string;
   /** ISO datetime created. */
   createdAt: string;
   /** ISO datetime last changed. */
@@ -259,7 +262,7 @@ export function makeRecommendation(
   input: {
     id: string; title: string; summary: string;
     type?: SubmissionType; ownerChairId?: string | null; priority?: Priority; visibility?: FounderVisibility;
-    originIntelId?: string; originOpportunityId?: string; originAssignmentId?: string;
+    originIntelId?: string; originOpportunityId?: string; originAssignmentId?: string; originDraftId?: string;
   },
   now: Date = new Date(),
 ): Recommendation | null {
@@ -271,6 +274,7 @@ export function makeRecommendation(
     ...(input.originIntelId ? { originIntelId: input.originIntelId } : {}),
     ...(input.originOpportunityId ? { originOpportunityId: input.originOpportunityId } : {}),
     ...(input.originAssignmentId ? { originAssignmentId: input.originAssignmentId } : {}),
+    ...(input.originDraftId ? { originDraftId: input.originDraftId } : {}),
     type: input.type && SUBMISSION_TYPE_BY_ID.has(input.type) ? input.type : DEFAULT_TYPE,
     title: input.title.trim(),
     summary: input.summary.trim(),
@@ -300,7 +304,7 @@ export function makeSubmission(
   input: {
     id: string; type: SubmissionType; title: string; description: string;
     priority?: Priority; ownerChairId?: string | null;
-    originIntelId?: string; originOpportunityId?: string; originAssignmentId?: string;
+    originIntelId?: string; originOpportunityId?: string; originAssignmentId?: string; originDraftId?: string;
   },
   now: Date = new Date(),
 ): Recommendation | null {
@@ -308,7 +312,7 @@ export function makeSubmission(
     { id: input.id, type: input.type, title: input.title, summary: input.description,
       priority: input.priority, ownerChairId: input.ownerChairId,
       originIntelId: input.originIntelId, originOpportunityId: input.originOpportunityId,
-      originAssignmentId: input.originAssignmentId },
+      originAssignmentId: input.originAssignmentId, originDraftId: input.originDraftId },
     now,
   );
 }
