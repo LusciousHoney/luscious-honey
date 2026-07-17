@@ -1448,6 +1448,11 @@
   border-left: 2px solid var(--brass);
 }
 
+/* The Assignment Desk (Sprint 13C) — reuses the brief form controls and plaster
+   cards; just its own spacing and a wider editor. */
+.hq-assign__desk { display: grid; gap: var(--s-4); margin: var(--s-6) 0; }
+.hq-assign__editor { gap: var(--s-3); }
+
 /* The six responses — quiet plaster buttons; the recorded one is marked. */
 .hq-cos__responses { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 .hq-cos__response {
