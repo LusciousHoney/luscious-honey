@@ -59,6 +59,10 @@ import {
   makeResponse, loadResponses, saveResponses, recordResponse, clearResponse,
   type CosSectionId, type DecisionView,
 } from './chief-of-staff.ts';
+import {
+  loadRecommendations, operationalBriefing,
+  recStatusLabel, priorityLabel, ownerLabel,
+} from './chief-of-staff-ops.ts';
 
 /* --- small helpers ------------------------------------------------------- */
 
@@ -1083,6 +1087,7 @@ function cosBriefing(): HTMLElement {
       el('p', { class: 'hq-cos__welcome-line' }, BRIEFING.goodMorning)),
     cosBlock('Today’s Priorities', BRIEFING.todaysPriorities),
     decisionsWaiting,
+    cosOperational(),
     cosBlock('Progress Since Yesterday', BRIEFING.progressSinceYesterday),
     cosBlock('Risks', BRIEFING.risks),
     cosBlock('Looking Ahead', BRIEFING.lookingAhead),
@@ -1090,6 +1095,65 @@ function cosBriefing(): HTMLElement {
       el('p', { class: 'hq-cos__note-label label' }, 'A note from your Chief of Staff'),
       el('p', { class: 'hq-cos__note-body' }, BRIEFING.chiefOfStaffNote)),
   );
+}
+
+/* --- 1b. Operational picture — derived from the Chief of Staff's real record.
+   One integrated summary (what awaits you, priorities, what is in motion, how the
+   Chairs are loaded), computed from the operational engine. Read-only in this
+   first version; honestly quiet until real work is recorded — nothing invented. */
+function cosOperational(): HTMLElement {
+  const brief = operationalBriefing(loadRecommendations());
+  const block = el('section', { class: 'hq-cos__block' },
+    el('h2', { class: 'hq-cos__block-title' }, 'The Institution, at a Glance'));
+
+  if (brief.quiet) {
+    block.append(el('p', { class: 'hq-cos__quiet' },
+      'No work is in motion yet. When recommendations are prepared and routed, they will gather here — so you see one picture, not many scattered updates.'));
+    return block;
+  }
+
+  // Awaiting your decision.
+  if (brief.waitingCount > 0) {
+    const list = el('ul', { class: 'hq-cos__lines' });
+    for (const r of brief.waiting) {
+      list.append(el('li', { class: 'hq-cos__line' },
+        `${r.title} — ${ownerLabel(r)}`));
+    }
+    block.append(
+      el('p', { class: 'hq-cos__lead' },
+        brief.waitingCount === 1
+          ? 'One recommendation awaits your decision.'
+          : `${spellCount(brief.waitingCount)} recommendations await your decision.`),
+      list);
+  }
+
+  // Institutional priorities — active work in priority order.
+  const prio = el('ul', { class: 'hq-cos__lines' });
+  for (const r of brief.priorities) {
+    prio.append(el('li', { class: 'hq-cos__line' },
+      el('span', { class: 'hq-cos__tag label', 'data-status': r.priority }, priorityLabel(r.priority)),
+      ` ${r.title} · ${ownerLabel(r)} · ${recStatusLabel(r.status)}`));
+  }
+  block.append(
+    el('h3', { class: 'hq-cos__field-label label' }, 'Institutional Priorities'),
+    prio);
+
+  // In execution — the office's follow-up, not the Founder's to track.
+  if (brief.inExecution.length > 0) {
+    const inx = el('ul', { class: 'hq-cos__lines' });
+    for (const r of brief.inExecution) inx.append(el('li', { class: 'hq-cos__line' }, `${r.title} — ${ownerLabel(r)}`));
+    block.append(el('h3', { class: 'hq-cos__field-label label' }, 'In Execution'), inx);
+  }
+
+  // Executive workload — how the Chairs are loaded (derived, honest).
+  const load = el('ul', { class: 'hq-cos__lines' });
+  for (const w of brief.workload) {
+    load.append(el('li', { class: 'hq-cos__line' },
+      `Chair #${String(w.ordinal).padStart(3, '0')} — ${w.title}: ${w.activeCount === 0 ? 'no active work' : `${w.activeCount} in motion`}`));
+  }
+  block.append(el('h3', { class: 'hq-cos__field-label label' }, 'Executive Workload'), load);
+
+  return block;
 }
 
 /* --- 2. Decision System (interactive record) ------------------------------ */
