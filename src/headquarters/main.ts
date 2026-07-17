@@ -95,6 +95,17 @@ import {
   type IntelligenceItem, type IntelSource, type IntelCategory, type IntelConfidence, type IntelReviewOutcome,
   type IntelAttachment,
 } from './growth-intelligence.ts';
+import {
+  // Sprint 13B — Content Opportunity Brief (the analysis layer)
+  CONTENT_PROPERTIES, OPPORTUNITY_TYPES, RATINGS, SCORE_DIMENSIONS,
+  contentPropertyLabel, opportunityTypeLabel, opportunityStatusLabel, ratingLabel,
+  makeContentOpportunity, updateOpportunity, scoreOpportunity, isIntelEligibleForBrief,
+  markReadyForReview, recommendOpportunity, returnOpportunityForResearch, holdOpportunity, declineOpportunity,
+  routeOpportunityToWork, founderBrief, isOpportunityRoutable,
+  loadOpportunities, saveOpportunities, upsertOpportunity,
+  draftOpportunities, opportunitiesForReview, founderReadyOpportunities, opportunityStanding, opportunityAuthorLabel,
+  type ContentOpportunity, type ContentProperty, type OpportunityType, type Rating, type OpportunitySignals,
+} from './content-opportunity.ts';
 
 /* --- small helpers ------------------------------------------------------- */
 
@@ -1081,6 +1092,8 @@ function renderGrowth(root: HTMLElement, room: Room): void {
   const intake = el('div', { class: 'hq-growth-intake' });
   // The research desk — Growth Intelligence capture (Sprint 13A).
   const desk = el('div', { class: 'hq-research' });
+  // Opportunity Briefs — the analysis layer over captured intelligence (Sprint 13B).
+  const briefs = el('div', { class: 'hq-briefs' });
 
   // The correspondence: each relationship as a calm plaster card — a standing
   // conversation, never a statistic. Curated and spacious, a salon not a grid.
@@ -1120,6 +1133,7 @@ function renderGrowth(root: HTMLElement, room: Room): void {
       ),
       intake,
       desk,
+      briefs,
       salon,
     ),
   );
@@ -1127,6 +1141,198 @@ function renderGrowth(root: HTMLElement, room: Room): void {
   root.replaceChildren(view);
   mountGrowthIntake(intake);
   mountResearchDesk(desk);
+  mountBriefDesk(briefs);
+}
+
+/* --- OPPORTUNITY BRIEFS — Growth's analysis surface (Sprint 13B) ------------
+   Where captured intelligence becomes a structured, ranked content opportunity.
+   Separate from rapid capture but connected to it: a brief always links to an
+   intelligence record. Analysis only — no execution, no publishing. Repaints in
+   place; drafts are editable, and a completed brief is marked ready for review. */
+let briefNotice: string | null = null;
+
+function mountBriefDesk(host: HTMLElement): void {
+  const repaint = (): void => mountBriefDesk(host);
+  const intel = loadIntelligence();
+  const opps = loadOpportunities();
+
+  const section = el('section', { class: 'hq-briefs__desk', 'aria-label': 'Opportunity briefs' },
+    el('p', { class: 'hq-cos__eyebrow label' }, 'Opportunity Briefs'),
+    el('p', { class: 'hq-cos__lead' }, 'Turn what you captured into a ranked content opportunity — the property, the audience need, the angle, and what to make.'));
+
+  const notice = el('p', { class: 'hq-cos__notice', role: 'status', 'aria-live': 'polite' });
+  if (briefNotice) { notice.classList.add('is-ok'); notice.append(el('span', { class: 'hq-cos__notice-mark', 'aria-hidden': 'true' }, '✓'), el('span', {}, briefNotice)); }
+  section.append(notice);
+
+  // Start a brief from an eligible intelligence item.
+  const eligible = intel.filter(isIntelEligibleForBrief);
+  if (eligible.length === 0) {
+    section.append(el('p', { class: 'hq-cos__quiet' }, 'No open intelligence to analyse yet. Capture something first, and it can become a brief here.'));
+  } else {
+    const sel = el('select', { class: 'hq-cos__select', id: 'brief_from', 'aria-label': 'Intelligence to analyse' }) as HTMLSelectElement;
+    for (const i of eligible) sel.append(el('option', { value: i.id }, i.title));
+    const start = el('button', { class: 'hq-cos__response', type: 'button' }, 'Start a brief') as HTMLButtonElement;
+    start.addEventListener('click', () => {
+      const src = eligible.find((i) => i.id === sel.value);
+      if (!src) return;
+      const opp = makeContentOpportunity({ id: `opp_${Date.now()}`, intelId: src.id, title: src.title, summary: src.summary, audience: src.audience });
+      if (!opp) return;
+      saveOpportunities(upsertOpportunity(loadOpportunities(), opp));
+      briefNotice = `Draft brief started from “${src.title}”.`;
+      repaint();
+    });
+    section.append(el('div', { class: 'hq-briefs__start' },
+      el('label', { class: 'hq-cos__note-input-label label', for: 'brief_from' }, 'Analyse an intelligence item'),
+      el('div', { class: 'hq-cos__route-row' }, sel, start)));
+  }
+
+  // Drafts in progress — editable.
+  const drafts = draftOpportunities(opps);
+  const draftBlock = el('section', { class: 'hq-cos__block' },
+    el('div', { class: 'hq-cos__block-head' },
+      el('h2', { class: 'hq-cos__block-title' }, 'In Progress'),
+      el('span', { class: 'hq-cos__count', 'aria-label': `${drafts.length} drafts` }, String(drafts.length))));
+  if (drafts.length === 0) draftBlock.append(el('p', { class: 'hq-cos__quiet' }, 'No briefs in progress.'));
+  else { const list = el('div', { class: 'hq-cos__decisions' }); for (const o of drafts) list.append(briefEditorCard(o, repaint)); draftBlock.append(list); }
+  section.append(draftBlock);
+
+  // Everything else Growth has produced (read-only summary).
+  const others = opps.filter((o) => o.status !== 'draft' && o.status !== 'analyzing')
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  if (others.length) {
+    const log = el('section', { class: 'hq-cos__block' },
+      el('div', { class: 'hq-cos__block-head' },
+        el('h2', { class: 'hq-cos__block-title' }, 'Submitted Briefs'),
+        el('span', { class: 'hq-cos__count', 'aria-label': `${others.length} submitted` }, String(others.length))));
+    const list = el('div', { class: 'hq-cos__decisions' });
+    for (const o of others.slice(0, 10)) list.append(briefSummaryCard(o));
+    log.append(list);
+    section.append(log);
+  }
+  host.replaceChildren(section);
+}
+
+/** Multi-select chips (checkboxes) for properties or formats. */
+function chipSet<T extends string>(
+  name: string, options: { id: T; label: string }[], selected: T[], onChange: (next: T[]) => void,
+): HTMLElement {
+  const wrap = el('div', { class: 'hq-briefs__chips', role: 'group', 'aria-label': name });
+  const chosen = new Set<T>(selected);
+  for (const o of options) {
+    const id = `${name.replace(/\W/g, '')}_${o.id}`;
+    const cb = el('input', { class: 'hq-briefs__chip-input', type: 'checkbox', id, ...(chosen.has(o.id) ? { checked: 'checked' } : {}) }) as HTMLInputElement;
+    cb.addEventListener('change', () => { if (cb.checked) chosen.add(o.id); else chosen.delete(o.id); onChange([...chosen]); });
+    wrap.append(el('label', { class: 'hq-briefs__chip', for: id }, cb, el('span', {}, o.label)));
+  }
+  return wrap;
+}
+
+function ratingSelect(id: string, value: Rating): HTMLSelectElement {
+  const s = el('select', { class: 'hq-cos__select hq-briefs__rating', id }) as HTMLSelectElement;
+  for (const r of RATINGS) s.append(el('option', { value: r.id, ...(r.id === value ? { selected: 'selected' } : {}) }, r.label));
+  return s;
+}
+
+function briefEditorCard(o: ContentOpportunity, repaint: () => void): HTMLElement {
+  // Working copy held in the closure; persisted on Save / Ready.
+  let draft = o;
+  const card = el('article', { class: 'hq-cos__decision hq-briefs__editor' });
+  const persist = (next: ContentOpportunity, notice: string): void => {
+    saveOpportunities(upsertOpportunity(loadOpportunities(), next));
+    briefNotice = notice; repaint();
+  };
+
+  const titleId = `bt_${o.id}`;
+  const title = el('input', { class: 'hq-research__input', id: titleId, type: 'text', maxlength: '140', value: o.title }) as HTMLInputElement;
+  const angleId = `ba_${o.id}`;
+  const angle = el('input', { class: 'hq-research__input', id: angleId, type: 'text', maxlength: '160', value: o.angle, placeholder: 'The recommended angle' }) as HTMLInputElement;
+  const needId = `bn_${o.id}`;
+  const need = el('input', { class: 'hq-research__input', id: needId, type: 'text', maxlength: '200', value: o.audienceNeed, placeholder: 'The audience need or question' }) as HTMLInputElement;
+  const audId = `bau_${o.id}`;
+  const aud = el('input', { class: 'hq-research__input', id: audId, type: 'text', maxlength: '120', value: o.audience, placeholder: 'Who it’s for' }) as HTMLInputElement;
+  const recId = `br_${o.id}`;
+  const recField = el('textarea', { class: 'hq-research__textarea', id: recId, rows: '2', maxlength: '400', placeholder: 'Your recommendation / strategic reasoning' }) as HTMLTextAreaElement;
+  recField.value = o.recommendation;
+  const nextId = `bx_${o.id}`;
+  const nextField = el('input', { class: 'hq-research__input', id: nextId, type: 'text', maxlength: '160', value: o.nextAction, placeholder: 'Proposed next action' }) as HTMLInputElement;
+
+  card.append(
+    el('div', { class: 'hq-cos__chair-head' },
+      el('h3', { class: 'hq-cos__decision-title' }, `Brief — ${o.title}`),
+      el('span', { class: 'hq-cos__tag label', 'data-status': o.status }, opportunityStatusLabel(o.status))),
+    deskField(titleId, 'Title', title),
+    briefFieldLabel('Properties'),
+    chipSet<ContentProperty>('Properties', CONTENT_PROPERTIES, draft.properties, (next) => { draft = { ...draft, properties: next }; }),
+    briefFieldLabel('Suggested formats'),
+    chipSet<OpportunityType>('Formats', OPPORTUNITY_TYPES, draft.types, (next) => { draft = { ...draft, types: next }; }),
+    deskField(needId, 'Audience need', need),
+    deskField(audId, 'Audience', aud),
+    deskField(angleId, 'Recommended angle', angle),
+    deskField(recId, 'Recommendation', recField),
+    deskField(nextId, 'Next action', nextField),
+  );
+
+  // The transparent scoring signals.
+  const signalRow = el('div', { class: 'hq-briefs__signals' });
+  const selects: Record<string, HTMLSelectElement> = {};
+  for (const dim of SCORE_DIMENSIONS) {
+    const sid = `bs_${o.id}_${dim.id}`;
+    const s = ratingSelect(sid, draft.signals[dim.id]);
+    selects[dim.id] = s;
+    signalRow.append(el('div', { class: 'hq-briefs__signal' },
+      el('label', { class: 'hq-cos__note-input-label label', for: sid }, dim.label), s));
+  }
+  const confId = `bc_${o.id}`;
+  const conf = ratingSelect(confId, draft.confidence);
+  signalRow.append(el('div', { class: 'hq-briefs__signal' },
+    el('label', { class: 'hq-cos__note-input-label label', for: confId }, 'Confidence'), conf));
+  card.append(briefFieldLabel('Strategic signals'), signalRow);
+
+  const scoreLine = el('p', { class: 'hq-briefs__score-line' });
+  const readSignals = (): OpportunitySignals => ({
+    timeliness: selects.timeliness.value as Rating, audienceRelevance: selects.audienceRelevance.value as Rating,
+    propertyFit: selects.propertyFit.value as Rating, founderFit: selects.founderFit.value as Rating,
+    contentPotential: selects.contentPotential.value as Rating, conversionPotential: selects.conversionPotential.value as Rating,
+    effort: selects.effort.value as Rating,
+  });
+  const paintScore = (): void => {
+    const sc = scoreOpportunity(readSignals(), conf.value as Rating);
+    scoreLine.replaceChildren(el('span', { class: 'hq-briefs__score' }, String(sc.score)), el('span', {}, ` / 100 · ${sc.band}${sc.caution ? ` · ${sc.caution}` : ''}`));
+  };
+  for (const s of Object.values(selects)) s.addEventListener('change', paintScore);
+  conf.addEventListener('change', paintScore);
+  paintScore();
+  card.append(el('div', { class: 'hq-briefs__score-preview' }, el('span', { class: 'hq-cos__note-input-label label' }, 'Score'), scoreLine));
+
+  const collect = (): ContentOpportunity => updateOpportunity(draft, {
+    title: title.value, angle: angle.value, audience: aud.value, audienceNeed: need.value,
+    recommendation: recField.value, nextAction: nextField.value,
+    properties: draft.properties, types: draft.types,
+    signals: readSignals(), confidence: conf.value as Rating,
+  });
+
+  const group = el('div', { class: 'hq-cos__responses', role: 'group', 'aria-label': `Actions for brief “${o.title}”` });
+  const saveBtn = el('button', { class: 'hq-cos__response', type: 'button' }, 'Save draft') as HTMLButtonElement;
+  saveBtn.addEventListener('click', () => persist(collect(), 'Draft saved.'));
+  const readyBtn = el('button', { class: 'hq-cos__response', type: 'button' }, 'Mark ready for review') as HTMLButtonElement;
+  readyBtn.addEventListener('click', () => persist(markReadyForReview(collect()), 'Sent to the Chief of Staff for review.'));
+  group.append(saveBtn, readyBtn);
+  card.append(group);
+  return card;
+}
+
+function briefFieldLabel(text: string): HTMLElement {
+  return el('p', { class: 'hq-cos__field-label label hq-briefs__section-label' }, text);
+}
+
+function briefSummaryCard(o: ContentOpportunity): HTMLElement {
+  const sc = scoreOpportunity(o.signals, o.confidence);
+  return el('article', { class: 'hq-cos__decision' },
+    el('div', { class: 'hq-cos__chair-head' },
+      el('h3', { class: 'hq-cos__decision-title' }, o.title),
+      el('span', { class: 'hq-cos__tag label', 'data-status': o.status }, opportunityStatusLabel(o.status))),
+    el('p', { class: 'hq-cos__decision-summary' },
+      `${o.properties.map(contentPropertyLabel).join(', ') || 'No property'} · score ${sc.score} · ${sc.band}`));
 }
 
 /* --- THE RESEARCH DESK — Growth Intelligence capture (Sprint 13A) ----------
@@ -2420,7 +2626,138 @@ function cosOpportunities(repaint: () => void): HTMLElement {
     pipeBlock.append(list);
   }
   section.append(pipeBlock);
+
+  // Content Opportunity Briefs (Sprint 13B) — Growth's ranked analysis, reviewed here.
+  const opps = loadOpportunities();
+  const forReview = opportunitiesForReview(opps);
+  const founderReady = founderReadyOpportunities(opps);
+  const os = opportunityStanding(opps);
+  const oppBits: string[] = [];
+  if (os.draft || os.analyzing) oppBits.push(`${os.draft + os.analyzing} in progress`);
+  if (os.readyForReview) oppBits.push(`${os.readyForReview} ready for review`);
+  if (os.recommended) oppBits.push(`${os.recommended} recommended`);
+  if (os.routed) oppBits.push(`${os.routed} routed to work`);
+
+  const briefsReview = el('section', { class: 'hq-cos__block' },
+    el('div', { class: 'hq-cos__block-head' },
+      el('h2', { class: 'hq-cos__block-title' }, 'Opportunity Briefs — For Review'),
+      el('span', { class: 'hq-cos__count', 'aria-label': `${forReview.length} for review` }, String(forReview.length))),
+    el('p', { class: 'hq-cos__block-note' }, 'Ranked content briefs from the Director of Growth, awaiting your prioritisation.'));
+  if (oppBits.length) briefsReview.append(el('p', { class: 'hq-cos__line' }, oppBits.join(' · ')));
+  if (forReview.length === 0) {
+    briefsReview.append(el('p', { class: 'hq-cos__quiet' }, 'No briefs are ready for review.'));
+  } else {
+    const list = el('div', { class: 'hq-cos__decisions' });
+    for (const o of forReview) list.append(briefReviewCard(o, repaint));
+    briefsReview.append(list);
+  }
+  section.append(briefsReview);
+
+  // The Founder-ready briefs — concise executive projections (recommended briefs).
+  const founderBlock = el('section', { class: 'hq-cos__block' },
+    el('div', { class: 'hq-cos__block-head' },
+      el('h2', { class: 'hq-cos__block-title' }, 'Founder-Ready Briefs'),
+      el('span', { class: 'hq-cos__count', 'aria-label': `${founderReady.length} recommended` }, String(founderReady.length))),
+    el('p', { class: 'hq-cos__block-note' }, 'What the Founder sees — a concise brief and a single decision. No raw research.'));
+  if (founderReady.length === 0) {
+    founderBlock.append(el('p', { class: 'hq-cos__quiet' }, 'Nothing recommended to the Founder yet.'));
+  } else {
+    const list = el('div', { class: 'hq-cos__decisions' });
+    for (const o of founderReady) list.append(founderBriefCard(o, repaint));
+    founderBlock.append(list);
+  }
+  section.append(founderBlock);
   return section;
+}
+
+/** The office reviews a ranked content brief — score, explanation, and the five
+    prioritisation actions. Route to Work reuses the idempotent promotion + full
+    provenance (intelligence → opportunity → recommendation). */
+function briefReviewCard(o: ContentOpportunity, repaint: () => void): HTMLElement {
+  const sc = scoreOpportunity(o.signals, o.confidence);
+  const card = el('article', { class: 'hq-cos__decision' });
+  card.append(
+    el('div', { class: 'hq-cos__chair-head' },
+      el('h3', { class: 'hq-cos__decision-title' }, o.title),
+      el('span', { class: 'hq-cos__tag label', 'data-status': o.confidence === 'low' ? 'low' : 'open' }, `Score ${sc.score} · ${sc.band}`)),
+    el('p', { class: 'hq-cos__decision-summary' },
+      `${o.properties.map(contentPropertyLabel).join(', ') || 'No property'} · ${o.types.map(opportunityTypeLabel).join(', ') || 'No format'} · ${opportunityAuthorLabel(o)}`),
+  );
+  if (o.summary) card.append(el('p', { class: 'hq-cos__field-body' }, o.summary));
+  if (o.audienceNeed) card.append(cosField('Audience need', o.audienceNeed));
+  if (o.angle) card.append(cosField('Recommended angle', o.angle));
+  if (o.recommendation) card.append(cosField('Growth recommendation', o.recommendation));
+  if (o.risks) card.append(cosField('Risks', o.risks));
+  if (o.nextAction) card.append(cosField('Next action', o.nextAction));
+  if (sc.caution) card.append(el('p', { class: 'hq-cos__quiet' }, sc.caution));
+
+  // Transparent score explanation.
+  card.append(briefScoreDetails(sc));
+
+  const persist = (next: ContentOpportunity, notice: string): void => {
+    saveOpportunities(upsertOpportunity(loadOpportunities(), next));
+    opportunitiesNotice = notice; repaint();
+  };
+  const group = el('div', { class: 'hq-cos__responses', role: 'group', 'aria-label': `Prioritise brief “${o.title}”` });
+  const act = (label: string, cls: string, fn: () => void): void => {
+    const b = el('button', { class: cls, type: 'button' }, label) as HTMLButtonElement;
+    b.addEventListener('click', fn); group.append(b);
+  };
+  act('Recommend to Founder', 'hq-cos__response', () => persist(recommendOpportunity(o), `${o.title} — recommended to the Founder.`));
+  act('Route to Work', 'hq-cos__response', () => {
+    const res = routeOpportunityToWork(o, loadRecommendations());
+    saveRecommendations(res.recommendations);
+    saveOpportunities(upsertOpportunity(loadOpportunities(), res.opportunity));
+    opportunitiesNotice = res.created ? `${o.title} — routed to work.` : `${o.title} — already routed; the existing work was kept.`;
+    repaint();
+  });
+  act('Return for Research', 'hq-cos__withdraw', () => persist(returnOpportunityForResearch(o), `${o.title} — returned for research.`));
+  act('Hold', 'hq-cos__withdraw', () => persist(holdOpportunity(o), `${o.title} — held.`));
+  act('Decline', 'hq-cos__withdraw', () => persist(declineOpportunity(o), `${o.title} — declined.`));
+  card.append(group);
+  return card;
+}
+
+function briefScoreDetails(sc: ReturnType<typeof scoreOpportunity>): HTMLElement {
+  const details = el('details', { class: 'hq-cos__history' });
+  details.append(el('summary', { class: 'hq-cos__history-summary' }, `Why this scored ${sc.score}`));
+  const ol = el('ul', { class: 'hq-briefs__factors' });
+  for (const f of sc.factors) ol.append(el('li', {},
+    el('span', { class: 'hq-briefs__factor-label' }, f.label),
+    el('span', {}, `${ratingLabel(f.rating)} — ${f.note}`)));
+  details.append(ol);
+  return details;
+}
+
+/** The Founder-ready projection — concise, executive-level, one decision requested. */
+function founderBriefCard(o: ContentOpportunity, repaint: () => void): HTMLElement {
+  const fb = founderBrief(o);
+  const card = el('article', { class: 'hq-cos__decision hq-briefs__founder' });
+  card.append(
+    el('h3', { class: 'hq-cos__decision-title' }, o.title),
+    cosField('What Growth found', fb.found),
+    cosField('Why it matters now', fb.whyNow),
+    cosField('Where it fits', fb.where),
+    cosField('Who it’s for', fb.who),
+    cosField('Recommended content', fb.recommended),
+  );
+  if (fb.formats.length) card.append(cosField('Suggested formats', fb.formats.join(', ')));
+  card.append(cosField('Strategic reason', fb.reason), cosField('Decision needed', fb.decision));
+
+  // The office can still route a recommended brief straight into work.
+  if (isOpportunityRoutable(o)) {
+    const group = el('div', { class: 'hq-cos__responses', role: 'group', 'aria-label': `Route brief “${o.title}”` });
+    const b = el('button', { class: 'hq-cos__response', type: 'button' }, 'Route to Work') as HTMLButtonElement;
+    b.addEventListener('click', () => {
+      const res = routeOpportunityToWork(o, loadRecommendations());
+      saveRecommendations(res.recommendations);
+      saveOpportunities(upsertOpportunity(loadOpportunities(), res.opportunity));
+      opportunitiesNotice = res.created ? `${o.title} — routed to work.` : `${o.title} — already routed; the existing work was kept.`;
+      repaint();
+    });
+    group.append(b); card.append(group);
+  }
+  return card;
 }
 
 function opportunityReviewCard(i: IntelligenceItem, repaint: () => void): HTMLElement {
