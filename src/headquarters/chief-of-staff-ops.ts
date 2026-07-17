@@ -190,6 +190,12 @@ export interface Recommendation {
   growthStage: GrowthStage | null;
   /** A note Growth sends back through the Chief of Staff. */
   growthNote?: string;
+  /** Append-only institutional trail of office-brokered handoffs on this record
+      (Sprint 12G). Provenance — never a second store, never removed. */
+  collaborationTrail: Handoff[];
+  /** Bounded question→answer consultations on this record (Sprint 12G). Ownership
+      never changes; not a messaging thread. */
+  consultations: Consultation[];
   /** ISO datetime created. */
   createdAt: string;
   /** ISO datetime last changed. */
@@ -265,6 +271,8 @@ export function makeRecommendation(
     creativeStage: null,
     productionStage: null,
     growthStage: null,
+    collaborationTrail: [],
+    consultations: [],
     createdAt: ts,
     updatedAt: ts,
   };
@@ -783,6 +791,342 @@ export function growthStanding(recs: Recommendation[]): GrowthStanding {
   };
 }
 
+/* =============================================================================
+   EXECUTIVE COLLABORATION — FOUNDATIONS (Sprint 12G / Council Phase II)
+
+   Doctrine: THE CHAIR PROPOSES; THE OFFICE DISPOSES. A Chair never hands work to
+   another Chair directly. It proposes, and the Chief of Staff brokers. These are
+   annotations on the ONE shared record — not a second store, not a second
+   lifecycle, not a messaging system. Two primitives only:
+
+     • HANDOFF     — office-brokered transfer of OWNERSHIP between Chairs.
+                     proposed → authorized (office) → accepted (owner moves) ;
+                     off-ramps: declined (returns to the office) / withdrawn.
+     • CONSULTATION — one focused question, one recorded answer. Ownership STAYS.
+
+   The five approved Founder decisions are encoded here:
+     1. The office may broker without separate Founder approval — BUT collaboration
+        never bypasses an existing lifecycle approval requirement (we only permit
+        collaboration on `executing`, owned work; awaiting_founder is never touched).
+     2. Direct ownership transfer to the receiving Chair, office-authorized and
+        recorded — no unowned queue between Chairs.
+     3. One question, one answer — no threads.
+     4. A declined handoff returns to the office, never straight to the sender.
+     5. The final Chair's completion closes the record; all history is preserved.
+   --------------------------------------------------------------------------- */
+
+export type HandoffStatus = 'proposed' | 'authorized' | 'accepted' | 'declined' | 'withdrawn';
+export type ConsultationStatus = 'open' | 'answered' | 'withdrawn';
+
+/** An office-brokered transfer of ownership from one Chair to another. Immutable
+    core (id / from / to / proposedBy / reason / prior context); timestamps and
+    status accrete as the office and receiving Chair act. Never removed from the
+    trail — it is the record's provenance. */
+export interface Handoff {
+  id: string;
+  fromChairId: string;          // the sending Chair (owner at proposal)
+  toChairId: string;            // the receiving Chair
+  proposedByChairId: string;    // who proposed (the owning Chair)
+  reason: string;               // purpose of the handoff
+  status: HandoffStatus;
+  /** Provenance: the sending Chair's stage snapshot at proposal (role-specific). */
+  fromStageAtProposal: string | null;
+  /** Prior lifecycle + ownership context, for auditability. */
+  priorOwnerChairId: string | null;
+  priorStatus: RecStatus;
+  createdAt: string;            // proposed at
+  authorizedAt?: string;        // the office authorized
+  authorizedBy?: string;        // the office marker (Chief of Staff)
+  acceptedAt?: string;          // the receiving Chair accepted (ownership moved)
+  declinedAt?: string;          // the receiving Chair declined (returned to office)
+  declineReason?: string;
+  resolvedAt?: string;          // accepted / declined / withdrawn — terminal moment
+}
+
+/** A bounded question→answer between the owning Chair and a consulted Chair.
+    Ownership never changes. Not a thread — exactly one question and one answer. */
+export interface Consultation {
+  id: string;
+  owningChairId: string;        // stays the owner throughout
+  consultedChairId: string;
+  question: string;
+  answer?: string;
+  status: ConsultationStatus;
+  brokeredBy: string;           // the office marker (Chief of Staff)
+  requestedAt: string;
+  answeredAt?: string;
+}
+
+/** The office is always the actor of record for a brokered transfer. */
+export const OFFICE_BROKER = 'chief_of_staff';
+
+/** Why a collaboration action was refused — explicit, so callers and tests can
+    distinguish each guard rather than reading an unchanged record. */
+export type CollaborationDenial =
+  | 'unknown_chair'          // sending or receiving Chair not in the Register
+  | 'self_handoff'           // a Chair cannot hand off to itself
+  | 'self_consultation'      // a Chair cannot consult itself
+  | 'not_owner'              // only the current owning Chair may propose
+  | 'record_not_collaborable'// record isn't owned, executing work (held/withdrawn/complete/awaiting_founder)
+  | 'existing_open_handoff'  // an open handoff already exists on this record
+  | 'handoff_not_found'
+  | 'handoff_wrong_state'    // the handoff is not in the required state for this action
+  | 'not_authorized'         // ownership cannot move before the office authorizes
+  | 'not_receiving_chair'    // only the receiving Chair may accept / decline
+  | 'not_proposer_or_office' // only the proposer or the office may withdraw
+  | 'consultation_not_found'
+  | 'consultation_wrong_state'
+  | 'not_consulted_chair'    // only the consulted Chair may answer
+  | 'empty_question'
+  | 'empty_answer';
+
+/** An explicit success/failure result — the collaboration surface never signals a
+    refusal by silently returning the record unchanged. On success it carries the
+    next record (and the handoff/consultation id it acted on). */
+export type CollaborationResult =
+  | { ok: true; rec: Recommendation; handoffId?: string; consultationId?: string }
+  | { ok: false; reason: CollaborationDenial };
+
+const fail = (reason: CollaborationDenial): CollaborationResult => ({ ok: false, reason });
+
+/** A record may begin new collaboration only when it is genuinely owned, in-motion
+    work: status `executing` with an owner. This single gate upholds decision #1 —
+    awaiting_founder / preparing / held / complete / withdrawn records can never be
+    handed off or consulted, so collaboration can never bypass a Founder approval
+    the lifecycle still requires. */
+export function isCollaborable(rec: Recommendation): boolean {
+  return rec.status === 'executing' && !!rec.ownerChairId;
+}
+
+/** The sending Chair's role-specific stage at the moment of a handoff — captured
+    as provenance so ownership can move without erasing where the work has been. */
+function ownerStageSnapshot(rec: Recommendation): string | null {
+  if (rec.ownerChairId === CHAIR_CREATIVE_DIRECTOR) return rec.creativeStage;
+  if (rec.ownerChairId === CHAIR_HEAD_OF_PRODUCTION) return rec.productionStage;
+  if (rec.ownerChairId === CHAIR_DIRECTOR_OF_GROWTH) return rec.growthStage;
+  return null;
+}
+
+/** The single open (proposed or authorized) handoff on a record, if any. */
+export function openHandoff(rec: Recommendation): Handoff | null {
+  return rec.collaborationTrail.find((h) => h.status === 'proposed' || h.status === 'authorized') ?? null;
+}
+function findHandoff(rec: Recommendation, id: string): Handoff | null {
+  return rec.collaborationTrail.find((h) => h.id === id) ?? null;
+}
+function replaceHandoff(rec: Recommendation, next: Handoff, now: Date): Recommendation {
+  return {
+    ...rec,
+    collaborationTrail: rec.collaborationTrail.map((h) => (h.id === next.id ? next : h)),
+    updatedAt: now.toISOString(),
+  };
+}
+
+/* --- Handoff (ownership moves, office-brokered) --------------------------- */
+
+/** A Chair PROPOSES a handoff to another Chair. Nothing moves yet — this only
+    records the proposal for the office to broker. Guards: only the current owner
+    may propose; the target must be a real, different Chair; the record must be
+    collaborable; and only one open handoff at a time. */
+export function proposeHandoff(
+  rec: Recommendation, fromChairId: string, toChairId: string, reason: string,
+  now: Date = new Date(), id: string = `handoff_${now.getTime()}`,
+): CollaborationResult {
+  if (!getChair(fromChairId) || !getChair(toChairId)) return fail('unknown_chair');
+  if (fromChairId === toChairId) return fail('self_handoff');
+  if (!isCollaborable(rec)) return fail('record_not_collaborable');
+  if (rec.ownerChairId !== fromChairId) return fail('not_owner');
+  if (openHandoff(rec)) return fail('existing_open_handoff');
+  const handoff: Handoff = {
+    id, fromChairId, toChairId, proposedByChairId: fromChairId,
+    reason: reason.trim(), status: 'proposed',
+    fromStageAtProposal: ownerStageSnapshot(rec),
+    priorOwnerChairId: rec.ownerChairId, priorStatus: rec.status,
+    createdAt: now.toISOString(),
+  };
+  return {
+    ok: true,
+    rec: { ...rec, collaborationTrail: [...rec.collaborationTrail, handoff], updatedAt: now.toISOString() },
+    handoffId: id,
+  };
+}
+
+/** The OFFICE authorizes a proposed handoff. Ownership still does not move — this
+    is the brokerage step that makes a later transfer legitimate. */
+export function authorizeHandoff(rec: Recommendation, handoffId: string, now: Date = new Date()): CollaborationResult {
+  const h = findHandoff(rec, handoffId);
+  if (!h) return fail('handoff_not_found');
+  if (h.status !== 'proposed') return fail('handoff_wrong_state');
+  const next: Handoff = { ...h, status: 'authorized', authorizedAt: now.toISOString(), authorizedBy: OFFICE_BROKER };
+  return { ok: true, rec: replaceHandoff(rec, next, now), handoffId };
+}
+
+/** The RECEIVING Chair accepts an AUTHORIZED handoff — and only now does ownership
+    move, directly to the receiving Chair. A Chair can never take ownership silently:
+    acceptance requires a prior office authorization, and only the named receiving
+    Chair may accept. The sending Chair's stage history is preserved on the record. */
+export function acceptHandoff(
+  rec: Recommendation, handoffId: string, byChairId: string, now: Date = new Date(),
+): CollaborationResult {
+  const h = findHandoff(rec, handoffId);
+  if (!h) return fail('handoff_not_found');
+  if (h.status !== 'authorized') return fail('not_authorized');
+  if (byChairId !== h.toChairId) return fail('not_receiving_chair');
+  const ts = now.toISOString();
+  const next: Handoff = { ...h, status: 'accepted', acceptedAt: ts, resolvedAt: ts };
+  const moved = replaceHandoff(rec, next, now);
+  return { ok: true, rec: { ...moved, ownerChairId: h.toChairId, updatedAt: ts }, handoffId };
+}
+
+/** The RECEIVING Chair declines an AUTHORIZED handoff. Per decision #4 the work
+    returns to the OFFICE (unowned, re-opened for triage) — never straight back to
+    the sending Chair. Ownership does not pass to the decliner. */
+export function declineHandoff(
+  rec: Recommendation, handoffId: string, byChairId: string, reason: string = '', now: Date = new Date(),
+): CollaborationResult {
+  const h = findHandoff(rec, handoffId);
+  if (!h) return fail('handoff_not_found');
+  if (h.status !== 'authorized') return fail('handoff_wrong_state');
+  if (byChairId !== h.toChairId) return fail('not_receiving_chair');
+  const ts = now.toISOString();
+  const next: Handoff = { ...h, status: 'declined', declinedAt: ts, resolvedAt: ts, declineReason: reason.trim() || undefined };
+  const withTrail = replaceHandoff(rec, next, now);
+  const status = canTransition(withTrail.status, 'preparing') ? 'preparing' : withTrail.status;
+  return { ok: true, rec: { ...withTrail, ownerChairId: null, triage: null, status, updatedAt: ts }, handoffId };
+}
+
+/** Withdraw an as-yet-unaccepted handoff (proposed or authorized). Only the Chair
+    that proposed it or the office may withdraw. Ownership is untouched — the work
+    simply stays where it was. */
+export function withdrawHandoff(
+  rec: Recommendation, handoffId: string, byChairId: string, now: Date = new Date(),
+): CollaborationResult {
+  const h = findHandoff(rec, handoffId);
+  if (!h) return fail('handoff_not_found');
+  if (h.status !== 'proposed' && h.status !== 'authorized') return fail('handoff_wrong_state');
+  if (byChairId !== h.proposedByChairId && byChairId !== OFFICE_BROKER) return fail('not_proposer_or_office');
+  const ts = now.toISOString();
+  const next: Handoff = { ...h, status: 'withdrawn', resolvedAt: ts };
+  return { ok: true, rec: replaceHandoff(rec, next, now), handoffId };
+}
+
+/* --- Consultation (ownership stays) --------------------------------------- */
+
+/** The owning Chair requests a focused consultation from another Chair. Ownership
+    never changes. One question; the answer comes later. Guards mirror handoff:
+    real, different Chair; the requester must own collaborable work; a question. */
+export function requestConsultation(
+  rec: Recommendation, fromChairId: string, toChairId: string, question: string,
+  now: Date = new Date(), id: string = `consult_${now.getTime()}`,
+): CollaborationResult {
+  if (!getChair(fromChairId) || !getChair(toChairId)) return fail('unknown_chair');
+  if (fromChairId === toChairId) return fail('self_consultation');
+  if (!isCollaborable(rec)) return fail('record_not_collaborable');
+  if (rec.ownerChairId !== fromChairId) return fail('not_owner');
+  const q = question.trim();
+  if (!q) return fail('empty_question');
+  const consultation: Consultation = {
+    id, owningChairId: fromChairId, consultedChairId: toChairId,
+    question: q, status: 'open', brokeredBy: OFFICE_BROKER, requestedAt: now.toISOString(),
+  };
+  return {
+    ok: true,
+    rec: { ...rec, consultations: [...rec.consultations, consultation], updatedAt: now.toISOString() },
+    consultationId: id,
+  };
+}
+
+/** The consulted Chair answers an open consultation — one recorded answer. Only the
+    consulted Chair may answer; ownership is never affected. */
+export function answerConsultation(
+  rec: Recommendation, consultationId: string, byChairId: string, answer: string, now: Date = new Date(),
+): CollaborationResult {
+  const c = rec.consultations.find((x) => x.id === consultationId) ?? null;
+  if (!c) return fail('consultation_not_found');
+  if (c.status !== 'open') return fail('consultation_wrong_state');
+  if (byChairId !== c.consultedChairId) return fail('not_consulted_chair');
+  const a = answer.trim();
+  if (!a) return fail('empty_answer');
+  const ts = now.toISOString();
+  const next: Consultation = { ...c, answer: a, status: 'answered', answeredAt: ts };
+  return {
+    ok: true,
+    rec: { ...rec, consultations: rec.consultations.map((x) => (x.id === next.id ? next : x)), updatedAt: ts },
+    consultationId,
+  };
+}
+
+/** Withdraw an open consultation — by the owning Chair or the office. */
+export function withdrawConsultation(
+  rec: Recommendation, consultationId: string, byChairId: string, now: Date = new Date(),
+): CollaborationResult {
+  const c = rec.consultations.find((x) => x.id === consultationId) ?? null;
+  if (!c) return fail('consultation_not_found');
+  if (c.status !== 'open') return fail('consultation_wrong_state');
+  if (byChairId !== c.owningChairId && byChairId !== OFFICE_BROKER) return fail('not_owner');
+  const next: Consultation = { ...c, status: 'withdrawn' };
+  return {
+    ok: true,
+    rec: { ...rec, consultations: rec.consultations.map((x) => (x.id === next.id ? next : x)), updatedAt: now.toISOString() },
+    consultationId,
+  };
+}
+
+/* --- Derived collaboration views (pure; support later UI, build none now) --- */
+
+/** A handoff paired with the record it belongs to — what the office needs to act. */
+export interface HandoffView { rec: Recommendation; handoff: Handoff; }
+export interface ConsultationView { rec: Recommendation; consultation: Consultation; }
+
+function collectHandoffs(recs: Recommendation[], keep: (h: Handoff) => boolean): HandoffView[] {
+  const out: HandoffView[] = [];
+  for (const rec of recs) for (const handoff of rec.collaborationTrail) if (keep(handoff)) out.push({ rec, handoff });
+  return out.sort((a, b) => a.handoff.createdAt.localeCompare(b.handoff.createdAt));
+}
+
+/** Proposals awaiting the office to authorize (or withdraw). */
+export function pendingHandoffProposals(recs: Recommendation[]): HandoffView[] {
+  return collectHandoffs(recs, (h) => h.status === 'proposed');
+}
+/** Authorized handoffs awaiting the receiving Chair's acceptance or decline. */
+export function handoffsAwaitingAcceptance(recs: Recommendation[]): HandoffView[] {
+  return collectHandoffs(recs, (h) => h.status === 'authorized');
+}
+/** Declined handoffs — the work is back with the office to re-broker. */
+export function declinedHandoffsForOffice(recs: Recommendation[]): HandoffView[] {
+  return collectHandoffs(recs, (h) => h.status === 'declined')
+    .sort((a, b) => (a.handoff.resolvedAt ?? '').localeCompare(b.handoff.resolvedAt ?? ''));
+}
+/** Open consultations awaiting the consulted Chair's answer. */
+export function unansweredConsultations(recs: Recommendation[]): ConsultationView[] {
+  const out: ConsultationView[] = [];
+  for (const rec of recs) for (const consultation of rec.consultations)
+    if (consultation.status === 'open') out.push({ rec, consultation });
+  return out.sort((a, b) => a.consultation.requestedAt.localeCompare(b.consultation.requestedAt));
+}
+
+/** The full, ordered collaboration provenance of a single record — every handoff
+    and consultation on it, oldest first. Honest history, never destroyed. */
+export interface CollaborationEvent {
+  at: string; kind: 'handoff' | 'consultation'; status: string;
+  handoff?: Handoff; consultation?: Consultation;
+}
+export function collaborationHistory(rec: Recommendation): CollaborationEvent[] {
+  const events: CollaborationEvent[] = [
+    ...rec.collaborationTrail.map((h) => ({ at: h.createdAt, kind: 'handoff' as const, status: h.status, handoff: h })),
+    ...rec.consultations.map((c) => ({ at: c.requestedAt, kind: 'consultation' as const, status: c.status, consultation: c })),
+  ];
+  return events.sort((a, b) => a.at.localeCompare(b.at));
+}
+
+/** Records currently WAITING on a collaboration to resolve — an open handoff still
+    to be brokered/accepted, or an unanswered consultation. Derived honestly from
+    the record itself; no invented dependency graph. */
+export function collaborationWaiting(recs: Recommendation[]): Recommendation[] {
+  return recs.filter((rec) =>
+    !!openHandoff(rec) || rec.consultations.some((c) => c.status === 'open'));
+}
+
 /* -----------------------------------------------------------------------------
    DERIVED VIEWS — the honest, computed picture of the operational record.
    --------------------------------------------------------------------------- */
@@ -993,6 +1337,33 @@ export function isRecommendation(x: unknown): x is Recommendation {
     defaults, and drop unknown enum values — so Sprint 12A–12C records stay valid
     without a migration and without silent data loss. Well-formed records pass
     through unchanged. */
+const HANDOFF_STATUSES = new Set<HandoffStatus>(['proposed', 'authorized', 'accepted', 'declined', 'withdrawn']);
+const CONSULTATION_STATUSES = new Set<ConsultationStatus>(['open', 'answered', 'withdrawn']);
+
+/** Keep only well-formed handoff entries — a stored trail can never inject a
+    malformed or half-typed handoff into the running office. */
+function sanitizeTrail(value: unknown): Handoff[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((h): h is Handoff =>
+    !!h && typeof h === 'object'
+    && typeof (h as Handoff).id === 'string'
+    && typeof (h as Handoff).fromChairId === 'string'
+    && typeof (h as Handoff).toChairId === 'string'
+    && typeof (h as Handoff).createdAt === 'string'
+    && HANDOFF_STATUSES.has((h as Handoff).status));
+}
+function sanitizeConsultations(value: unknown): Consultation[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((c): c is Consultation =>
+    !!c && typeof c === 'object'
+    && typeof (c as Consultation).id === 'string'
+    && typeof (c as Consultation).owningChairId === 'string'
+    && typeof (c as Consultation).consultedChairId === 'string'
+    && typeof (c as Consultation).question === 'string'
+    && typeof (c as Consultation).requestedAt === 'string'
+    && CONSULTATION_STATUSES.has((c as Consultation).status));
+}
+
 export function normalizeRecommendation(rec: Recommendation): Recommendation {
   const type = SUBMISSION_TYPE_BY_ID.has(rec.type) ? rec.type : DEFAULT_TYPE;
   const visibility = VISIBILITY_BY_ID.has(rec.visibility) ? rec.visibility : DEFAULT_VISIBILITY;
@@ -1002,11 +1373,18 @@ export function normalizeRecommendation(rec: Recommendation): Recommendation {
   const creativeStage = rec.creativeStage && CREATIVE_STAGE_BY_ID.has(rec.creativeStage) ? rec.creativeStage : null;
   const productionStage = rec.productionStage && PRODUCTION_STAGE_BY_ID.has(rec.productionStage) ? rec.productionStage : null;
   const growthStage = rec.growthStage && GROWTH_STAGE_BY_ID.has(rec.growthStage) ? rec.growthStage : null;
+  // Collaboration collections (12G) — always arrays, only well-formed entries. Kept
+  // by reference when already clean so the unchanged fast-path still holds.
+  const trailOk = Array.isArray(rec.collaborationTrail) && sanitizeTrail(rec.collaborationTrail).length === rec.collaborationTrail.length;
+  const collaborationTrail = trailOk ? rec.collaborationTrail : sanitizeTrail(rec.collaborationTrail);
+  const consultOk = Array.isArray(rec.consultations) && sanitizeConsultations(rec.consultations).length === rec.consultations.length;
+  const consultations = consultOk ? rec.consultations : sanitizeConsultations(rec.consultations);
   const unchanged = rec.type === type && rec.visibility === visibility
     && rec.triage === triage && rec.preparation === preparation && rec.blocked === blocked
     && rec.creativeStage === creativeStage && rec.productionStage === productionStage
-    && rec.growthStage === growthStage;
-  return unchanged ? rec : { ...rec, type, visibility, triage, preparation, blocked, creativeStage, productionStage, growthStage };
+    && rec.growthStage === growthStage
+    && rec.collaborationTrail === collaborationTrail && rec.consultations === consultations;
+  return unchanged ? rec : { ...rec, type, visibility, triage, preparation, blocked, creativeStage, productionStage, growthStage, collaborationTrail, consultations };
 }
 
 export function loadRecommendations(): Recommendation[] {
