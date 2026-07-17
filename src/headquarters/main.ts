@@ -66,6 +66,8 @@ import {
   triage, prepareRecommendation, presentToFounder, requestRevision,
   recordFounderDecision, setBlocked, advance,
   decisionsForFounder,
+  creativeQueue, creativeAccept, creativeStart, creativeComplete, creativeReturn,
+  creativeRequestClarification, creativeStageLabel, creativeStanding,
   SUBMISSION_TYPES, PRIORITIES, TRIAGE_OUTCOMES,
   recStatusLabel, priorityLabel, ownerLabel, typeLabel as recTypeLabel, visibilityLabel,
   triageStateLabel,
@@ -515,6 +517,8 @@ function renderCreative(root: HTMLElement, room: Room): void {
   const archive = el('div', { class: 'hq-archive', 'aria-label': 'The Archive', 'aria-busy': 'true' },
     el('p', { class: 'hq-archive__eyebrow label' }, 'The Archive'),
     el('p', { class: 'hq-state__lede' }, 'Opening the archive…'));
+  // The receiving queue — work routed to the Creative Director (Sprint 12D).
+  const intake = el('div', { class: 'hq-creative-intake' });
 
   const view = el(
     'section',
@@ -535,6 +539,7 @@ function renderCreative(root: HTMLElement, room: Room): void {
         el('h1', { class: 'hq-title hq-title--seated' }, room.name),
         el('p', { class: 'hq-lede' }, 'A private library where the making lives. The work is alive and waiting — kept warm for whenever you return to it.'),
       ),
+      intake,
       el(
         'div',
         { class: 'hq-library' },
@@ -546,7 +551,86 @@ function renderCreative(root: HTMLElement, room: Room): void {
   );
 
   root.replaceChildren(view);
+  mountCreativeIntake(intake);
   void mountLibrary(manuscript, archive);
+}
+
+/* --- The Creative Director's receiving queue (Sprint 12D) ------------------
+   Work routed here by the Chief of Staff — ONLY items owned by Chair #002. The
+   Creative Director acts on the same shared record; a clarification returns to
+   the Chief of Staff, never to the Founder. Renders synchronously from the
+   client store and repaints itself in place. */
+function mountCreativeIntake(host: HTMLElement): void {
+  const repaint = (): void => mountCreativeIntake(host);
+  const queue = creativeQueue(loadRecommendations());
+
+  const section = el('section', { class: 'hq-cos__section', 'aria-label': 'Work from the Chief of Staff' },
+    el('p', { class: 'hq-cos__eyebrow label' }, 'From the Chief of Staff'),
+    el('p', { class: 'hq-cos__lead' }, 'Work routed to the Creative Director. Everything here arrives through the Chief of Staff — the making is yours.'));
+
+  if (queue.length === 0) {
+    section.append(el('p', { class: 'hq-cos__quiet' },
+      'Nothing has been routed to you yet. When the Chief of Staff sends creative work, it appears here.'));
+  } else {
+    const list = el('div', { class: 'hq-cos__decisions' });
+    for (const r of queue) list.append(cosCreativeCard(r, repaint));
+    section.append(list);
+  }
+  host.replaceChildren(section);
+}
+
+function cosCreativeCard(r: Recommendation, repaint: () => void): HTMLElement {
+  const persist = (next: Recommendation): void => {
+    saveRecommendations(upsertRecommendation(loadRecommendations(), next));
+    repaint();
+  };
+  const card = el('article', { class: 'hq-cos__decision' });
+  card.append(
+    el('div', { class: 'hq-cos__chair-head' },
+      el('h3', { class: 'hq-cos__decision-title' }, r.title),
+      el('span', { class: 'hq-cos__tag label', 'data-status': r.priority }, priorityLabel(r.priority))),
+    el('p', { class: 'hq-cos__decision-summary' },
+      `${recTypeLabel(r)} · ${recStatusLabel(r.status)} · ${creativeStageLabel(r.creativeStage)} · ${visibilityLabel(r.visibility)}`),
+    el('p', { class: 'hq-cos__decision-summary' },
+      `Recorded ${formatWhen(r.createdAt)}${r.preparation ? ` · prepared ${formatWhen(r.preparation.preparedAt)}` : ''}`),
+  );
+  if (r.summary) card.append(el('p', { class: 'hq-cos__field-body' }, r.summary));
+  if (r.preparation?.recommendation) card.append(cosField('Chief of Staff’s note', r.preparation.recommendation));
+  if (r.creativeStage === 'clarification' && r.creativeNote) {
+    card.append(cosField('Clarification requested (with the Chief of Staff)', r.creativeNote));
+  }
+
+  // Creative review actions — contextual to the stage.
+  const group = el('div', { class: 'hq-cos__responses', role: 'group', 'aria-label': `Creative review of “${r.title}”` });
+  const act = (label: string, fn: () => Recommendation): void => {
+    const b = el('button', { class: 'hq-cos__response', type: 'button' }, label) as HTMLButtonElement;
+    b.addEventListener('click', () => persist(fn()));
+    group.append(b);
+  };
+  if (r.creativeStage === null) act('Accept Work', () => creativeAccept(r));
+  if (r.creativeStage === 'accepted' || r.creativeStage === 'clarification') act('Mark In Progress', () => creativeStart(r));
+  if (r.creativeStage === 'accepted' || r.creativeStage === 'in_progress') act('Mark Creative Review Complete', () => creativeComplete(r));
+  group.append((() => {
+    const b = el('button', { class: 'hq-cos__response', type: 'button' }, 'Return to Chief of Staff') as HTMLButtonElement;
+    b.addEventListener('click', () => persist(creativeReturn(r)));
+    return b;
+  })());
+  card.append(group);
+
+  // Request Founder clarification — routed BACK through the Chief of Staff.
+  const noteId = `cnote_${r.id.replace(/[^a-z0-9]/gi, '')}`;
+  const note = el('input', {
+    class: 'hq-cos__note-input', id: noteId, type: 'text', maxlength: '200',
+    placeholder: 'What needs clarifying?',
+    ...(r.creativeNote ? { value: r.creativeNote } : {}),
+  }) as HTMLInputElement;
+  const clarify = el('button', { class: 'hq-cos__withdraw', type: 'button' },
+    'Request Founder clarification (via Chief of Staff)') as HTMLButtonElement;
+  clarify.addEventListener('click', () => persist(creativeRequestClarification(r, note.value)));
+  card.append(el('div', { class: 'hq-cos__note-field' },
+    el('label', { class: 'hq-cos__note-input-label label', for: noteId }, 'Clarification note'), note, clarify));
+
+  return card;
 }
 
 /**
@@ -1177,6 +1261,20 @@ function cosOperational(): HTMLElement {
       `Chair #${String(w.ordinal).padStart(3, '0')} — ${w.title}: ${w.activeCount === 0 ? 'no active work' : `${w.activeCount} in motion`}`));
   }
   block.append(el('h3', { class: 'hq-cos__field-label label' }, 'Executive Workload'), load);
+
+  // The Creative Director's standing — what the Chair has taken up (Sprint 12D).
+  const cd = creativeStanding(loadRecommendations());
+  const cdParts: string[] = [];
+  if (cd.awaiting) cdParts.push(`${cd.awaiting} awaiting`);
+  if (cd.accepted) cdParts.push(`${cd.accepted} accepted`);
+  if (cd.inProgress) cdParts.push(`${cd.inProgress} in progress`);
+  if (cd.clarification) cdParts.push(`${cd.clarification} needing clarification`);
+  if (cd.completed) cdParts.push(`${cd.completed} complete`);
+  if (cdParts.length > 0) {
+    block.append(
+      el('h3', { class: 'hq-cos__field-label label' }, 'Creative Director'),
+      el('p', { class: 'hq-cos__line' }, cdParts.join(' · ')));
+  }
 
   return block;
 }

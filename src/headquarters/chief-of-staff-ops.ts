@@ -24,7 +24,7 @@
 
 import {
   STORAGE_ROOT, loadCollection, saveCollection,
-  CHAIRS, getChair,
+  CHAIRS, getChair, CHAIR_CREATIVE_DIRECTOR,
   founderDecisionLabel,
   type ExecutiveChair, type FounderDecision,
 } from './executive-register.ts';
@@ -87,7 +87,8 @@ const TRANSITIONS: Record<RecStatus, RecStatus[]> = {
   preparing:        ['awaiting_founder', 'executing', 'held', 'withdrawn'],
   awaiting_founder: ['decided', 'preparing', 'held', 'withdrawn'],
   decided:          ['executing', 'complete', 'withdrawn'],
-  executing:        ['complete', 'held', 'withdrawn'],
+  // 'preparing' added so a receiving Chair can Return work to the Chief of Staff.
+  executing:        ['preparing', 'complete', 'held', 'withdrawn'],
   complete:         [],
   held:             ['preparing', 'awaiting_founder', 'executing', 'withdrawn'],
   withdrawn:        [],
@@ -176,6 +177,11 @@ export interface Recommendation {
   decidedAt?: string;
   /** Whether the item is blocked in execution (a lightweight follow-up flag). */
   blocked: boolean;
+  /** The receiving Chair's own progress on this item, or null until they act.
+      An annotation beside the lifecycle (like triage), never a second engine. */
+  creativeStage: CreativeStage | null;
+  /** A note the receiving Chair sends back through the Chief of Staff. */
+  creativeNote?: string;
   /** ISO datetime created. */
   createdAt: string;
   /** ISO datetime last changed. */
@@ -248,6 +254,7 @@ export function makeRecommendation(
     triage: null,
     preparation: null,
     blocked: false,
+    creativeStage: null,
     createdAt: ts,
     updatedAt: ts,
   };
@@ -411,6 +418,97 @@ export function requestRevision(rec: Recommendation, note: string = '', now: Dat
 /** Set (or clear) the execution "blocked" follow-up flag. */
 export function setBlocked(rec: Recommendation, blocked: boolean, now: Date = new Date()): Recommendation {
   return { ...rec, blocked, updatedAt: now.toISOString() };
+}
+
+/* -----------------------------------------------------------------------------
+   RECEIVING CHAIR — CREATIVE DIRECTOR (Sprint 12D). The Creative Director works
+   only on items the Chief of Staff has routed to Chair #002. `creativeStage` is
+   the Chair's own progress annotation beside the shared lifecycle — NOT a second
+   engine; every action updates the same recommendation record. The Chair never
+   speaks to the Founder directly: a clarification returns to the Chief of Staff.
+   --------------------------------------------------------------------------- */
+export type CreativeStage = 'accepted' | 'in_progress' | 'clarification' | 'complete';
+
+export interface CreativeStageKind { id: CreativeStage; label: string; }
+export const CREATIVE_STAGES: CreativeStageKind[] = [
+  { id: 'accepted',      label: 'Accepted' },
+  { id: 'in_progress',   label: 'In Progress' },
+  { id: 'clarification', label: 'Clarification Requested' },
+  { id: 'complete',      label: 'Creative Review Complete' },
+];
+const CREATIVE_STAGE_BY_ID = new Map(CREATIVE_STAGES.map((s) => [s.id, s]));
+
+/** The label for a creative stage; null (routed, not yet accepted) reads as
+    "Awaiting Creative". */
+export function creativeStageLabel(stage: CreativeStage | null): string {
+  return stage ? (CREATIVE_STAGE_BY_ID.get(stage)?.label ?? stage) : 'Awaiting Creative';
+}
+
+/** Accept a routed item — the Creative Director takes it up. Keeps it in
+    execution (advancing there if it arrived approved-but-not-yet-in-motion). */
+export function creativeAccept(rec: Recommendation, now: Date = new Date()): Recommendation {
+  const status = canTransition(rec.status, 'executing') ? 'executing' : rec.status;
+  return { ...rec, creativeStage: 'accepted', status, updatedAt: now.toISOString() };
+}
+
+/** Mark accepted work as actively in progress. */
+export function creativeStart(rec: Recommendation, now: Date = new Date()): Recommendation {
+  const status = canTransition(rec.status, 'executing') ? 'executing' : rec.status;
+  return { ...rec, creativeStage: 'in_progress', status, updatedAt: now.toISOString() };
+}
+
+/** Mark the creative review complete — the Chair's part is done. */
+export function creativeComplete(rec: Recommendation, now: Date = new Date()): Recommendation {
+  const status = canTransition(rec.status, 'complete') ? 'complete' : rec.status;
+  return { ...rec, creativeStage: 'complete', status, updatedAt: now.toISOString() };
+}
+
+/** Return the work to the Chief of Staff — the Chair sets it down; ownership and
+    the creative annotation are cleared, and it re-enters the office untriaged. */
+export function creativeReturn(rec: Recommendation, now: Date = new Date()): Recommendation {
+  const status = canTransition(rec.status, 'preparing') ? 'preparing' : rec.status;
+  return {
+    ...rec, ownerChairId: null, creativeStage: null, creativeNote: undefined,
+    triage: null, status, updatedAt: now.toISOString(),
+  };
+}
+
+/** Request Founder clarification — routed BACK through the Chief of Staff, never
+    to the Founder directly. The item is paused (held) with the Chair's note for
+    the office to carry. */
+export function creativeRequestClarification(
+  rec: Recommendation, note: string = '', now: Date = new Date(),
+): Recommendation {
+  const status = canTransition(rec.status, 'held') ? 'held' : rec.status;
+  const trimmed = note.trim();
+  return { ...rec, creativeStage: 'clarification', creativeNote: trimmed || undefined, status, updatedAt: now.toISOString() };
+}
+
+/** The Creative Director's queue — ONLY active work routed to Chair #002, in
+    priority order. Work owned by other Chairs is never exposed here. */
+export function creativeQueue(recs: Recommendation[]): Recommendation[] {
+  return activeRecommendations(recs).filter((r) => r.ownerChairId === CHAIR_CREATIVE_DIRECTOR);
+}
+
+/** What the Chief of Staff needs to know about Creative at a glance — derived,
+    honest counts. `completed` includes finished (inactive) creative work. */
+export interface CreativeStanding {
+  awaiting: number;      // routed, not yet accepted
+  accepted: number;
+  inProgress: number;
+  clarification: number; // paused, needs the office to carry a clarification
+  completed: number;
+}
+export function creativeStanding(recs: Recommendation[]): CreativeStanding {
+  const owned = recs.filter((r) => r.ownerChairId === CHAIR_CREATIVE_DIRECTOR);
+  const active = owned.filter((r) => isActiveStatus(r.status));
+  return {
+    awaiting: active.filter((r) => r.creativeStage === null).length,
+    accepted: active.filter((r) => r.creativeStage === 'accepted').length,
+    inProgress: active.filter((r) => r.creativeStage === 'in_progress').length,
+    clarification: owned.filter((r) => r.creativeStage === 'clarification').length,
+    completed: owned.filter((r) => r.creativeStage === 'complete').length,
+  };
 }
 
 /* -----------------------------------------------------------------------------
@@ -619,18 +717,21 @@ export function isRecommendation(x: unknown): x is Recommendation {
 }
 
 /** Fill fields that a stored record may predate (Inbox type/visibility from 12B;
-    triage/preparation/blocked from 12C) with honest defaults, and drop unknown
-    enum values — so Sprint 12A and 12B records stay valid without a migration and
-    without silent data loss. Well-formed records pass through unchanged. */
+    triage/preparation/blocked from 12C; creativeStage from 12D) with honest
+    defaults, and drop unknown enum values — so Sprint 12A–12C records stay valid
+    without a migration and without silent data loss. Well-formed records pass
+    through unchanged. */
 export function normalizeRecommendation(rec: Recommendation): Recommendation {
   const type = SUBMISSION_TYPE_BY_ID.has(rec.type) ? rec.type : DEFAULT_TYPE;
   const visibility = VISIBILITY_BY_ID.has(rec.visibility) ? rec.visibility : DEFAULT_VISIBILITY;
   const triage = rec.triage && TRIAGE_BY_ID.has(rec.triage) ? rec.triage : null;
   const preparation = rec.preparation ?? null;
   const blocked = rec.blocked === true;
+  const creativeStage = rec.creativeStage && CREATIVE_STAGE_BY_ID.has(rec.creativeStage) ? rec.creativeStage : null;
   const unchanged = rec.type === type && rec.visibility === visibility
-    && rec.triage === triage && rec.preparation === preparation && rec.blocked === blocked;
-  return unchanged ? rec : { ...rec, type, visibility, triage, preparation, blocked };
+    && rec.triage === triage && rec.preparation === preparation && rec.blocked === blocked
+    && rec.creativeStage === creativeStage;
+  return unchanged ? rec : { ...rec, type, visibility, triage, preparation, blocked, creativeStage };
 }
 
 export function loadRecommendations(): Recommendation[] {
