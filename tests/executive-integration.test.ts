@@ -149,7 +149,7 @@ test('the Decision System is untouched — its responses and decisions remain', 
   // The Executive Inbox (12B) and the Brokerage (12H) are additive sections; the
   // rest are intact.
   assert.deepEqual(cos.COS_SECTIONS.map((s) => s.id),
-    ['briefing', 'inbox', 'decisions', 'docket', 'brokerage', 'chairs', 'leadership', 'archive']);
+    ['briefing', 'inbox', 'decisions', 'docket', 'brokerage', 'opportunities', 'chairs', 'leadership', 'archive']);
   assert.deepEqual(cos.RESPONSES.map((r) => r.id),
     ['approved', 'approved_with_changes', 'not_yet', 'rework', 'discuss', 'archive']);
   assert.equal(cos.DECISIONS.length > 0, true);

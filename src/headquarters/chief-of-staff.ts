@@ -50,6 +50,7 @@ export type CosSectionId =
   | 'decisions'
   | 'docket'
   | 'brokerage'
+  | 'opportunities'
   | 'chairs'
   | 'leadership'
   | 'archive';
@@ -68,6 +69,7 @@ export const COS_SECTIONS: CosSection[] = [
   { id: 'decisions',  label: 'Decisions',         note: 'Prepared recommendations awaiting your word.' },
   { id: 'docket',     label: 'Docket',            note: 'The active questions before the House.' },
   { id: 'brokerage',  label: 'The Brokerage',     note: 'Where the office brokers collaboration between the Chairs.' },
+  { id: 'opportunities', label: 'Opportunities',  note: 'Intelligence the Director of Growth has found, awaiting your prioritisation.' },
   { id: 'chairs',     label: 'Open Chairs',       note: 'The seats the House is preparing to fill.' },
   { id: 'leadership', label: 'Leadership Records', note: 'Who holds each charge, and how it was given.' },
   { id: 'archive',    label: 'Archive',           note: 'The institutional record, kept in order.' },
