@@ -95,18 +95,73 @@ export function canTransition(from: RecStatus, to: RecStatus): boolean {
 }
 
 /* -----------------------------------------------------------------------------
-   THE RECOMMENDATION — the operational record the Chief of Staff tracks.
+   SUBMISSION TYPE — the kind of work entering through the Executive Inbox. The
+   Inbox is the one front door; every submission becomes a tracked record of one
+   of these kinds. (This is a description of the work, never a judgement about it.)
+   --------------------------------------------------------------------------- */
+export type SubmissionType =
+  | 'idea'
+  | 'decision_request'
+  | 'opportunity'
+  | 'risk'
+  | 'problem'
+  | 'creative_concept'
+  | 'production_request'
+  | 'growth_initiative'
+  | 'administrative_task';
+
+export interface SubmissionTypeKind { id: SubmissionType; label: string; }
+export const SUBMISSION_TYPES: SubmissionTypeKind[] = [
+  { id: 'idea',                label: 'Idea' },
+  { id: 'decision_request',    label: 'Decision Request' },
+  { id: 'opportunity',         label: 'Opportunity' },
+  { id: 'risk',                label: 'Risk' },
+  { id: 'problem',             label: 'Problem' },
+  { id: 'creative_concept',    label: 'Creative Concept' },
+  { id: 'production_request',  label: 'Production Request' },
+  { id: 'growth_initiative',   label: 'Growth Initiative' },
+  { id: 'administrative_task', label: 'Administrative Task' },
+];
+const SUBMISSION_TYPE_BY_ID = new Map(SUBMISSION_TYPES.map((s) => [s.id, s]));
+export function submissionTypeLabel(id: SubmissionType): string { return SUBMISSION_TYPE_BY_ID.get(id)?.label ?? id; }
+const DEFAULT_TYPE: SubmissionType = 'idea';
+
+/* -----------------------------------------------------------------------------
+   FOUNDER VISIBILITY — whether an item is on the Founder's radar (surfaced in her
+   briefing) or being carried internally by the office. New submissions are
+   visible — she recorded it and can see it landed; the Chief of Staff may take it
+   internal once the office owns it, taking it off her plate.
+   --------------------------------------------------------------------------- */
+export type FounderVisibility = 'visible' | 'internal';
+
+export interface FounderVisibilityKind { id: FounderVisibility; label: string; }
+export const FOUNDER_VISIBILITIES: FounderVisibilityKind[] = [
+  { id: 'visible',  label: 'On Your Radar' },
+  { id: 'internal', label: 'Held by the Office' },
+];
+const VISIBILITY_BY_ID = new Map(FOUNDER_VISIBILITIES.map((v) => [v.id, v]));
+export function visibilityLabel(id: FounderVisibility): string { return VISIBILITY_BY_ID.get(id)?.label ?? id; }
+const DEFAULT_VISIBILITY: FounderVisibility = 'visible';
+
+/* -----------------------------------------------------------------------------
+   THE RECOMMENDATION — the operational record the Chief of Staff tracks. Every
+   Executive Inbox submission IS a recommendation record; the Inbox is simply the
+   front door through which one is created.
    --------------------------------------------------------------------------- */
 export interface Recommendation {
   id: string;
+  /** The kind of work this is (from the Inbox). */
+  type: SubmissionType;
   /** The matter, in a line. */
   title: string;
-  /** What it is — one honest sentence. */
+  /** What it is — an honest description. */
   summary: string;
   /** The Chair this work is routed to (by Register id), or null if unassigned. */
   ownerChairId: string | null;
   priority: Priority;
   status: RecStatus;
+  /** Whether it is on the Founder's radar or held internally by the office. */
+  visibility: FounderVisibility;
   /** The Founder's recorded decision (pending until she answers). */
   founderDecision: FounderDecision;
   /** ISO datetime created. */
@@ -118,7 +173,10 @@ export interface Recommendation {
 /** Build a recommendation from a sketch. Requires a title and summary; defaults
     to preparing / next / unassigned / undecided. Nothing is invented. */
 export function makeRecommendation(
-  input: { id: string; title: string; summary: string; ownerChairId?: string | null; priority?: Priority },
+  input: {
+    id: string; title: string; summary: string;
+    type?: SubmissionType; ownerChairId?: string | null; priority?: Priority; visibility?: FounderVisibility;
+  },
   now: Date = new Date(),
 ): Recommendation | null {
   if (!input.id || !input.title.trim() || !input.summary.trim()) return null;
@@ -126,15 +184,41 @@ export function makeRecommendation(
   const ts = now.toISOString();
   return {
     id: input.id,
+    type: input.type && SUBMISSION_TYPE_BY_ID.has(input.type) ? input.type : DEFAULT_TYPE,
     title: input.title.trim(),
     summary: input.summary.trim(),
     ownerChairId: owner && getChair(owner) ? owner : null,
     priority: input.priority ?? 'next',
     status: 'preparing',
+    visibility: input.visibility && VISIBILITY_BY_ID.has(input.visibility) ? input.visibility : DEFAULT_VISIBILITY,
     founderDecision: 'pending',
     createdAt: ts,
     updatedAt: ts,
   };
+}
+
+/** Intake a submission through the Executive Inbox — the institution's single
+    front door. A submission is just a recommendation created with a type and a
+    description; every submission becomes a tracked record the moment it is made.
+    Requires a title and a description; nothing is invented. */
+export function makeSubmission(
+  input: {
+    id: string; type: SubmissionType; title: string; description: string;
+    priority?: Priority; ownerChairId?: string | null;
+  },
+  now: Date = new Date(),
+): Recommendation | null {
+  return makeRecommendation(
+    { id: input.id, type: input.type, title: input.title, summary: input.description,
+      priority: input.priority, ownerChairId: input.ownerChairId },
+    now,
+  );
+}
+
+/** Set a record's Founder-visibility (on the radar vs. held by the office). */
+export function setVisibility(rec: Recommendation, visibility: FounderVisibility, now: Date = new Date()): Recommendation {
+  if (!VISIBILITY_BY_ID.has(visibility)) return rec;
+  return { ...rec, visibility, updatedAt: now.toISOString() };
 }
 
 /** Route (or re-route) a recommendation to a Chair — validated against the
@@ -233,6 +317,34 @@ export function decisionLabel(rec: Recommendation): string {
   return founderDecisionLabel(rec.founderDecision);
 }
 
+/** The label for a recommendation's submission type. */
+export function typeLabel(rec: Recommendation): string {
+  return submissionTypeLabel(rec.type);
+}
+
+/* -----------------------------------------------------------------------------
+   THE EXECUTIVE INBOX — the Chief of Staff's working queue.
+
+   The full ledger is the institution's long-term memory (newest first); the
+   working queue is the active portion the office is coordinating. These reuse the
+   same records — the Inbox does not hold a second store.
+   --------------------------------------------------------------------------- */
+
+/** Every submission ever made, newest first — the institution's memory. */
+export function inboxLedger(recs: Recommendation[]): Recommendation[] {
+  return [...recs].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/** The Chief of Staff's active working queue, in priority order. */
+export function chiefOfStaffQueue(recs: Recommendation[]): Recommendation[] {
+  return activeRecommendations(recs);
+}
+
+/** Active work still being readied by the office — what requires preparation. */
+export function needsPreparation(recs: Recommendation[]): Recommendation[] {
+  return activeRecommendations(recs).filter((r) => r.status === 'preparing');
+}
+
 /* -----------------------------------------------------------------------------
    THE INTEGRATED OPERATIONAL BRIEFING — one honest picture for the Founder.
 
@@ -288,8 +400,17 @@ export function isRecommendation(x: unknown): x is Recommendation {
     && typeof o.createdAt === 'string' && typeof o.updatedAt === 'string';
 }
 
+/** Fill the Inbox fields (type, visibility) with honest defaults when a stored
+    record predates them or carries an unknown value — so old records stay valid
+    without a store migration. */
+export function normalizeRecommendation(rec: Recommendation): Recommendation {
+  const type = SUBMISSION_TYPE_BY_ID.has(rec.type) ? rec.type : DEFAULT_TYPE;
+  const visibility = VISIBILITY_BY_ID.has(rec.visibility) ? rec.visibility : DEFAULT_VISIBILITY;
+  return rec.type === type && rec.visibility === visibility ? rec : { ...rec, type, visibility };
+}
+
 export function loadRecommendations(): Recommendation[] {
-  return loadCollection(RECOMMENDATIONS_KEY, isRecommendation);
+  return loadCollection(RECOMMENDATIONS_KEY, isRecommendation).map(normalizeRecommendation);
 }
 export function saveRecommendations(recs: Recommendation[]): void {
   saveCollection(RECOMMENDATIONS_KEY, recs);

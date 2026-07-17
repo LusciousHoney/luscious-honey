@@ -46,6 +46,7 @@ export { chairStatusLabel };
    --------------------------------------------------------------------------- */
 export type CosSectionId =
   | 'briefing'
+  | 'inbox'
   | 'decisions'
   | 'docket'
   | 'chairs'
@@ -62,6 +63,7 @@ export interface CosSection {
 
 export const COS_SECTIONS: CosSection[] = [
   { id: 'briefing',   label: 'Founder Briefing',  note: 'What has been prepared for you today.' },
+  { id: 'inbox',      label: 'Executive Inbox',   note: 'The front door — record work and the House takes it up.' },
   { id: 'decisions',  label: 'Decisions',         note: 'Prepared recommendations awaiting your word.' },
   { id: 'docket',     label: 'Docket',            note: 'The active questions before the House.' },
   { id: 'chairs',     label: 'Open Chairs',       note: 'The seats the House is preparing to fill.' },

@@ -19,6 +19,10 @@ import {
   ownerLabel, decisionLabel,
   operationalBriefing,
   RECOMMENDATIONS_KEY, isRecommendation, loadRecommendations, saveRecommendations, upsertRecommendation,
+  // Sprint 12B — Executive Inbox
+  SUBMISSION_TYPES, submissionTypeLabel, typeLabel,
+  FOUNDER_VISIBILITIES, visibilityLabel, setVisibility,
+  makeSubmission, normalizeRecommendation, inboxLedger, chiefOfStaffQueue, needsPreparation,
   type Recommendation,
 } from '../src/headquarters/chief-of-staff-ops.ts';
 import { CHAIR_CHIEF_OF_STAFF, CHAIR_CREATIVE_DIRECTOR, STORAGE_ROOT } from '../src/headquarters/executive-register.ts';
@@ -171,4 +175,79 @@ test('priorities and statuses expose labels', () => {
   assert.equal(recStatusLabel('awaiting_founder'), 'Awaiting You');
   assert.equal(isActiveStatus('executing'), true);
   assert.equal(isActiveStatus('complete'), false);
+});
+
+/* =============================================================================
+   SPRINT 12B — EXECUTIVE INBOX
+   ============================================================================= */
+
+test('the nine submission types and their labels are defined', () => {
+  assert.deepEqual(SUBMISSION_TYPES.map((s) => s.id), [
+    'idea', 'decision_request', 'opportunity', 'risk', 'problem',
+    'creative_concept', 'production_request', 'growth_initiative', 'administrative_task',
+  ]);
+  assert.equal(submissionTypeLabel('creative_concept'), 'Creative Concept');
+  assert.equal(submissionTypeLabel('mystery' as never), 'mystery');
+});
+
+test('makeSubmission records a typed, tracked institutional record', () => {
+  assert.equal(makeSubmission({ id: 's1', type: 'idea', title: '  ', description: 'd' }, T), null);
+  const s = makeSubmission(
+    { id: 's1', type: 'risk', title: '  A risk  ', description: '  watch this  ', priority: 'now', ownerChairId: CHAIR_CREATIVE_DIRECTOR },
+    T,
+  )!;
+  assert.equal(s.type, 'risk');
+  assert.equal(s.title, 'A risk');
+  assert.equal(s.summary, 'watch this');
+  assert.equal(s.priority, 'now');
+  assert.equal(s.ownerChairId, CHAIR_CREATIVE_DIRECTOR);
+  assert.equal(s.status, 'preparing', 'enters at preparing');
+  assert.equal(s.visibility, 'visible', 'on the Founder’s radar by default');
+  assert.equal(s.founderDecision, 'pending');
+  assert.equal(typeLabel(s), 'Risk');
+});
+
+test('an unknown submission type falls back to idea; unknown owner drops to unassigned', () => {
+  const s = makeSubmission({ id: 's2', type: 'bogus' as never, title: 't', description: 'd', ownerChairId: 'ghost' }, T)!;
+  assert.equal(s.type, 'idea');
+  assert.equal(s.ownerChairId, null);
+});
+
+test('Founder visibility has two honest states and can be toggled', () => {
+  assert.deepEqual(FOUNDER_VISIBILITIES.map((v) => v.id), ['visible', 'internal']);
+  assert.equal(visibilityLabel('internal'), 'Held by the Office');
+  const s = makeSubmission({ id: 's3', type: 'idea', title: 't', description: 'd' }, T)!;
+  assert.equal(setVisibility(s, 'internal', T).visibility, 'internal');
+  assert.equal(setVisibility(s, 'nope' as never, T).visibility, 'visible', 'unknown state is a no-op');
+});
+
+test('normalizeRecommendation fills type/visibility for records that predate them', () => {
+  const legacy = { ...makeSubmission({ id: 'L', type: 'idea', title: 't', description: 'd' }, T)! } as Recommendation;
+  // Simulate a pre-12B record missing the new fields.
+  delete (legacy as { type?: unknown }).type;
+  delete (legacy as { visibility?: unknown }).visibility;
+  const fixed = normalizeRecommendation(legacy);
+  assert.equal(fixed.type, 'idea');
+  assert.equal(fixed.visibility, 'visible');
+  // A well-formed record is returned unchanged (same reference).
+  const good = makeSubmission({ id: 'g', type: 'risk', title: 't', description: 'd' }, T)!;
+  assert.equal(normalizeRecommendation(good), good);
+});
+
+test('the Inbox reuses the same store as recommendations (no second source)', () => {
+  const s = makeSubmission({ id: 'q', type: 'opportunity', title: 't', description: 'd' }, T)!;
+  assert.ok(isRecommendation(s), 'a submission is a recommendation record');
+  // saved and loaded through the single recommendations store.
+  assert.doesNotThrow(() => saveRecommendations([s]));
+  assert.deepEqual(loadRecommendations(), [], 'no localStorage in tests → honest empty');
+});
+
+test('the working queue is active work in priority order; ledger is newest-first', () => {
+  const a = advance(makeSubmission({ id: 'a', type: 'idea', title: 'a', description: 'd', priority: 'later' }, new Date('2026-07-16T08:00:00Z'))!, 'awaiting_founder', T);
+  const b = makeSubmission({ id: 'b', type: 'idea', title: 'b', description: 'd', priority: 'now' }, new Date('2026-07-16T10:00:00Z'))!;
+  const done = advance(advance(advance(makeSubmission({ id: 'c', type: 'idea', title: 'c', description: 'd' }, T)!, 'awaiting_founder', T), 'decided', T), 'complete', T);
+  const store = [a, b, done];
+  assert.deepEqual(chiefOfStaffQueue(store).map((r) => r.id), ['b', 'a'], 'now before later; complete excluded');
+  assert.deepEqual(needsPreparation(store).map((r) => r.id), ['b'], 'only b is still preparing');
+  assert.deepEqual(inboxLedger(store).map((r) => r.id), ['b', 'c', 'a'], 'newest-created first — full memory, nothing dropped');
 });

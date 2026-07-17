@@ -143,9 +143,10 @@ test('Headquarters remains six architectural rooms', () => {
   assert.equal(ROOMS.length, 6);
 });
 
-test('the Decision System is untouched — its sections and responses remain', () => {
+test('the Decision System is untouched — its responses and decisions remain', () => {
+  // The Executive Inbox is an additive section (Sprint 12B); the rest are intact.
   assert.deepEqual(cos.COS_SECTIONS.map((s) => s.id),
-    ['briefing', 'decisions', 'docket', 'chairs', 'leadership', 'archive']);
+    ['briefing', 'inbox', 'decisions', 'docket', 'chairs', 'leadership', 'archive']);
   assert.deepEqual(cos.RESPONSES.map((r) => r.id),
     ['approved', 'approved_with_changes', 'not_yet', 'rework', 'discuss', 'archive']);
   assert.equal(cos.DECISIONS.length > 0, true);

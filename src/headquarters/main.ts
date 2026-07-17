@@ -60,9 +60,15 @@ import {
   type CosSectionId, type DecisionView,
 } from './chief-of-staff.ts';
 import {
-  loadRecommendations, operationalBriefing,
-  recStatusLabel, priorityLabel, ownerLabel,
+  loadRecommendations, saveRecommendations, upsertRecommendation,
+  makeSubmission, routeRecommendation, advance, setVisibility,
+  operationalBriefing, chiefOfStaffQueue,
+  SUBMISSION_TYPES, PRIORITIES, REC_STATUSES,
+  recStatusLabel, priorityLabel, ownerLabel, typeLabel as recTypeLabel, visibilityLabel,
+  canTransition,
+  type Recommendation, type SubmissionType, type Priority, type RecStatus,
 } from './chief-of-staff-ops.ts';
+import { CHAIRS as EXECUTIVE_CHAIRS } from './executive-register.ts';
 
 /* --- small helpers ------------------------------------------------------- */
 
@@ -1033,6 +1039,7 @@ function renderChiefOfStaff(root: HTMLElement): void {
 function cosSectionView(section: CosSectionId, repaint: () => void): HTMLElement {
   switch (section) {
     case 'briefing':   return cosBriefing();
+    case 'inbox':      return cosInbox(repaint);
     case 'decisions':  return cosDecisions(repaint);
     case 'docket':     return cosDocket();
     case 'chairs':     return cosChairs();
@@ -1154,6 +1161,160 @@ function cosOperational(): HTMLElement {
   block.append(el('h3', { class: 'hq-cos__field-label label' }, 'Executive Workload'), load);
 
   return block;
+}
+
+/* --- 1c. Executive Inbox — the institution's single front door -------------
+   Founder-facing capture (record work → a tracked institutional record) plus the
+   Chief of Staff's working queue. Built entirely on the Sprint 12A operational
+   engine; client-side persistence, honest empty states, nothing fabricated. */
+function cosInbox(repaint: () => void): HTMLElement {
+  const recs = loadRecommendations();
+  return el('div', { class: 'hq-cos__section' },
+    cosIntro('Executive Inbox',
+      'The one front door for executive work. Record a thought and the House takes it up — nothing lives only in your memory.'),
+    cosInboxCapture(repaint),
+    cosInboxQueue(recs, repaint),
+  );
+}
+
+/** The Founder's capture — fast, calm, editorial. A few fields, then recorded. */
+function cosInboxCapture(repaint: () => void): HTMLElement {
+  const typeSel = el('select', { class: 'hq-cos__input', id: 'inbox-type' }) as HTMLSelectElement;
+  for (const t of SUBMISSION_TYPES) typeSel.append(el('option', { value: t.id }, t.label));
+
+  const titleInput = el('input', {
+    class: 'hq-cos__note-input', id: 'inbox-title', type: 'text', maxlength: '120',
+    placeholder: 'A short title — what is it?',
+  }) as HTMLInputElement;
+
+  const descInput = el('textarea', {
+    class: 'hq-cos__note-input', id: 'inbox-desc', rows: '3', maxlength: '600',
+    placeholder: 'Describe it in your own words (optional).',
+  }) as HTMLTextAreaElement;
+
+  const prioSel = el('select', { class: 'hq-cos__input', id: 'inbox-priority' }) as HTMLSelectElement;
+  for (const p of PRIORITIES) {
+    const o = el('option', { value: p.id }, p.label);
+    if (p.id === 'next') o.setAttribute('selected', 'selected');
+    prioSel.append(o);
+  }
+
+  const assignSel = el('select', { class: 'hq-cos__input', id: 'inbox-assign' }) as HTMLSelectElement;
+  assignSel.append(el('option', { value: '' }, 'Unassigned — I’ll route it'));
+  for (const c of EXECUTIVE_CHAIRS) {
+    assignSel.append(el('option', { value: c.id }, `Chair #${String(c.ordinal).padStart(3, '0')} — ${c.title}`));
+  }
+
+  const feedback = el('p', { class: 'hq-cos__quiet', role: 'status', 'aria-live': 'polite' });
+
+  const field = (labelText: string, forId: string, control: HTMLElement): HTMLElement =>
+    el('div', { class: 'hq-cos__field' },
+      el('label', { class: 'hq-cos__field-label label', for: forId }, labelText),
+      control);
+
+  const submit = el('button', { class: 'hq-cos__response', type: 'button' },
+    'Record for the Council') as HTMLButtonElement;
+  submit.addEventListener('click', () => {
+    const title = titleInput.value.trim();
+    if (!title) { feedback.textContent = 'Add a short title, and it is recorded.'; titleInput.focus(); return; }
+    const id = `sub_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    const sub = makeSubmission({
+      id,
+      type: typeSel.value as SubmissionType,
+      title,
+      description: descInput.value,
+      priority: prioSel.value as Priority,
+      ownerChairId: assignSel.value || null,
+    });
+    if (!sub) { feedback.textContent = 'That could not be recorded — please try again.'; return; }
+    saveRecommendations(upsertRecommendation(loadRecommendations(), sub));
+    repaint();
+  });
+
+  return el('section', { class: 'hq-cos__block hq-cos__inbox-capture' },
+    el('h2', { class: 'hq-cos__block-title' }, 'Record Something'),
+    field('Type', 'inbox-type', typeSel),
+    field('Title', 'inbox-title', titleInput),
+    field('Description', 'inbox-desc', descInput),
+    field('Priority', 'inbox-priority', prioSel),
+    field('Route to (optional)', 'inbox-assign', assignSel),
+    el('div', { class: 'hq-cos__responses' }, submit),
+    feedback,
+  );
+}
+
+/** The Chief of Staff's working queue — active submissions in priority order. */
+function cosInboxQueue(recs: Recommendation[], repaint: () => void): HTMLElement {
+  const queue = chiefOfStaffQueue(recs);
+  const block = el('section', { class: 'hq-cos__block' },
+    el('h2', { class: 'hq-cos__block-title' }, 'The Working Queue'));
+
+  if (queue.length === 0) {
+    block.append(el('p', { class: 'hq-cos__quiet' },
+      'Nothing is in the queue yet. What you record above appears here — tracked, owned, and never lost.'));
+    return block;
+  }
+
+  const list = el('div', { class: 'hq-cos__decisions' });
+  for (const r of queue) list.append(cosInboxCard(r, repaint));
+  block.append(list);
+  return block;
+}
+
+/** One submission in the queue, with the Chief of Staff's coordination controls. */
+function cosInboxCard(r: Recommendation, repaint: () => void): HTMLElement {
+  const card = el('article', { class: 'hq-cos__decision' });
+
+  card.append(
+    el('div', { class: 'hq-cos__chair-head' },
+      el('h3', { class: 'hq-cos__decision-title' }, r.title),
+      el('span', { class: 'hq-cos__tag label', 'data-status': r.priority }, priorityLabel(r.priority))),
+    el('p', { class: 'hq-cos__decision-summary' },
+      `${recTypeLabel(r)} · ${ownerLabel(r)} · ${recStatusLabel(r.status)} · ${visibilityLabel(r.visibility)}`),
+  );
+  if (r.summary) card.append(el('p', { class: 'hq-cos__field-body' }, r.summary));
+
+  // Route to a Chair (validated by the engine against the Register).
+  const assign = el('select', { class: 'hq-cos__input', 'aria-label': `Route “${r.title}”` }) as HTMLSelectElement;
+  const unassigned = el('option', { value: '' }, 'Unassigned');
+  if (r.ownerChairId === null) unassigned.setAttribute('selected', 'selected');
+  assign.append(unassigned);
+  for (const c of EXECUTIVE_CHAIRS) {
+    const o = el('option', { value: c.id }, c.title);
+    if (r.ownerChairId === c.id) o.setAttribute('selected', 'selected');
+    assign.append(o);
+  }
+  assign.addEventListener('change', () => {
+    saveRecommendations(upsertRecommendation(loadRecommendations(), routeRecommendation(r, assign.value || null)));
+    repaint();
+  });
+  card.append(el('div', { class: 'hq-cos__field' },
+    el('span', { class: 'hq-cos__field-label label' }, 'Route to'), assign));
+
+  // Move it along — only permitted lifecycle transitions are offered.
+  const controls = el('div', { class: 'hq-cos__responses', role: 'group', 'aria-label': `Move “${r.title}”` });
+  for (const s of REC_STATUSES) {
+    if (!canTransition(r.status, s.id)) continue;
+    const btn = el('button', { class: 'hq-cos__response', type: 'button' }, s.label) as HTMLButtonElement;
+    btn.addEventListener('click', () => {
+      saveRecommendations(upsertRecommendation(loadRecommendations(), advance(r, s.id as RecStatus)));
+      repaint();
+    });
+    controls.append(btn);
+  }
+  if (controls.childElementCount > 0) card.append(controls);
+
+  // Visibility — keep it on the Founder's radar, or hold it internally.
+  const nextVis = r.visibility === 'visible' ? 'internal' : 'visible';
+  const visBtn = el('button', { class: 'hq-cos__withdraw', type: 'button' },
+    r.visibility === 'visible' ? 'Hold internally' : 'Put on the Founder’s radar') as HTMLButtonElement;
+  visBtn.addEventListener('click', () => {
+    saveRecommendations(upsertRecommendation(loadRecommendations(), setVisibility(r, nextVis)));
+    repaint();
+  });
+  card.append(visBtn);
+
+  return card;
 }
 
 /* --- 2. Decision System (interactive record) ------------------------------ */
