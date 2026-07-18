@@ -83,6 +83,11 @@ routes. Future wings are built only when real content exists for them.
 - [`docs/Accessibility.md`](docs/Accessibility.md) — WCAG 2.2 AA targets + reduced motion.
 - [`docs/Asset-Manifest.md`](docs/Asset-Manifest.md) — media slots awaiting final imagery.
 
+**Headquarters — design constitution** *(governs the private founder residence at `/headquarters` and Studio Mode)*
+
+- [`docs/executive-headquarters/Design-Language-Standard.md`](docs/executive-headquarters/Design-Language-Standard.md) — **the permanent Design Language Standard.** Headquarters is a *place*, not software; apply to every future sprint unless the Founder supersedes it.
+- [`docs/executive-headquarters/Experience-Architecture.md`](docs/executive-headquarters/Experience-Architecture.md) — the detailed, room-by-room creative direction (how the residence *feels*).
+
 ---
 
 ## Deployment assumptions

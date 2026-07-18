@@ -6,6 +6,13 @@ first day of summer." It owns **presentation and session memory only**; it reads
 existing submissions spine and holds no source of truth. This document is the map for
 maintainers and future integrations.
 
+**Design language.** How Headquarters (and Studio Mode) must look and feel is governed by a
+permanent standard — [`docs/executive-headquarters/Design-Language-Standard.md`](docs/executive-headquarters/Design-Language-Standard.md),
+with its detailed, room-by-room companion
+[`docs/executive-headquarters/Experience-Architecture.md`](docs/executive-headquarters/Experience-Architecture.md).
+Headquarters is a *place*, not software; every surface is measured by the emotional sense of
+place it creates. Read the standard before designing any Headquarters or Studio Mode surface.
+
 ## Source layout
 
 | File | Responsibility |
@@ -104,7 +111,10 @@ No backend/DB/migration/workflow/auth changes from the client. No fabricated dat
 counts, or activity. Frozen systems (arrival, Scene Asset Foundation, artwork pipeline,
 rendering architecture, time-of-day, existing rendering seams) are not redesigned. The
 Editorial Office remains the operational review workspace; Headquarters references
-systems of record, never replaces them.
+systems of record, never replaces them. Every visual/interaction decision conforms to the
+permanent [Design Language Standard](docs/executive-headquarters/Design-Language-Standard.md)
+(a *place*, not software) — reach for default SaaS/dashboard conventions only where they
+genuinely improve the experience, and flag any conflict with the standard before overriding it.
 
 ## Verify
 
