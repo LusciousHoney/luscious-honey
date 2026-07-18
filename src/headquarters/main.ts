@@ -86,6 +86,12 @@ import {
 } from './chief-of-staff-ops.ts';
 import { CHAIRS as EXECUTIVE_CHAIRS, CHAIR_CHIEF_OF_STAFF } from './executive-register.ts';
 import {
+  // Sprint 13F — the Executive Work Queue (a projection; owns nothing)
+  QUEUE_OFFICES, QUEUE_PRIORITIES, queueOfficeLabel, queuePriorityLabel,
+  loadWorkQueue, activeQueue, filterQueue, queueSummary, queueOwners,
+  type QueueItem, type QueueOffice, type QueuePriority, type QueueFilter,
+} from './executive-work-queue.ts';
+import {
   // Sprint 13A — Growth Intelligence (the Director of Growth's research desk)
   INTEL_SOURCES, INTEL_CATEGORIES, INTEL_CONFIDENCES, INTEL_REVIEW_OUTCOMES,
   intelSourceLabel, intelCategoryLabel, intelConfidenceLabel, intelStatusLabel, intelOutcomeLabel,
@@ -296,6 +302,9 @@ function renderScene(root: HTMLElement): void {
     el('p', { class: 'hq-briefing__line' }, 'Reading the desk…'),
   );
 
+  // The executive summary — a few honest counts derived from the Work Queue (13F).
+  const execSummary = el('aside', { class: 'hq-execsummary' });
+
   const scene = el(
     'section',
     { class: 'hq-view hq-view--scene', 'aria-label': 'Executive Office' },
@@ -313,6 +322,7 @@ function renderScene(root: HTMLElement): void {
           'Morning light across the limestone, the terrace open to clean air, the writing table waiting. Every wing of the residence opens from here.',
         ),
         briefing,
+        execSummary,
       ),
       el(
         'nav',
@@ -324,6 +334,36 @@ function renderScene(root: HTMLElement): void {
 
   root.replaceChildren(scene);
   void mountBriefing(briefing);
+  mountExecSummary(execSummary);
+}
+
+/** The Executive Office summary — a few honest counts from the Work Queue, and a
+    quiet path to it. A projection, not a dashboard; no record is owned or edited. */
+function mountExecSummary(host: HTMLElement): void {
+  const s = queueSummary(loadWorkQueue());
+  const lines: { label: string; n: number }[] = [
+    { label: 'Requiring your attention', n: s.founderAttention },
+    { label: 'Waiting on Creative', n: s.waitingCreative },
+    { label: 'Waiting on Production', n: s.waitingProduction },
+    { label: 'Waiting on Growth', n: s.waitingGrowth },
+    { label: 'Completed today', n: s.completedToday },
+  ].filter((l) => l.n > 0);
+  const block = el('section', { class: 'hq-execsummary__inner', 'aria-label': 'Executive summary' },
+    el('p', { class: 'hq-briefing__eyebrow label' }, 'The House at a glance'));
+  if (lines.length === 0) {
+    block.append(el('p', { class: 'hq-briefing__line' }, 'Nothing is waiting on you. The House is running quietly.'));
+  } else {
+    const ul = el('ul', { class: 'hq-execsummary__list' });
+    for (const l of lines) ul.append(el('li', { class: 'hq-execsummary__item' },
+      el('span', { class: 'hq-execsummary__count' }, String(l.n)), el('span', {}, ` ${l.label}`)));
+    block.append(ul);
+  }
+  if (s.recentlyFinished.length) {
+    block.append(el('p', { class: 'hq-execsummary__recent' },
+      el('span', { class: 'label' }, 'Recently finished'), ` ${s.recentlyFinished.map((i) => i.title).join(' · ')}`));
+  }
+  block.append(el('a', { class: 'hq-cos__more', href: '#/chief-of-staff/work-queue' }, 'Open the Work Queue →'));
+  host.replaceChildren(block);
 }
 
 /**
@@ -2221,6 +2261,7 @@ function renderChiefOfStaff(root: HTMLElement): void {
 function cosSectionView(section: CosSectionId, repaint: () => void): HTMLElement {
   switch (section) {
     case 'briefing':   return cosBriefing();
+    case 'work-queue': return cosWorkQueue(repaint);
     case 'inbox':      return cosInbox(repaint);
     case 'decisions':  return cosDecisions(repaint);
     case 'docket':     return cosDocket();
@@ -2412,6 +2453,85 @@ function cosOperational(): HTMLElement {
   }
 
   return block;
+}
+
+/* --- 1b. THE EXECUTIVE WORK QUEUE — one projection of "what needs attention"
+   (Sprint 13F). A DERIVED, read-only view over every pipeline store — it owns no
+   record and stores nothing. Cards navigate to the owning surface; nothing is
+   edited here. Filters are held at module scope so they survive the repaint. */
+let workQueueFilter: QueueFilter = {};
+
+function cosWorkQueue(repaint: () => void): HTMLElement {
+  const all = loadWorkQueue();
+  const active = activeQueue(all);
+  const shown = filterQueue(all, workQueueFilter);
+
+  const section = el('div', { class: 'hq-cos__section' },
+    cosIntro('Work Queue', 'One honest view of what requires attention now, derived across the House. Every card links to where the work lives — nothing is edited here.'));
+
+  // Filters — quiet chips; a projection, not a search engine.
+  const filters = el('div', { class: 'hq-wq__filters', role: 'group', 'aria-label': 'Filter the work queue' });
+  const chip = (label: string, active2: boolean, apply: () => void): void => {
+    const b = el('button', { class: 'hq-wq__chip', type: 'button', 'aria-pressed': active2 ? 'true' : 'false' }, label) as HTMLButtonElement;
+    b.addEventListener('click', () => { apply(); repaint(); });
+    filters.append(b);
+  };
+  chip('All', Object.keys(workQueueFilter).length === 0, () => { workQueueFilter = {}; });
+  chip('Needs Founder', !!workQueueFilter.needsFounder, () => { workQueueFilter = { needsFounder: true }; });
+  chip('Waiting', !!workQueueFilter.waiting, () => { workQueueFilter = { waiting: true }; });
+  chip('Completed', !!workQueueFilter.completed, () => { workQueueFilter = { completed: true }; });
+  section.append(filters);
+
+  // Office filter (derived offices) + owner filter — native selects, labelled.
+  const officeSel = el('select', { class: 'hq-cos__select', id: 'wq_office', 'aria-label': 'Filter by office' }) as HTMLSelectElement;
+  officeSel.append(el('option', { value: '' }, 'Any office'));
+  for (const o of QUEUE_OFFICES.filter((x) => x.id !== 'hidden')) officeSel.append(el('option', { value: o.id, ...(workQueueFilter.office === o.id ? { selected: 'selected' } : {}) }, o.label));
+  officeSel.addEventListener('change', () => { workQueueFilter = { ...clearedExclusive(), office: (officeSel.value || undefined) as QueueOffice | undefined }; repaint(); });
+  const prioSel = el('select', { class: 'hq-cos__select', id: 'wq_prio', 'aria-label': 'Filter by priority' }) as HTMLSelectElement;
+  prioSel.append(el('option', { value: '' }, 'Any priority'));
+  for (const p of QUEUE_PRIORITIES) prioSel.append(el('option', { value: p.id, ...(workQueueFilter.priority === p.id ? { selected: 'selected' } : {}) }, p.label));
+  prioSel.addEventListener('change', () => { workQueueFilter = { ...workQueueFilter, priority: (prioSel.value || undefined) as QueuePriority | undefined }; repaint(); });
+  const ownerSel = el('select', { class: 'hq-cos__select', id: 'wq_owner', 'aria-label': 'Filter by owner' }) as HTMLSelectElement;
+  ownerSel.append(el('option', { value: '' }, 'Any owner'));
+  for (const o of queueOwners(all)) ownerSel.append(el('option', { value: o, ...(workQueueFilter.owner === o ? { selected: 'selected' } : {}) }, o));
+  ownerSel.addEventListener('change', () => { workQueueFilter = { ...workQueueFilter, owner: ownerSel.value || undefined }; repaint(); });
+  section.append(el('div', { class: 'hq-research__row' },
+    deskField('wq_office', 'Office', officeSel), deskField('wq_prio', 'Priority', prioSel), deskField('wq_owner', 'Owner', ownerSel)));
+
+  section.append(el('p', { class: 'hq-cos__line' }, `${active.length} active · ${shown.length} shown`));
+
+  if (shown.length === 0) {
+    section.append(el('p', { class: 'hq-cos__quiet' }, 'Nothing matches — the House is quiet, or your filter is narrow.'));
+  } else {
+    const list = el('div', { class: 'hq-cos__decisions' });
+    for (const it of shown) list.append(workQueueCard(it));
+    section.append(list);
+  }
+  return section;
+}
+
+/** Reset the exclusive (single-choice) filters when switching to an office filter. */
+function clearedExclusive(): QueueFilter {
+  const { priority, owner } = workQueueFilter;
+  return { priority, owner };
+}
+
+function workQueueCard(it: QueueItem): HTMLElement {
+  const provChain = [
+    it.provenance.intelId && 'Intel', it.provenance.opportunityId && 'Opportunity', it.provenance.assignmentId && 'Assignment',
+    it.provenance.draftId && 'Draft', it.provenance.productionId && 'Production', it.provenance.recommendationId && 'Recommendation',
+  ].filter(Boolean).join(' → ');
+  const card = el('article', { class: 'hq-cos__decision hq-wq__card' });
+  card.append(
+    el('div', { class: 'hq-cos__chair-head' },
+      el('h3', { class: 'hq-cos__decision-title' }, it.title),
+      el('span', { class: 'hq-cos__tag label', 'data-status': it.priority }, `${queuePriorityLabel(it.priority)}`)),
+    el('p', { class: 'hq-cos__decision-summary' }, `${queueOfficeLabel(it.office)} · ${it.owner} · ${it.summary}`),
+    el('p', { class: 'hq-wq__action' }, el('span', { class: 'label' }, 'Needs'), ` ${it.requiredAction}`),
+  );
+  if (provChain) card.append(el('p', { class: 'hq-wq__prov' }, el('span', { class: 'label' }, 'Provenance'), ` ${provChain}`));
+  card.append(el('a', { class: 'hq-cos__more', href: it.route }, 'Go to the work →'));
+  return card;
 }
 
 /* --- 1c. Executive Inbox — the institution's single front door -------------
