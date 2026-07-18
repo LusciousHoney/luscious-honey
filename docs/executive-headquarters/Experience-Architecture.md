@@ -4,6 +4,7 @@
 
 **Document status:** Canonical creative-direction source of truth
 **Companion to:** Executive Team Headquarters — Build Bible v1.0
+**Governed by:** [Design-Language-Standard.md](Design-Language-Standard.md) — the permanent design standard for Headquarters and Studio Mode; this document is its detailed, room-by-room expression.
 **Project:** Luscious Honey Collective (private founder workspace at `/headquarters`)
 **Version:** 1.0 · July 12, 2026
 
