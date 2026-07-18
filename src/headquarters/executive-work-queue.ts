@@ -20,6 +20,7 @@ import { loadIntelligence, intelStatusLabel, type IntelligenceItem } from './gro
 import { loadOpportunities, opportunityStatusLabel, type ContentOpportunity } from './content-opportunity.ts';
 import { loadAssignments, assignmentStatusLabel, type CreativeAssignment } from './creative-assignment.ts';
 import { loadDrafts, draftStatusLabel, draftTypeLabel, type CreativeDraft } from './creative-draft.ts';
+import { loadProduction, productionStatusLabel, type ProductionReadiness } from './production-readiness.ts';
 
 /* --- vocabulary ----------------------------------------------------------- */
 
@@ -93,7 +94,7 @@ function base(sourceType: QueueSourceType, sourceId: string, createdAt: string, 
 function deriveRecommendation(r: Recommendation): QueueItem {
   const provenance: QueueProvenance = {
     intelId: r.originIntelId, opportunityId: r.originOpportunityId, assignmentId: r.originAssignmentId,
-    draftId: r.originDraftId, recommendationId: r.id,
+    draftId: r.originDraftId, productionId: r.originProductionId, recommendationId: r.id,
   };
   let office: QueueOffice; let priority: QueuePriority; let action: QueueAction; let status: QueueStatusKind; let due: QueueDueState; let route: string;
   const ownerOffice: QueueOffice = r.ownerChairId === CHAIR_CREATIVE_DIRECTOR ? 'creative_director'
@@ -176,11 +177,29 @@ function deriveDraft(d: CreativeDraft): QueueItem {
   };
 }
 
+function deriveProduction(p: ProductionReadiness): QueueItem {
+  const prov: QueueProvenance = {
+    intelId: p.originIntelId, opportunityId: p.originOpportunityId, assignmentId: p.originAssignmentId,
+    draftId: p.originDraftId, productionId: p.id, recommendationId: p.promotedRecommendationId,
+  };
+  let office: QueueOffice = 'production'; let priority: QueuePriority = 'low'; let action: QueueAction = 'Waiting on Production'; let status: QueueStatusKind = 'waiting'; let due: QueueDueState = 'waiting'; let route = '#/production';
+  if (p.promotedRecommendationId) { office = 'hidden'; status = 'hidden'; action = 'No action required'; }
+  else if (p.status === 'declined' || p.status === 'held') { office = 'hidden'; status = 'hidden'; action = 'No action required'; }
+  else if (p.status === 'ready_for_review') { office = 'founder'; priority = 'normal'; action = 'Review requested'; status = 'actionable'; due = 'now'; route = '#/chief-of-staff/opportunities'; }
+  else if (p.status === 'approved') { office = 'chief_of_staff'; priority = 'normal'; action = 'Ready to route'; status = 'actionable'; due = 'soon'; route = '#/chief-of-staff/opportunities'; }
+  return {
+    ...base('production', p.id, p.createdAt, p.updatedAt),
+    owner: chairLabel(p.createdBy), office, priority, title: p.title,
+    summary: `Production readiness · ${productionStatusLabel(p.status)}`, requiredAction: action, status, dueState: due, provenance: prov, route,
+  };
+}
+
 /* --- the projection ------------------------------------------------------- */
 
 export interface QueueCollections {
   intelligence: IntelligenceItem[]; opportunities: ContentOpportunity[];
-  assignments: CreativeAssignment[]; drafts: CreativeDraft[]; recommendations: Recommendation[];
+  assignments: CreativeAssignment[]; drafts: CreativeDraft[];
+  production: ProductionReadiness[]; recommendations: Recommendation[];
 }
 
 /** Derive the whole queue from the institutional stores — pure, ownerless, and
@@ -193,6 +212,7 @@ export function deriveWorkQueue(c: QueueCollections): QueueItem[] {
     ...c.opportunities.map(deriveOpportunity),
     ...c.assignments.map(deriveAssignment),
     ...c.drafts.map(deriveDraft),
+    ...c.production.map(deriveProduction),
   ];
   return items.sort((a, b) => (priorityRank(a.priority) - priorityRank(b.priority)) || b.updatedAt.localeCompare(a.updatedAt));
 }
@@ -201,7 +221,8 @@ export function deriveWorkQueue(c: QueueCollections): QueueItem[] {
 export function loadWorkQueue(): QueueItem[] {
   return deriveWorkQueue({
     intelligence: loadIntelligence(), opportunities: loadOpportunities(),
-    assignments: loadAssignments(), drafts: loadDrafts(), recommendations: loadRecommendations(),
+    assignments: loadAssignments(), drafts: loadDrafts(), production: loadProduction(),
+    recommendations: loadRecommendations(),
   });
 }
 

@@ -21,9 +21,10 @@ import { makeContentOpportunity, markReadyForReview } from '../src/headquarters/
 import { makeCreativeAssignment, markAssignmentReady, approveAssignment } from '../src/headquarters/creative-assignment.ts';
 import { makeCreativeDraft, generateDraft, buildDraftContext, deterministicDraftProvider } from '../src/headquarters/creative-draft.ts';
 import { CHAIR_CREATIVE_DIRECTOR, CHAIR_HEAD_OF_PRODUCTION } from '../src/headquarters/executive-register.ts';
+import { makeProductionReadiness } from '../src/headquarters/production-readiness.ts';
 
 const T = new Date('2026-07-17T09:00:00.000Z');
-const empty: QueueCollections = { intelligence: [], opportunities: [], assignments: [], drafts: [], recommendations: [] };
+const empty: QueueCollections = { intelligence: [], opportunities: [], assignments: [], drafts: [], production: [], recommendations: [] };
 const sub = (id: string): Recommendation => makeRecommendation({ id, title: `t${id}`, summary: 's' }, T)!;
 const item = (q: QueueItem[], id: string): QueueItem => q.find((x) => x.id === id)!;
 
@@ -78,7 +79,7 @@ test('each pipeline record derives with correct office, action, and provenance',
   const asn = approveAssignment(markAssignmentReady(makeCreativeAssignment({ id: 'a1', originOpportunityId: 'o1', originIntelId: 'i1', title: 't' }, T)!));
   const draftReady = await generateDraft(makeCreativeDraft({ id: 'd1', assignment: asn, type: 'tiktok_short', context: buildDraftContext(asn, null, null) }, T)!, deterministicDraftProvider, T);
 
-  const q = deriveWorkQueue({ intelligence: [intel], opportunities: [opp], assignments: [asn], drafts: [draftReady], recommendations: [] });
+  const q = deriveWorkQueue({ intelligence: [intel], opportunities: [opp], assignments: [asn], drafts: [draftReady], production: [], recommendations: [] });
   assert.equal(item(q, 'intelligence:i1').office, 'chief_of_staff');
   assert.equal(item(q, 'intelligence:i1').requiredAction, 'Research review');
   assert.equal(item(q, 'opportunity:o1').office, 'chief_of_staff');
@@ -90,6 +91,27 @@ test('each pipeline record derives with correct office, action, and provenance',
   assert.equal(d.provenance.opportunityId, 'o1');
   assert.equal(d.provenance.assignmentId, 'a1');
   assert.equal(d.provenance.draftId, 'd1');
+});
+
+test('a production-readiness pack surfaces by status; a routed pack is hidden (no duplicate)', () => {
+  const ready = { ...makeProdLike('p1'), status: 'ready_for_review' as const };
+  const r = item(deriveWorkQueue({ ...empty, production: [ready] }), 'production:p1');
+  assert.equal(r.office, 'founder', 'a ready pack awaits Founder review');
+  assert.equal(r.status, 'actionable');
+  assert.equal(r.requiredAction, 'Review requested');
+  assert.equal(r.provenance.productionId, 'p1', 'the pack carries its own id as provenance');
+  assert.equal(r.provenance.draftId, 'dr_p1', 'and inherits the upstream draft');
+
+  const approved = { ...makeProdLike('p2'), status: 'approved' as const };
+  assert.equal(item(deriveWorkQueue({ ...empty, production: [approved] }), 'production:p2').requiredAction, 'Ready to route');
+
+  const routed = { ...makeProdLike('p3'), status: 'routed_to_work' as const, promotedRecommendationId: 'rec_from_prod_p3' };
+  assert.equal(item(deriveWorkQueue({ ...empty, production: [routed] }), 'production:p3').status, 'hidden', 'a routed pack defers to its recommendation');
+});
+
+test('originProductionId flows from a recommendation into queue provenance', () => {
+  const rec = makeRecommendation({ id: 'rp', title: 't', summary: 's', originProductionId: 'p9' }, T)!;
+  assert.equal(item(deriveWorkQueue({ ...empty, recommendations: [rec] }), 'recommendation:rp').provenance.productionId, 'p9');
 });
 
 test('a failed draft is a high-priority creative revision; a researching item waits on Growth', () => {
@@ -175,4 +197,7 @@ test('malformed / empty collections derive to an empty queue without throwing', 
 function makeCreativeDraftLike(id: string) {
   const a = approveAssignment(markAssignmentReady(makeCreativeAssignment({ id: `asn_${id}`, originOpportunityId: 'o', originIntelId: 'i', title: 't' }, T)!));
   return makeCreativeDraft({ id, assignment: a, type: 'tiktok_short', context: buildDraftContext(a, null, null) }, T)!;
+}
+function makeProdLike(id: string) {
+  return makeProductionReadiness({ id, draft: makeCreativeDraftLike(`dr_${id}`), title: `Prod ${id}` }, T)!;
 }
