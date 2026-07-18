@@ -29,7 +29,7 @@ being written here — each is a separate, Founder-approved sprint.
       │                   │
    Headquarters           ┘
       │
-   Executive Departments
+   The Chairs / executive functions
 ```
 
 This hierarchy is foundational and does not change. The roadmap below builds *outward* from

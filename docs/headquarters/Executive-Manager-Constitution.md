@@ -46,12 +46,18 @@ Everything below is a consequence of holding these two lines.
                     │
              Headquarters          ← manages the institution
                     │
-        Executive Departments      ← Creative · Production · Growth · Business
+    The Chairs / executive functions   ← Creative · Production · Growth · Business
 ```
 
+*(Terminology: the institution's executive functions are the established **Chairs** of the
+Executive Council — Chief of Staff #001, Creative Director #002, Head of Production #003,
+Director of Growth #004 — each leading a functional domain, presented in the residence as
+its wings/studios/suites. "Department" is not repository terminology and is not used as an
+organizational layer; see the EOS Charter and Experience Architecture.)*
+
 The line between the Executive Manager and Headquarters is crossed at exactly **one
-point**: the Chief of Staff. There is no second bridge. A department never speaks to the
-Executive Manager directly, and the Executive Manager never reaches into a department
+point**: the Chief of Staff. There is no second bridge. A Chair never speaks to the
+Executive Manager directly, and the Executive Manager never reaches into a Chair's domain
 directly. This single-bridge rule is what keeps the two systems from fusing into one
 undifferentiated assistant.
 
@@ -179,11 +185,12 @@ across the bridge (e.g., "three decisions are waiting"). Headquarters, in turn, 
 the Founder's calendar, energy, or personal life. Currency: **none directly — mediated
 entirely by the Chief of Staff.**
 
-### Executive Manager ↔ Executive Departments
-**No relationship.** Creative, Production, Growth, and Business have no line to the
-Executive Manager. Work reaches them through the Chief of Staff's brokerage; their needs
-reach the Founder the same way. The Executive Manager does not know a department's internal
-state and has no authority over it. Currency: **none — deliberately.**
+### Executive Manager ↔ the Chairs / executive functions
+**No relationship.** The Chairs — Creative Director, Head of Production, Director of Growth
+(and the Business function) — have no line to the Executive Manager. Work reaches them
+through the Chief of Staff's brokerage; their needs reach the Founder the same way. The
+Executive Manager does not know a Chair's internal state and has no authority over it.
+Currency: **none — deliberately.**
 
 ### Chief of Staff ↔ Headquarters
 Unchanged from existing canon. The Chief of Staff (Chair #001) is *inside* Headquarters:
