@@ -146,6 +146,16 @@ import {
   productionDrafts, productionForReview, approvedProduction, productionStanding as productionPackStanding,
   type ProductionReadiness, type ProductionComplexity,
 } from './production-readiness.ts';
+import {
+  // Studio Mode — the experimental design layer inside the Headquarters
+  STUDIO_SECTIONS, STUDIO_HOME_SECTION, sectionFromSegment,
+  STUDIO_EYEBROW, STUDIO_TITLE, STUDIO_LEDE, previewStages,
+  type StudioSectionId,
+} from './studio/sections.ts';
+import { PREFERENCES } from './studio/preferences.ts';
+import { loadPreferences, type PreferenceState } from './studio/preferences.ts';
+import { favoriteIds, favoriteCount } from './studio/favorites.ts';
+import { standardsCount } from './studio/standards.ts';
 
 /* --- small helpers ------------------------------------------------------- */
 
@@ -4267,6 +4277,179 @@ function maybePlayArrival(then: () => void): void {
   playArrival(() => { markArrivalSeen(); then(); });
 }
 
+/* =============================================================================
+   STUDIO MODE — the experimental design layer inside the Headquarters.
+
+   Route: #/studio (with a section sub-route #/studio/<section>). Like the Office
+   of the Chief of Staff, Studio Mode is a WORKSPACE, not a room in the residence:
+   it is reached from the House Toolbar, rides the same seated view, the same
+   glass, and the SAME Cloudflare Access gate on /headquarters — Headquarters
+   remains the product; this is a layer within it.
+
+   This sprint is FOUNDATION ONLY: the frame and honest placeholders. The pure
+   models live in ./studio/* (preferences, favorites, sections, standards); this
+   renders them in the residence idiom. No component library, no room redesign.
+   ============================================================================= */
+const STUDIO_ROUTE = '#/studio';
+
+/** Studio Mode's session copy of the Founder's verdicts (loaded once per entry). */
+let studioPreferences: PreferenceState = {};
+
+function renderStudio(root: HTMLElement): void {
+  setMode('seated');
+  studioPreferences = loadPreferences();
+
+  const section: StudioSectionId = sectionFromSegment(subSegment());
+
+  // The section navigation — Studio Mode's own quiet index. The home section is
+  // the bare route; the rest are sub-routes, so each section is deep-linkable.
+  const nav = el('nav', { class: 'hq-cos__nav', 'aria-label': 'Sections of Studio Mode' });
+  const navList = el('ul', { class: 'hq-cos__nav-list' });
+  for (const s of STUDIO_SECTIONS) {
+    const href = s.id === STUDIO_HOME_SECTION ? STUDIO_ROUTE : `${STUDIO_ROUTE}/${s.id}`;
+    const attrs: Record<string, string> = { class: 'hq-cos__nav-link', href };
+    if (s.id === section) attrs['aria-current'] = 'page';
+    const link = el('a', attrs, s.label);
+    if (s.id === 'favorites') {
+      const n = favoriteCount(studioPreferences);
+      if (n > 0) link.append(el('span', { class: 'hq-studio__badge' }, String(n)));
+    }
+    navList.append(el('li', { class: 'hq-cos__nav-item' }, link));
+  }
+  nav.append(navList);
+
+  const body = el('div', { class: 'hq-cos__body' });
+  body.replaceChildren(studioSectionView(section));
+
+  const view = el(
+    'section',
+    { class: 'hq-view hq-view--seated hq-view--cos hq-view--studio', 'aria-label': STUDIO_TITLE },
+    el(
+      'div',
+      { class: 'hq-view__inner container' },
+      el(
+        'div',
+        { class: 'hq-seated__bar' },
+        el('a', { class: 'hq-back', href: getRoom(HOME_ROOM)!.route }, '← Return to the Executive Office'),
+      ),
+      el(
+        'header',
+        { class: 'hq-seated__head' },
+        el('p', { class: 'hq-eyebrow label' }, STUDIO_EYEBROW),
+        el('h1', { class: 'hq-title hq-title--seated' }, STUDIO_TITLE),
+        el('p', { class: 'hq-lede' }, STUDIO_LEDE),
+      ),
+      nav,
+      body,
+    ),
+  );
+
+  root.replaceChildren(view);
+}
+
+/** A section intro: an eyebrow + one prepared line beneath it. */
+function studioIntro(eyebrow: string, line: string): HTMLElement {
+  return el('div', { class: 'hq-cos__intro' },
+    el('p', { class: 'hq-cos__eyebrow label' }, eyebrow),
+    el('p', { class: 'hq-cos__lead' }, line));
+}
+
+/** An honest empty state for a prepared-but-unpopulated section. */
+function studioEmpty(title: string, line: string): HTMLElement {
+  return el('section', { class: 'hq-studio__empty' },
+    el('p', { class: 'hq-studio__empty-title label' }, title),
+    el('p', { class: 'hq-studio__empty-line' }, line));
+}
+
+/** The four verdicts as a quiet legend — the visible face of the preference
+    architecture. No option is attached; it documents the verdicts every future
+    design option will offer. */
+function studioVerdictLegend(): HTMLElement {
+  const list = el('ul', { class: 'hq-studio__verdicts' });
+  for (const p of PREFERENCES) {
+    list.append(el('li', { class: 'hq-studio__verdict', 'data-verdict': p.value },
+      el('span', { class: 'hq-studio__verdict-glyph', 'aria-hidden': 'true' }, p.glyph),
+      el('span', { class: 'hq-studio__verdict-label label' }, p.label),
+      el('span', { class: 'hq-studio__verdict-note' }, p.note)));
+  }
+  return el('section', { class: 'hq-studio__legend' },
+    el('p', { class: 'hq-studio__legend-title label' }, 'Every design option earns one verdict'),
+    list);
+}
+
+/** A component-family placeholder: intro + empty workspace + the verdict legend. */
+function studioCategory(label: string, note: string): HTMLElement {
+  return el('div', { class: 'hq-cos__section' },
+    studioIntro(label, note),
+    studioEmpty('Empty workspace',
+      `This workspace is prepared and waiting. A future sprint will place ${label.toLowerCase()} options here — each one offering the four verdicts below.`),
+    studioVerdictLegend());
+}
+
+/** Room Preview: the seam back to the real residence. Lists the actual rooms a
+    design option will be previewable over — derived from the room registry. */
+function studioRoomPreview(): HTMLElement {
+  const stages = previewStages();
+  const list = el('ul', { class: 'hq-studio__stages' });
+  for (const s of stages) {
+    list.append(el('li', { class: 'hq-studio__stage' },
+      el('a', { class: 'hq-studio__stage-link', href: s.route }, s.name),
+      el('span', { class: 'hq-studio__stage-note' }, 'Preview stage')));
+  }
+  return el('div', { class: 'hq-cos__section' },
+    studioIntro('Room Preview', 'A design option will be seen here over a real Headquarters room scene — not in the abstract.'),
+    studioEmpty('No option to preview yet',
+      'When a design option is being explored, you will choose one of the rooms below and see the option composed over its actual scene. The stages are the real residence:'),
+    list);
+}
+
+/** Favorites: the shelf of approved options — derived live from the preferences. */
+function studioFavorites(): HTMLElement {
+  const ids = favoriteIds(studioPreferences);
+  const section = el('div', { class: 'hq-cos__section' },
+    studioIntro('Favorites', 'The shelf of approved options, collected as you work through Studio Mode.'));
+  if (ids.length === 0) {
+    section.append(studioEmpty('No favorites yet',
+      'Options you mark Favorite will collect here — a curated shelf of what is approved for the Headquarters. There is nothing to show yet.'));
+  } else {
+    const list = el('ul', { class: 'hq-studio__favlist' });
+    for (const id of ids) {
+      list.append(el('li', { class: 'hq-studio__fav' },
+        el('span', { class: 'hq-studio__fav-id' }, id),
+        el('span', { class: 'hq-studio__fav-verdict label' }, 'Favorite')));
+    }
+    section.append(list);
+  }
+  return section;
+}
+
+/** Standards: the registry the Headquarters consumes — empty in this sprint. */
+function studioStandards(): HTMLElement {
+  const section = el('div', { class: 'hq-cos__section' },
+    studioIntro('Standards', 'The codified rules the Headquarters consumes. Approved decisions become standards here.'));
+  if (standardsCount() === 0) {
+    section.append(studioEmpty('No standards on record',
+      'The registry is in place and starts empty. As you ratify design decisions, they will be recorded here as rules the residence reads.'));
+  }
+  return section;
+}
+
+/** Build the body for one Studio Mode section. */
+function studioSectionView(section: StudioSectionId): HTMLElement {
+  switch (section) {
+    case 'navigation':    return studioCategory('Navigation', 'Wayfinding — menus, corridors, returns, the House Toolbar.');
+    case 'cards':         return studioCategory('Cards', 'Panels and plates that hold a single idea.');
+    case 'controls':      return studioCategory('Controls', 'Buttons, inputs, toggles — the working surfaces.');
+    case 'typography':    return studioCategory('Typography', 'Voice on the page — scale, rhythm, emphasis.');
+    case 'motion':        return studioCategory('Motion', 'How the interface arrives, settles, and responds.');
+    case 'layers':        return studioCategory('Layers', 'Depth and glass — what floats over what.');
+    case 'notifications': return studioCategory('Notifications', 'The design of the House’s quiet signals — never a red badge.');
+    case 'room-preview':  return studioRoomPreview();
+    case 'favorites':     return studioFavorites();
+    case 'standards':     return studioStandards();
+  }
+}
+
 /* --- router -------------------------------------------------------------- */
 
 /** Parse the leading segment of the hash, e.g. '#/operations' → 'operations'. */
@@ -4303,6 +4486,17 @@ function route(): void {
   // here — before the room registry — so it never appears in the atrium or rail.
   if (seg === 'chief-of-staff') {
     renderChiefOfStaff(root);
+    window.scrollTo({ top: 0 });
+    root.setAttribute('tabindex', '-1');
+    root.focus({ preventScroll: true });
+    return;
+  }
+
+  // Studio Mode — the experimental design layer. Like the Chief of Staff, it is a
+  // WORKSPACE reached from the House Toolbar (not a room), handled here before the
+  // room registry so it never appears in the atrium or the rail.
+  if (seg === 'studio') {
+    renderStudio(root);
     window.scrollTo({ top: 0 });
     root.setAttribute('tabindex', '-1');
     root.focus({ preventScroll: true });
@@ -4626,6 +4820,10 @@ function mountHouseToolbar(): void {
     // (a full surface) instead of opening a modal like the other services.
     svc('Chief of Staff', ICON_COS, () => { closeHqModal(); location.hash = COS_ROUTE; },
       'Open the Office of the Chief of Staff'),
+    // Studio Mode — the experimental design layer. Like the Chief of Staff, it
+    // navigates to a full surface rather than opening a modal.
+    svc('Studio', ICON_STUDIO, () => { closeHqModal(); location.hash = STUDIO_ROUTE; },
+      'Open Studio Mode'),
     svc('Search', ICON_SEARCH, () => openHqModal(globalSearchPanel(), 'Search the House')),
     svc('Dictate', ICON_MIC, () => openHqModal(dictationPanel(), 'Dictation')),
     svc('Calendar', ICON_CAL, () => openHqModal(calendarPanel(), 'Headquarters Calendar')),
@@ -4641,6 +4839,8 @@ const ICON_MIC = MIC_SVG;
 const ICON_CAL = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 9h17M8 3v4M16 3v4"/></svg>`;
 const ICON_BELL = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>`;
 const ICON_STAR = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 4l2.2 4.9L19.5 9l-4 3.6 1.1 5.4L12 15.8 7.4 18l1.1-5.4-4-3.6 5.3-.1z"/></svg>`;
+// Studio Mode — an artist's palette, the experimental design layer.
+const ICON_STUDIO = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 0 0 0 18c1.4 0 2-1 2-1.8 0-.5-.3-.9-.6-1.2-.3-.4-.6-.7-.6-1.2 0-.8.7-1.4 1.5-1.4H16a5 5 0 0 0 5-5c0-3.6-4-6.2-9-6.2z"/><circle cx="7.5" cy="11" r="1"/><circle cx="12" cy="7.5" r="1"/><circle cx="16.5" cy="11" r="1"/></svg>`;
 
 function boot(): void {
   setTimeOfDay();
@@ -4659,5 +4859,5 @@ if (document.readyState === 'loading') {
 }
 
 // Re-exported for tests and future milestones (kept off the module's happy path).
-export { renderScene, renderSeated, renderOperations, renderCreative, renderProduction, renderGrowth, renderBusiness, renderChiefOfStaff, renderError, renderAccessDenied };
+export { renderScene, renderSeated, renderOperations, renderCreative, renderProduction, renderGrowth, renderBusiness, renderChiefOfStaff, renderStudio, renderError, renderAccessDenied };
 export type { Room, RoomId };
