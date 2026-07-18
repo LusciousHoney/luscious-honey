@@ -152,10 +152,24 @@ import {
   STUDIO_EYEBROW, STUDIO_TITLE, STUDIO_LEDE, previewStages,
   type StudioSectionId,
 } from './studio/sections.ts';
-import { PREFERENCES } from './studio/preferences.ts';
-import { loadPreferences, type PreferenceState } from './studio/preferences.ts';
+import {
+  PREFERENCES, preferenceLabel,
+  loadPreferences, savePreferences, togglePreference,
+  // Sprint 2A — written evaluation notes, on the same store
+  NOTE_FIELDS, loadNotes, saveNotes, setOptionNote, getOptionNotes,
+  type PreferenceState, type PreferenceValue, type NotesState, type OptionNotes,
+} from './studio/preferences.ts';
 import { favoriteIds, favoriteCount } from './studio/favorites.ts';
 import { standardsCount } from './studio/standards.ts';
+import {
+  // Sprint 002 — the Navigation Lab (the first real selection experience)
+  NAV_FAMILIES, NAV_DEMO_ITEMS, PREVIEW_ROOMS, LAB_VERDICTS,
+  getNavFamily, familyVerdict, undecidedFamilies,
+  reviewWindow, normalizeFinalists,
+  // Sprint 2A — the Founder evaluation session
+  interactionStatesFor, reviewSummary,
+  type NavFamily, type PreviewRoom, type SummaryEntry,
+} from './studio/navigation-lab.ts';
 
 /* --- small helpers ------------------------------------------------------- */
 
@@ -4292,12 +4306,14 @@ function maybePlayArrival(then: () => void): void {
    ============================================================================= */
 const STUDIO_ROUTE = '#/studio';
 
-/** Studio Mode's session copy of the Founder's verdicts (loaded once per entry). */
+/** Studio Mode's session copy of the Founder's verdicts + written notes. */
 let studioPreferences: PreferenceState = {};
+let studioNotes: NotesState = {};
 
 function renderStudio(root: HTMLElement): void {
   setMode('seated');
   studioPreferences = loadPreferences();
+  studioNotes = loadNotes();
 
   const section: StudioSectionId = sectionFromSegment(subSegment());
 
@@ -4319,7 +4335,10 @@ function renderStudio(root: HTMLElement): void {
   nav.append(navList);
 
   const body = el('div', { class: 'hq-cos__body' });
-  body.replaceChildren(studioSectionView(section));
+  // Interactive sections (the Navigation Lab) refresh in place after the Founder
+  // acts, exactly as the Chief-of-Staff Decisions record does.
+  const paint = (): void => { body.replaceChildren(studioSectionView(section, paint)); };
+  paint();
 
   const view = el(
     'section',
@@ -4382,7 +4401,7 @@ function studioCategory(label: string, note: string): HTMLElement {
   return el('div', { class: 'hq-cos__section' },
     studioIntro(label, note),
     studioEmpty('Empty workspace',
-      `This workspace is prepared and waiting. A future sprint will place ${label.toLowerCase()} options here — each one offering the four verdicts below.`),
+      `This workspace is prepared and waiting. A future sprint will place ${label.toLowerCase()} options here — each one offering the verdicts below.`),
     studioVerdictLegend());
 }
 
@@ -4434,10 +4453,11 @@ function studioStandards(): HTMLElement {
   return section;
 }
 
-/** Build the body for one Studio Mode section. */
-function studioSectionView(section: StudioSectionId): HTMLElement {
+/** Build the body for one Studio Mode section. `repaint` lets interactive
+    sections (the Navigation Lab) refresh in place after the Founder acts. */
+function studioSectionView(section: StudioSectionId, repaint: () => void): HTMLElement {
   switch (section) {
-    case 'navigation':    return studioCategory('Navigation', 'Wayfinding — menus, corridors, returns, the House Toolbar.');
+    case 'navigation':    return renderNavigationLab(repaint);   // Sprint 002 — the first real lab
     case 'cards':         return studioCategory('Cards', 'Panels and plates that hold a single idea.');
     case 'controls':      return studioCategory('Controls', 'Buttons, inputs, toggles — the working surfaces.');
     case 'typography':    return studioCategory('Typography', 'Voice on the page — scale, rhythm, emphasis.');
@@ -4448,6 +4468,589 @@ function studioSectionView(section: StudioSectionId): HTMLElement {
     case 'favorites':     return studioFavorites();
     case 'standards':     return studioStandards();
   }
+}
+
+/* =============================================================================
+   STUDIO MODE · NAVIGATION LAB (Sprint 002)
+
+   The first real selection experience. The Founder reviews six navigation
+   systems (≤3 at a time), records a verdict through the existing Studio
+   preference store, tries a system over a real room scene, and compares two
+   finalists honestly (same room, same content — only the navigation changes).
+
+   All state that persists is a verdict in the Studio store; everything else here
+   is ephemeral view state. Nothing touches the real Headquarters navigation —
+   the demos are inert previews rendered inside Studio Mode's own DOM.
+   ============================================================================= */
+
+type NavLabView = 'review' | 'summary' | 'compare' | 'room';
+
+interface NavLabState {
+  view: NavLabView;
+  page: number;                 // review pager page
+  tryFamilyId: string | null;   // family shown in the room view
+  returnView: NavLabView;       // where "Back" from the room view goes
+  roomId: string;               // current preview room (Try in Room)
+  finalistA: string;            // pinned finalist A
+  finalistB: string;            // pinned finalist B
+  compareActive: 'A' | 'B';     // which pinned finalist the single stage shows
+  compareRoomId: string;
+}
+
+let navLab: NavLabState = {
+  view: 'review',
+  page: 0,
+  tryFamilyId: null,
+  returnView: 'review',
+  roomId: PREVIEW_ROOMS[0].roomId,
+  finalistA: NAV_FAMILIES[0].id,
+  finalistB: NAV_FAMILIES[1].id,
+  compareActive: 'A',
+  compareRoomId: PREVIEW_ROOMS[0].roomId,
+};
+
+/** The verdict glyph for a value, from the shared vocabulary. */
+function verdictGlyph(v: PreferenceValue): string {
+  return PREFERENCES.find((p) => p.value === v)?.glyph ?? '·';
+}
+
+/** Record (or toggle off) a verdict, persist it, and refresh in place. */
+function setFamilyVerdict(id: string, value: PreferenceValue, repaint: () => void): void {
+  studioPreferences = togglePreference(studioPreferences, id, value);
+  savePreferences(studioPreferences);
+  repaint();
+}
+
+/* --- the six demos: one renderer, six genuinely different structures ------ */
+
+/** The real destinations every demo navigates (the current room is lit). */
+const NAV_CURRENT: string = NAV_DEMO_ITEMS[0].roomId; // 'executive' — you are here
+
+function navDemo(family: NavFamily): HTMLElement {
+  const demo = el('div', { class: 'hq-navdemo', 'data-layout': family.layout,
+    'aria-label': `${family.name} — a navigation preview` });
+  switch (family.layout) {
+    case 'rail':     demo.append(navDemoRail()); break;
+    case 'ribbon':   demo.append(navDemoRibbon()); break;
+    case 'dock':     demo.append(navDemoDock()); break;
+    case 'sidebar':  demo.append(navDemoSidebar()); break;
+    case 'compass':  demo.append(navDemoCompass()); break;
+    case 'hybrid':   demo.append(navDemoHybrid()); break;
+  }
+  return demo;
+}
+
+function navItemEls(kind: 'label' | 'short', cls: string): HTMLElement[] {
+  return NAV_DEMO_ITEMS.map((it) => {
+    const a = el('span', { class: cls, ...(it.roomId === NAV_CURRENT ? { 'data-current': 'true' } : {}) },
+      kind === 'label' ? it.label : it.short);
+    return a;
+  });
+}
+
+function navDemoRail(): HTMLElement {
+  const list = el('div', { class: 'hq-navdemo__rail-list' }, ...navItemEls('label', 'hq-navdemo__rail-item'));
+  return el('div', { class: 'hq-navdemo__rail' },
+    el('span', { class: 'hq-navdemo__brand' }, 'Headquarters'),
+    list);
+}
+
+function navDemoRibbon(): HTMLElement {
+  const rooms = el('div', { class: 'hq-navdemo__ribbon-rooms' }, ...navItemEls('label', 'hq-navdemo__ribbon-item'));
+  const actions = el('div', { class: 'hq-navdemo__ribbon-actions' },
+    el('span', { class: 'hq-navdemo__pip' }, 'Search'),
+    el('span', { class: 'hq-navdemo__pip' }, 'Dictate'));
+  return el('div', { class: 'hq-navdemo__ribbon' },
+    el('span', { class: 'hq-navdemo__brand' }, 'Luscious Honey'),
+    rooms, actions);
+}
+
+function navDemoDock(): HTMLElement {
+  const tiles = NAV_DEMO_ITEMS.map((it) =>
+    el('span', { class: 'hq-navdemo__dock-tile', ...(it.roomId === NAV_CURRENT ? { 'data-current': 'true' } : {}) },
+      el('span', { class: 'hq-navdemo__dot', 'aria-hidden': 'true' }),
+      el('span', { class: 'hq-navdemo__dock-lbl' }, it.short)));
+  return el('div', { class: 'hq-navdemo__dock' }, ...tiles);
+}
+
+function navDemoSidebar(): HTMLElement {
+  // Two editorial groups over the six rooms; a real expand/collapse interaction.
+  const groups: [string, string[]][] = [
+    ['The House', ['executive', 'operations', 'business']],
+    ['The Work', ['creative', 'production', 'growth']],
+  ];
+  const col = el('div', { class: 'hq-navdemo__side-col' });
+  for (const [heading, ids] of groups) {
+    const g = el('div', { class: 'hq-navdemo__side-group' },
+      el('span', { class: 'hq-navdemo__side-head' }, heading));
+    for (const id of ids) {
+      const it = NAV_DEMO_ITEMS.find((x) => x.roomId === id)!;
+      g.append(el('span', { class: 'hq-navdemo__side-item', ...(id === NAV_CURRENT ? { 'data-current': 'true' } : {}) },
+        el('span', { class: 'hq-navdemo__side-initial', 'aria-hidden': 'true' }, it.label[0]),
+        el('span', { class: 'hq-navdemo__side-lbl' }, it.label)));
+    }
+    col.append(g);
+  }
+  const side = el('div', { class: 'hq-navdemo__sidebar', 'data-expanded': 'true' }, col);
+  const toggle = el('button', { class: 'hq-navdemo__side-toggle', type: 'button', 'aria-pressed': 'true',
+    'aria-label': 'Collapse the sidebar' }, '‹');
+  toggle.addEventListener('click', (e) => {
+    e.preventDefault();
+    const open = side.getAttribute('data-expanded') !== 'false';
+    side.setAttribute('data-expanded', open ? 'false' : 'true');
+    toggle.setAttribute('aria-pressed', open ? 'false' : 'true');
+    toggle.setAttribute('aria-label', open ? 'Expand the sidebar' : 'Collapse the sidebar');
+    toggle.textContent = open ? '›' : '‹';
+  });
+  side.append(toggle);
+  return side;
+}
+
+function navDemoCompass(): HTMLElement {
+  const ring = el('div', { class: 'hq-navdemo__compass-ring' });
+  NAV_DEMO_ITEMS.forEach((it, i) => {
+    const node = el('span', {
+      class: 'hq-navdemo__compass-node',
+      style: `--i:${i}; --n:${NAV_DEMO_ITEMS.length}`,
+      ...(it.roomId === NAV_CURRENT ? { 'data-current': 'true' } : {}),
+    }, it.short);
+    ring.append(node);
+  });
+  return el('div', { class: 'hq-navdemo__compass' },
+    el('span', { class: 'hq-navdemo__compass-center' }, 'You are here'),
+    ring);
+}
+
+function navDemoHybrid(): HTMLElement {
+  const rail = el('div', { class: 'hq-navdemo__hy-rail' }, ...navItemEls('short', 'hq-navdemo__hy-room'));
+  const strip = el('div', { class: 'hq-navdemo__hy-strip' },
+    el('span', { class: 'hq-navdemo__pip' }, 'Search'),
+    el('span', { class: 'hq-navdemo__pip' }, 'Dictate'),
+    el('span', { class: 'hq-navdemo__pip' }, 'Calendar'));
+  return el('div', { class: 'hq-navdemo__hybrid' },
+    strip,
+    el('div', { class: 'hq-navdemo__hy-body' }, rail, el('span', { class: 'hq-navdemo__hy-fill' })));
+}
+
+/* --- the preview stage: a demo over a room (or a neutral warm stage) ------- */
+
+// The Executive Office photographic scene, reused honestly inside a contained
+// stage (not the fixed residence atmosphere). Only this room is photographed.
+const NAV_SCENE_PICTURE = SCENE_PICTURE;
+
+/** A stage that holds a nav demo. `room` null → a neutral warm structure stage
+    (used in review); a real room → its scene (Executive) or atmospheric shell. */
+function navStage(family: NavFamily, room: PreviewRoom | null, opts: { experimental?: boolean } = {}): HTMLElement {
+  const stage = el('div', { class: 'hq-navstage', 'data-layout': family.layout,
+    ...(room ? { 'data-room': room.roomId } : { 'data-room': 'neutral' }) });
+
+  // backdrop
+  const back = el('div', { class: 'hq-navstage__back', 'aria-hidden': 'true' });
+  if (room?.hasScene) {
+    back.setAttribute('data-scene', 'photo');
+    back.innerHTML = NAV_SCENE_PICTURE;
+  } else if (room) {
+    back.setAttribute('data-scene', 'shell'); // room atmosphere shell (CSS per data-room)
+  } else {
+    back.setAttribute('data-scene', 'neutral');
+  }
+  stage.append(back);
+
+  // A faint slice of room "content" — identical across compares so switching
+  // only the navigation is an honest comparison.
+  stage.append(el('div', { class: 'hq-navstage__content', 'aria-hidden': 'true' },
+    el('span', { class: 'hq-navstage__content-eyebrow' }, room ? room.name : 'Room content'),
+    el('span', { class: 'hq-navstage__content-title' }, 'The day begins with possibility.'),
+    el('span', { class: 'hq-navstage__content-line' }),
+    el('span', { class: 'hq-navstage__content-line' }),
+    el('span', { class: 'hq-navstage__content-line hq-navstage__content-line--short' })));
+
+  // the navigation demo, overlaid
+  stage.append(navDemo(family));
+
+  if (opts.experimental) {
+    stage.append(el('span', { class: 'hq-navstage__flag label', role: 'status' }, 'Experimental preview'));
+  }
+  return stage;
+}
+
+/* --- verdict controls ----------------------------------------------------- */
+
+function navVerdictBar(family: NavFamily, repaint: () => void): HTMLElement {
+  const current = familyVerdict(studioPreferences, family.id);
+  const bar = el('div', { class: 'hq-navcard__verdicts', role: 'group',
+    'aria-label': `Your verdict on ${family.name}` });
+  for (const v of LAB_VERDICTS) {
+    const on = current === v;
+    const btn = el('button', {
+      class: 'hq-navverdict', type: 'button', 'data-verdict': v,
+      'aria-pressed': on ? 'true' : 'false',
+    },
+      el('span', { class: 'hq-navverdict__glyph', 'aria-hidden': 'true' }, verdictGlyph(v)),
+      el('span', { class: 'hq-navverdict__lbl' }, preferenceLabel(v)));
+    btn.addEventListener('click', (e) => { e.preventDefault(); setFamilyVerdict(family.id, v, repaint); });
+    bar.append(btn);
+  }
+  const tryBtn = el('button', { class: 'hq-navtry', type: 'button' }, 'Try in Room →');
+  tryBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    navLab.tryFamilyId = family.id;
+    navLab.returnView = navLab.view === 'room' ? 'review' : navLab.view;
+    navLab.view = 'room';
+    repaint();
+  });
+  bar.append(tryBtn);
+  return bar;
+}
+
+/** A verdict chip shown on a decided card (the mark that it has been judged). */
+function navVerdictMark(v: PreferenceValue): HTMLElement {
+  return el('span', { class: 'hq-navmark label', 'data-verdict': v },
+    el('span', { 'aria-hidden': 'true' }, verdictGlyph(v)), preferenceLabel(v));
+}
+
+/* --- designer notes (objective, an industrial designer's reading) --------- */
+
+function designerNotesBlock(family: NavFamily): HTMLElement {
+  const d = family.designer;
+  const rows: [string, string][] = [
+    ['Philosophy', d.philosophy],
+    ['Strengths', d.strengths],
+    ['Tradeoffs', d.tradeoffs],
+    ['Ideal use', d.idealUse],
+  ];
+  const dl = el('dl', { class: 'hq-navdesigner__list' });
+  for (const [k, v] of rows) { dl.append(el('dt', {}, k), el('dd', {}, v)); }
+  const details = el('details', { class: 'hq-navdesigner' });
+  details.append(el('summary', { class: 'hq-navdesigner__summary label' }, 'Designer notes'), dl);
+  return details;
+}
+
+/* --- interaction focus: live, hoverable state samples --------------------- */
+
+function interactionStatesBlock(family: NavFamily): HTMLElement {
+  const block = el('section', { class: 'hq-navstates', 'aria-label': `How ${family.name} feels` });
+  block.append(el('p', { class: 'hq-navstates__title label' }, 'Interaction — hover, press, tab'));
+  const grid = el('div', { class: 'hq-navstates__grid' });
+  for (const s of interactionStatesFor(family)) {
+    const cell = el('div', { class: 'hq-navstates__cell' });
+    if (s.id === 'expanded') {
+      // a real, keyboard-operable expand/collapse sample
+      const sample = el('button', { class: 'hq-navstate hq-navstate--expand', type: 'button',
+        'data-state': s.id, 'aria-expanded': 'false', 'aria-label': `${family.name}: expanded state sample` },
+        el('span', { class: 'hq-navstate__spine' }, 'A'),
+        el('span', { class: 'hq-navstate__wide' }, 'Executive Office'));
+      sample.addEventListener('click', (e) => {
+        e.preventDefault();
+        const open = sample.getAttribute('aria-expanded') === 'true';
+        sample.setAttribute('aria-expanded', open ? 'false' : 'true');
+      });
+      cell.append(sample);
+    } else {
+      const sample = el('button', {
+        class: 'hq-navstate', type: 'button', 'data-state': s.id,
+        ...(s.id === 'selected' ? { 'data-current': 'true' } : {}),
+        'aria-label': `${family.name}: ${s.label.toLowerCase()} state sample`,
+      }, 'Aa');
+      // inert demo: it exists to be felt, not to navigate
+      sample.addEventListener('click', (e) => e.preventDefault());
+      cell.append(sample);
+    }
+    cell.append(
+      el('span', { class: 'hq-navstates__label label' }, s.label),
+      el('span', { class: 'hq-navstates__note' }, s.note),
+    );
+    grid.append(cell);
+  }
+  block.append(grid);
+  return block;
+}
+
+/* --- written evaluation notes (persist without a repaint) ----------------- */
+
+function evalNotesFields(family: NavFamily): HTMLElement {
+  const current = getOptionNotes(studioNotes, family.id);
+  const wrap = el('div', { class: 'hq-navnotes' });
+  wrap.append(el('p', { class: 'hq-navnotes__title label' }, 'Your evaluation'));
+  for (const { key, label } of NOTE_FIELDS) {
+    const ta = el('textarea', {
+      class: 'hq-navnotes__field', rows: '2',
+      'aria-label': `${label} — ${family.name}`,
+      placeholder: label === 'Notes' ? 'Anything else worth remembering…' : `${label}…`,
+    }) as HTMLTextAreaElement;
+    ta.value = current[key];
+    // Persist on input WITHOUT repainting — the textarea keeps focus and caret.
+    ta.addEventListener('input', () => {
+      studioNotes = setOptionNote(studioNotes, family.id, key, ta.value);
+      saveNotes(studioNotes);
+    });
+    wrap.append(el('label', { class: 'hq-navnotes__row' },
+      el('span', { class: 'hq-navnotes__lbl label' }, label), ta));
+  }
+  return wrap;
+}
+
+/* --- the full evaluation card --------------------------------------------- */
+
+function navFamilyCard(family: NavFamily, repaint: () => void): HTMLElement {
+  const verdict = familyVerdict(studioPreferences, family.id);
+  const card = el('article', { class: 'hq-navcard',
+    ...(verdict ? { 'data-verdict': verdict } : {}) });
+
+  card.append(navStage(family, null));
+
+  const head = el('header', { class: 'hq-navcard__head' },
+    el('h3', { class: 'hq-navcard__name' }, family.name));
+  if (verdict) head.append(navVerdictMark(verdict));
+  card.append(head);
+
+  card.append(el('p', { class: 'hq-navcard__tagline' }, family.tagline));
+  card.append(el('dl', { class: 'hq-navcard__facts' },
+    el('dt', {}, 'Structure'), el('dd', {}, family.structure),
+    el('dt', {}, 'Interaction'), el('dd', {}, family.interaction)));
+
+  card.append(designerNotesBlock(family));
+  card.append(interactionStatesBlock(family));
+  card.append(navVerdictBar(family, repaint));
+  card.append(evalNotesFields(family));
+  return card;
+}
+
+/* --- the lab shell: toolbar + a view ------------------------------------- */
+
+function navLabTab(label: string, view: NavLabView, count: number | null, repaint: () => void): HTMLElement {
+  const btn = el('button', {
+    class: 'hq-navlab__tab', type: 'button',
+    ...(navLab.view === view ? { 'aria-current': 'page' } : {}),
+  }, label);
+  if (count !== null) btn.append(el('span', { class: 'hq-navlab__tab-count' }, String(count)));
+  btn.addEventListener('click', (e) => { e.preventDefault(); navLab.view = view; repaint(); });
+  return btn;
+}
+
+function renderNavigationLab(repaint: () => void): HTMLElement {
+  const undecided = undecidedFamilies(studioPreferences);
+
+  const intro = studioIntro('Navigation Lab · Founder Evaluation',
+    'Six navigation systems for the Headquarters. Evaluate each one — how it feels, not only how it looks — record a verdict and written notes, pin two to compare instantly over the same room, and read a summary of your session. No winner is chosen for you.');
+
+  const tabs = el('nav', { class: 'hq-navlab__tabs', 'aria-label': 'Navigation Lab views' },
+    navLabTab('Review', 'review', undecided.length, repaint),
+    navLabTab('Compare', 'compare', null, repaint),
+    navLabTab('Summary', 'summary', null, repaint));
+
+  let bodyView: HTMLElement;
+  switch (navLab.view) {
+    case 'review':  bodyView = navReviewView(repaint); break;
+    case 'compare': bodyView = navCompareView(repaint); break;
+    case 'summary': bodyView = navSummaryView(repaint); break;
+    case 'room':    bodyView = navRoomView(repaint); break;
+    default:        bodyView = navReviewView(repaint);
+  }
+
+  return el('div', { class: 'hq-cos__section hq-navlab' }, intro, tabs, bodyView);
+}
+
+/* --- view: Review — evaluate all six, ≤3 at a time ------------------------ */
+
+function navReviewView(repaint: () => void): HTMLElement {
+  const wrap = el('div', { class: 'hq-navlab__view' });
+
+  const win = reviewWindow(NAV_FAMILIES, navLab.page, 3);
+  navLab.page = win.page; // clamp
+  const undecided = undecidedFamilies(studioPreferences).length;
+
+  const first = win.page * 3 + 1;
+  const last = win.page * 3 + win.families.length;
+  wrap.append(el('p', { class: 'hq-navlab__count meta' },
+    `Six systems · showing ${first}–${last} · ${undecided === 0 ? 'all have a verdict' : `${undecided} still undecided`}`));
+
+  const grid = el('div', { class: 'hq-navlab__grid', 'data-count': String(win.families.length) });
+  for (const f of win.families) grid.append(navFamilyCard(f, repaint));
+  wrap.append(grid);
+
+  // Previous / Next comparison-set pager.
+  const pager = el('div', { class: 'hq-navlab__pager' });
+  const prev = el('button', { class: 'hq-navlab__page-btn', type: 'button',
+    ...(win.hasPrev ? {} : { disabled: 'true' }) }, '← Previous set');
+  const next = el('button', { class: 'hq-navlab__page-btn', type: 'button',
+    ...(win.hasNext ? {} : { disabled: 'true' }) }, 'Next set →');
+  prev.addEventListener('click', (e) => { e.preventDefault(); navLab.page = Math.max(0, win.page - 1); repaint(); });
+  next.addEventListener('click', (e) => { e.preventDefault(); navLab.page = win.page + 1; repaint(); });
+  pager.append(prev, el('span', { class: 'hq-navlab__page-of meta' }, `Set ${win.page + 1} of ${win.pageCount}`), next);
+  wrap.append(pager);
+  return wrap;
+}
+
+/* --- view: Try in Room ---------------------------------------------------- */
+
+function roomChips(current: string, onPick: (roomId: string) => void): HTMLElement {
+  const row = el('div', { class: 'hq-navlab__rooms', role: 'group', 'aria-label': 'Preview room' });
+  for (const r of PREVIEW_ROOMS) {
+    const chip = el('button', { class: 'hq-navlab__roomchip', type: 'button',
+      'aria-pressed': r.roomId === current ? 'true' : 'false' }, r.name);
+    if (!r.hasScene) chip.append(el('span', { class: 'hq-navlab__roomchip-note' }, 'shell'));
+    chip.addEventListener('click', (e) => { e.preventDefault(); onPick(r.roomId); });
+    row.append(chip);
+  }
+  return row;
+}
+
+function navRoomView(repaint: () => void): HTMLElement {
+  const family = getNavFamily(navLab.tryFamilyId ?? '') ?? NAV_FAMILIES[0];
+  const room = PREVIEW_ROOMS.find((r) => r.roomId === navLab.roomId) ?? PREVIEW_ROOMS[0];
+
+  const wrap = el('div', { class: 'hq-navlab__view hq-navlab__view--room' });
+
+  const bar = el('div', { class: 'hq-navlab__roombar' });
+  const backLabel = navLab.returnView === 'summary' ? 'Summary'
+    : navLab.returnView === 'compare' ? 'Compare' : 'Review';
+  const back = el('button', { class: 'hq-navlab__back', type: 'button' }, '← Back to ' + backLabel);
+  back.addEventListener('click', (e) => { e.preventDefault(); navLab.view = navLab.returnView; repaint(); });
+  bar.append(back);
+  wrap.append(bar);
+
+  wrap.append(el('header', { class: 'hq-navlab__roomhead' },
+    el('p', { class: 'hq-cos__eyebrow label' }, 'Try in Room'),
+    el('h3', { class: 'hq-navlab__roomtitle' }, `${family.name} · ${room.name}`),
+    el('p', { class: 'hq-navlab__roomnote' },
+      room.hasScene
+        ? 'Shown over the real Executive Office scene. This is an experimental preview inside Studio Mode — the residence itself is untouched.'
+        : `The ${room.name} has no photographed scene yet, so this preview uses its atmospheric shell. Experimental preview only — the residence is untouched.`)));
+
+  wrap.append(roomChips(room.roomId, (roomId) => { navLab.roomId = roomId; repaint(); }));
+
+  wrap.append(navStage(family, room, { experimental: true }));
+
+  wrap.append(navVerdictBar(family, repaint));
+  return wrap;
+}
+
+/* --- view: Compare — pin two, switch instantly over one identical stage ---- */
+
+function finalistPicker(label: string, selected: string, onPick: (id: string) => void): HTMLElement {
+  const wrap = el('label', { class: 'hq-navlab__pick' }, el('span', { class: 'hq-navlab__pick-lbl label' }, label));
+  const sel = el('select', { class: 'hq-navlab__select' }) as HTMLSelectElement;
+  for (const f of NAV_FAMILIES) {
+    const opt = el('option', { value: f.id, ...(f.id === selected ? { selected: 'true' } : {}) }, f.name);
+    sel.append(opt);
+  }
+  sel.addEventListener('change', () => onPick(sel.value));
+  wrap.append(sel);
+  return wrap;
+}
+
+function navCompareView(repaint: () => void): HTMLElement {
+  const [a, b] = normalizeFinalists(navLab.finalistA, navLab.finalistB);
+  navLab.finalistA = a; navLab.finalistB = b;
+  const famA = getNavFamily(a)!;
+  const famB = getNavFamily(b)!;
+  const room = PREVIEW_ROOMS.find((r) => r.roomId === navLab.compareRoomId) ?? PREVIEW_ROOMS[0];
+  const activeFam = navLab.compareActive === 'B' ? famB : famA;
+
+  const wrap = el('div', { class: 'hq-navlab__view hq-navlab__view--compare' });
+
+  wrap.append(el('p', { class: 'hq-navlab__roomnote' },
+    'Pin two systems, then switch between them instantly. The room, the viewport, and the content stay identical — only the navigation changes, so the comparison is honest.'));
+
+  wrap.append(el('div', { class: 'hq-navlab__compare-controls' },
+    finalistPicker('Pin A', a, (id) => { navLab.finalistA = id; if (navLab.compareActive === 'A') navLab.compareActive = 'A'; repaint(); }),
+    finalistPicker('Pin B', b, (id) => { navLab.finalistB = id; repaint(); })));
+  wrap.append(roomChips(room.roomId, (roomId) => { navLab.compareRoomId = roomId; repaint(); }));
+
+  // The ONE stage — built once, shared. Toggling swaps only the nav overlay in
+  // place, so the scene, content and viewport are literally unchanged.
+  const stage = navStage(activeFam, room, { experimental: true });
+  const nameLabel = el('span', { class: 'hq-navlab__ab-name' }, activeFam.name);
+  const verdictHost = el('div', { class: 'hq-navlab__ab-verdict' }, navVerdictBar(activeFam, repaint));
+
+  const btnA = el('button', { class: 'hq-navlab__ab-btn', type: 'button',
+    'aria-pressed': navLab.compareActive === 'A' ? 'true' : 'false' }, 'A · ' + famA.name);
+  const btnB = el('button', { class: 'hq-navlab__ab-btn', type: 'button',
+    'aria-pressed': navLab.compareActive === 'B' ? 'true' : 'false' }, 'B · ' + famB.name);
+  const swapTo = (which: 'A' | 'B'): void => {
+    navLab.compareActive = which;
+    const fam = which === 'B' ? getNavFamily(navLab.finalistB)! : getNavFamily(navLab.finalistA)!;
+    const oldDemo = stage.querySelector('.hq-navdemo');
+    if (oldDemo) oldDemo.replaceWith(navDemo(fam)); // only the navigation changes
+    nameLabel.textContent = fam.name;
+    verdictHost.replaceChildren(navVerdictBar(fam, repaint));
+    btnA.setAttribute('aria-pressed', which === 'A' ? 'true' : 'false');
+    btnB.setAttribute('aria-pressed', which === 'B' ? 'true' : 'false');
+  };
+  btnA.addEventListener('click', (e) => { e.preventDefault(); swapTo('A'); });
+  btnB.addEventListener('click', (e) => { e.preventDefault(); swapTo('B'); });
+
+  wrap.append(el('div', { class: 'hq-navlab__ab', role: 'group', 'aria-label': 'Switch between pinned systems' }, btnA, btnB));
+  wrap.append(el('p', { class: 'hq-navlab__ab-showing meta' }, 'Showing:'), nameLabel);
+  wrap.append(stage);
+  wrap.append(verdictHost);
+  return wrap;
+}
+
+/* --- view: Founder Review Summary (describes; never recommends a winner) --- */
+
+function summaryGroup(title: string, verdict: PreferenceValue | null, entries: SummaryEntry[]): HTMLElement | null {
+  if (entries.length === 0) return null;
+  const list = el('ul', { class: 'hq-navsummary__list' });
+  for (const e of entries) {
+    const item = el('li', { class: 'hq-navsummary__item' },
+      el('span', { class: 'hq-navsummary__name' }, e.family.name));
+    if (e.hasWritten) item.append(el('span', { class: 'hq-navsummary__hasnote meta' }, 'has notes'));
+    list.append(item);
+  }
+  const head = verdict
+    ? el('span', { class: 'hq-navmark label', 'data-verdict': verdict },
+        el('span', { 'aria-hidden': 'true' }, verdictGlyph(verdict)), title)
+    : el('span', { class: 'label' }, title);
+  return el('section', { class: 'hq-navsummary__group' },
+    el('h3', { class: 'hq-navsummary__group-head' }, head,
+      el('span', { class: 'hq-navsummary__count meta' }, String(entries.length))),
+    list);
+}
+
+function navSummaryView(_repaint: () => void): HTMLElement {
+  const s = reviewSummary(studioPreferences, studioNotes);
+  const wrap = el('div', { class: 'hq-navlab__view hq-navsummary' });
+
+  wrap.append(el('header', { class: 'hq-navlab__roomhead' },
+    el('p', { class: 'hq-cos__eyebrow label' }, 'Founder Review'),
+    el('h3', { class: 'hq-navlab__roomtitle' }, 'Your session, summarised'),
+    el('p', { class: 'hq-navlab__roomnote' },
+      'What you recorded across the six systems, with your written notes. This is a record of your evaluation — it does not rank the systems or recommend a winner.')));
+
+  const groups = el('div', { class: 'hq-navsummary__groups' });
+  for (const g of [
+    summaryGroup('Loved', 'love', s.loved),
+    summaryGroup('Liked', 'like', s.liked),
+    summaryGroup('Saved for Later', 'save', s.saved),
+    summaryGroup('Passed', 'pass', s.passed),
+    summaryGroup('Not yet reviewed', null, s.unreviewed),
+  ]) { if (g) groups.append(g); }
+  wrap.append(groups);
+
+  // Written notes, verbatim.
+  const notesPanel = el('section', { class: 'hq-navsummary__notes' },
+    el('h3', { class: 'hq-navsummary__notes-head label' }, 'Written notes'));
+  if (s.withNotes.length === 0) {
+    notesPanel.append(el('p', { class: 'hq-studio__empty-line' },
+      'You have not written any notes yet. Add “What I Like”, “What I’d Change”, or free notes under Review.'));
+  } else {
+    for (const e of s.withNotes) {
+      const card = el('article', { class: 'hq-navsummary__notecard' },
+        el('h4', { class: 'hq-navsummary__notename' }, e.family.name));
+      if (e.verdict) card.append(navVerdictMark(e.verdict));
+      const dl = el('dl', { class: 'hq-navsummary__notelist' });
+      for (const { key, label } of NOTE_FIELDS) {
+        const val = (e.notes as OptionNotes)[key].trim();
+        if (val) { dl.append(el('dt', {}, label), el('dd', {}, val)); }
+      }
+      card.append(dl);
+      notesPanel.append(card);
+    }
+  }
+  wrap.append(notesPanel);
+  return wrap;
 }
 
 /* --- router -------------------------------------------------------------- */
