@@ -24,7 +24,7 @@ import {
 test('the office has its named sections (incl. the Brokerage) and briefing is home', () => {
   assert.deepEqual(
     COS_SECTIONS.map((s) => s.id),
-    ['briefing', 'inbox', 'decisions', 'docket', 'brokerage', 'opportunities', 'chairs', 'leadership', 'archive'],
+    ['briefing', 'work-queue', 'inbox', 'decisions', 'docket', 'brokerage', 'opportunities', 'chairs', 'leadership', 'archive'],
   );
   assert.equal(COS_HOME_SECTION, 'briefing');
   assert.ok(COS_SECTIONS.every((s) => s.label.length > 0 && s.note.length > 0));

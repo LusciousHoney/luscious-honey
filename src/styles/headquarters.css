@@ -1488,6 +1488,36 @@
 }
 .hq-prod__check .hq-briefs__chip-input:checked + span { color: var(--umber); text-decoration: line-through; }
 
+/* The Executive Work Queue (Sprint 13F) — a projection. Reuses the plaster cards;
+   adds filter chips, a compact action + provenance line, and the executive summary
+   on the Executive Office. No layout redesign. */
+.hq-wq__filters { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.hq-wq__chip {
+  font-family: var(--sans); font-size: var(--fs-label); letter-spacing: 0.03em;
+  color: var(--hq-ink); background: transparent; min-height: 40px; padding: 8px var(--s-3);
+  border: 1px solid var(--hq-brass-hair); border-radius: 999px; cursor: pointer;
+}
+.hq-wq__chip:hover, .hq-wq__chip:focus-visible { border-color: var(--brass); outline: none; }
+.hq-wq__chip[aria-pressed='true'] { color: var(--alabaster); background: var(--ink); border-color: var(--ink); }
+.hq-wq__action { font-family: var(--serif); font-size: var(--fs-body-sm); color: var(--hq-ink); margin: 0; }
+.hq-wq__prov { font-family: var(--sans); font-size: var(--fs-label); color: var(--umber); margin: 0; }
+
+.hq-execsummary { display: block; margin-top: var(--s-4); }
+.hq-execsummary__inner {
+  display: grid; gap: var(--s-2); max-width: 60ch; padding: var(--s-4) var(--s-5);
+  background: linear-gradient(152deg, var(--hq-plaster) 0%, var(--hq-plaster-2) 100%);
+  border: var(--hairline); border-radius: var(--radius); box-shadow: var(--hq-shadow-card);
+}
+.hq-execsummary__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.hq-execsummary__item { font-family: var(--serif); font-size: var(--fs-body); color: var(--hq-ink); }
+.hq-execsummary__count {
+  font-family: var(--sans); font-weight: 700; color: var(--brass);
+  font-variant-numeric: tabular-nums; margin-right: 6px;
+}
+.hq-execsummary__recent {
+  font-family: var(--serif); font-style: italic; font-size: var(--fs-body-sm); color: var(--umber); margin: 0;
+}
+
 /* The six responses — quiet plaster buttons; the recorded one is marked. */
 .hq-cos__responses { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 .hq-cos__response {
