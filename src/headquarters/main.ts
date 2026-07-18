@@ -128,6 +128,18 @@ import {
   loadDrafts, saveDrafts, upsertDraft,
   type CreativeDraft, type DraftType, type DraftProvider, type DraftContent,
 } from './creative-draft.ts';
+import {
+  // Sprint 13E — Production Readiness Pack (the Head of Production's preparation layer)
+  CONTENT_PLATFORMS as PROD_PLATFORMS, PRODUCTION_COMPLEXITIES,
+  productionStatusLabel,
+  makeProductionReadiness, updateProductionReadiness, isDraftEligibleForProduction,
+  addChecklistItem, toggleChecklistItem, checklistProgress,
+  markProductionReady, approveProduction, returnProductionForRevision, holdProduction, declineProduction,
+  routeProductionToWork, isProductionRoutable, founderProductionView, productionAuthorLabel,
+  loadProduction, saveProduction, upsertProduction,
+  productionDrafts, productionForReview, approvedProduction, productionStanding as productionPackStanding,
+  type ProductionReadiness, type ProductionComplexity,
+} from './production-readiness.ts';
 
 /* --- small helpers ------------------------------------------------------- */
 
@@ -1248,6 +1260,8 @@ function renderProduction(root: HTMLElement, room: Room): void {
     el('p', { class: 'hq-state__lede' }, 'Looking in on the studio…'));
   // The receiving queue — work routed to the Head of Production (Sprint 12E).
   const intake = el('div', { class: 'hq-production-intake' });
+  // The Production Readiness surface — prepare approved drafts for recording (13E).
+  const readiness = el('div', { class: 'hq-prod' });
 
   const view = el(
     'section',
@@ -1269,6 +1283,7 @@ function renderProduction(root: HTMLElement, room: Room): void {
         el('p', { class: 'hq-lede' }, 'A glass studio for momentum without noise. Capable, and in motion — where cleared work is narrated, shaped, and finished.'),
       ),
       intake,
+      readiness,
       el(
         'div',
         { class: 'hq-studio' },
@@ -1279,8 +1294,151 @@ function renderProduction(root: HTMLElement, room: Room): void {
   );
 
   root.replaceChildren(view);
+  mountProductionReadiness(readiness);
   mountProductionIntake(intake);
   void mountSprint(sprint);
+}
+
+/* --- PRODUCTION READINESS — the Head of Production's preparation surface (13E)
+   Approved Creative Drafts become practical production packs here: runtime,
+   framing, visual direction, audio, a recording checklist, and required assets.
+   Preparation only — nothing records, publishes, or schedules. Repaints in place.
+   Additive to the Production Suite; existing controls are untouched. */
+let prodNotice: string | null = null;
+
+function mountProductionReadiness(host: HTMLElement): void {
+  const repaint = (): void => mountProductionReadiness(host);
+  const drafts = loadDrafts();
+  const packs = loadProduction();
+
+  const section = el('section', { class: 'hq-prod__ready', 'aria-label': 'Production readiness' },
+    el('p', { class: 'hq-cos__eyebrow label' }, 'Production Readiness'),
+    el('p', { class: 'hq-cos__lead' }, 'Prepare an approved draft for recording — the setup, the framing, the checklist. Preparation, not recording.'));
+
+  const notice = el('p', { class: 'hq-cos__notice', role: 'status', 'aria-live': 'polite' });
+  if (prodNotice) { notice.classList.add('is-ok'); notice.append(el('span', { class: 'hq-cos__notice-mark', 'aria-hidden': 'true' }, '✓'), el('span', {}, prodNotice)); }
+  section.append(notice);
+
+  const eligible = drafts.filter(isDraftEligibleForProduction);
+  if (eligible.length === 0) {
+    section.append(el('p', { class: 'hq-cos__quiet' }, 'No approved drafts to prepare yet. Approve a draft in the Drafting Room first.'));
+  } else {
+    const sel = el('select', { class: 'hq-cos__select', id: 'prod_from', 'aria-label': 'Approved draft' }) as HTMLSelectElement;
+    for (const d of eligible) sel.append(el('option', { value: d.id }, `${draftTypeLabel(d.type)} — ${d.context.centralIdea || 'draft'}`));
+    const start = el('button', { class: 'hq-cos__response', type: 'button' }, 'Create readiness pack') as HTMLButtonElement;
+    start.addEventListener('click', () => {
+      const d = eligible.find((x) => x.id === sel.value);
+      if (!d) return;
+      const p = makeProductionReadiness({ id: `prod_${Date.now()}`, draft: d });
+      if (!p) return;
+      saveProduction(upsertProduction(loadProduction(), p));
+      prodNotice = 'Readiness pack started.'; repaint();
+    });
+    section.append(el('div', { class: 'hq-briefs__start' },
+      el('label', { class: 'hq-cos__note-input-label label', for: 'prod_from' }, 'Prepare an approved draft'),
+      el('div', { class: 'hq-cos__route-row' }, sel, start)));
+  }
+
+  const inProgress = productionDrafts(packs);
+  const block = el('section', { class: 'hq-cos__block' },
+    el('div', { class: 'hq-cos__block-head' },
+      el('h2', { class: 'hq-cos__block-title' }, 'Packs in Preparation'),
+      el('span', { class: 'hq-cos__count', 'aria-label': `${inProgress.length} in preparation` }, String(inProgress.length))));
+  if (inProgress.length === 0) block.append(el('p', { class: 'hq-cos__quiet' }, 'No packs in preparation.'));
+  else { const l = el('div', { class: 'hq-cos__decisions' }); for (const p of inProgress) l.append(productionEditorCard(p, repaint)); block.append(l); }
+  section.append(block);
+  host.replaceChildren(section);
+}
+
+function prodInput(id: string, val: string, ph: string): HTMLInputElement {
+  return el('input', { class: 'hq-research__input', id, type: 'text', maxlength: '200', value: val, placeholder: ph }) as HTMLInputElement;
+}
+
+function productionEditorCard(p: ProductionReadiness, repaint: () => void): HTMLElement {
+  let draft = p;
+  const card = el('article', { class: 'hq-cos__decision hq-prod__editor' });
+  const persist = (next: ProductionReadiness, notice: string): void => { saveProduction(upsertProduction(loadProduction(), next)); prodNotice = notice; repaint(); };
+
+  const title = prodInput(`pt_${p.id}`, p.title, 'Production title');
+  const duration = prodInput(`pd_${p.id}`, p.estimatedDuration, 'e.g. 45–60s');
+  const format = prodInput(`pf_${p.id}`, p.contentFormat, 'Recording format');
+  const env = prodInput(`pe_${p.id}`, p.recordingEnvironment, 'Recording environment');
+  const visual = prodInput(`pv_${p.id}`, p.visualDirection, 'Visual direction / opening shot');
+  const camera = prodInput(`pc_${p.id}`, p.cameraRecommendation, 'Camera framing');
+  const audio = prodInput(`pa_${p.id}`, p.audioNotes, 'Audio notes');
+  const cta = prodInput(`pcta_${p.id}`, p.ctaPlacement, 'CTA timing / placement');
+  const caption = prodInput(`pcap_${p.id}`, p.captionNotes, 'Caption notes');
+  const cautions = prodInput(`pca_${p.id}`, p.cautions, 'Production cautions');
+  const platform = el('select', { class: 'hq-cos__select', id: `ppl_${p.id}` }) as HTMLSelectElement;
+  for (const pl of PROD_PLATFORMS) platform.append(el('option', { value: pl.id, ...(pl.id === p.primaryPlatform ? { selected: 'selected' } : {}) }, pl.label));
+  const readySel = el('select', { class: 'hq-cos__select', id: `prd_${p.id}` }) as HTMLSelectElement;
+  for (const c of PRODUCTION_COMPLEXITIES) readySel.append(el('option', { value: c.id, ...(c.id === p.readiness ? { selected: 'selected' } : {}) }, c.label));
+
+  card.append(
+    el('div', { class: 'hq-cos__chair-head' },
+      el('h3', { class: 'hq-cos__decision-title' }, `Pack — ${p.title}`),
+      el('span', { class: 'hq-cos__tag label', 'data-status': p.status }, productionStatusLabel(p.status))),
+  );
+  if (p.revisionNote) card.append(cosField('Revision requested', p.revisionNote));
+  card.append(
+    deskField(title.id, 'Title', title),
+    el('div', { class: 'hq-research__row' },
+      deskField(platform.id, 'Primary platform', platform),
+      deskField(format.id, 'Format', format),
+      deskField(duration.id, 'Estimated duration', duration)),
+    el('div', { class: 'hq-research__row' },
+      deskField(env.id, 'Recording environment', env),
+      deskField(camera.id, 'Camera framing', camera),
+      deskField(readySel.id, 'Readiness', readySel)),
+    deskField(visual.id, 'Visual direction', visual),
+    el('div', { class: 'hq-research__row' },
+      deskField(audio.id, 'Audio notes', audio),
+      deskField(cta.id, 'CTA placement', cta),
+      deskField(caption.id, 'Caption notes', caption)),
+    deskField(cautions.id, 'Production cautions', cautions),
+  );
+
+  // The production checklist and the asset checklist — tickable, addable.
+  card.append(checklistView(draft, 'checklist', 'Recording checklist', persist));
+  card.append(checklistView(draft, 'requiredAssets', 'Required assets', persist));
+  const prog = Math.round(checklistProgress(draft) * 100);
+  card.append(el('p', { class: 'hq-cos__quiet' }, `Checklist ${prog}% complete.`));
+
+  const collect = (): ProductionReadiness => updateProductionReadiness(draft, {
+    title: title.value, estimatedDuration: duration.value, contentFormat: format.value,
+    recordingEnvironment: env.value, visualDirection: visual.value, cameraRecommendation: camera.value,
+    audioNotes: audio.value, ctaPlacement: cta.value, captionNotes: caption.value, cautions: cautions.value,
+    primaryPlatform: platform.value as ProductionReadiness['primaryPlatform'] || undefined,
+    readiness: readySel.value as ProductionComplexity,
+  });
+
+  const group = el('div', { class: 'hq-cos__responses', role: 'group', 'aria-label': `Actions for pack “${p.title}”` });
+  const save = el('button', { class: 'hq-cos__response', type: 'button' }, 'Save draft') as HTMLButtonElement;
+  save.addEventListener('click', () => persist(collect(), 'Pack saved.'));
+  const ready = el('button', { class: 'hq-cos__response', type: 'button' }, 'Ready for Founder review') as HTMLButtonElement;
+  ready.addEventListener('click', () => persist(markProductionReady(collect()), 'Sent to the Chief of Staff for review.'));
+  group.append(save, ready);
+  card.append(group);
+  return card;
+}
+
+function checklistView(p: ProductionReadiness, which: 'checklist' | 'requiredAssets', label: string, persist: (n: ProductionReadiness, notice: string) => void): HTMLElement {
+  const wrap = el('div', { class: 'hq-cos__field' }, el('p', { class: 'hq-cos__field-label label' }, label));
+  const items = p[which];
+  const ul = el('ul', { class: 'hq-prod__checklist' });
+  for (const it of items) {
+    const cbId = `${which}_${it.id}`;
+    const cb = el('input', { class: 'hq-briefs__chip-input', type: 'checkbox', id: cbId, ...(it.done ? { checked: 'checked' } : {}) }) as HTMLInputElement;
+    cb.addEventListener('change', () => persist(toggleChecklistItem(p, which, it.id), 'Checklist updated.'));
+    ul.append(el('li', { class: 'hq-prod__check' }, el('label', { class: 'hq-prod__check-label', for: cbId }, cb, el('span', {}, it.label))));
+  }
+  wrap.append(ul);
+  const addId = `add_${which}_${p.id}`;
+  const add = el('input', { class: 'hq-cos__note-input', id: addId, type: 'text', maxlength: '120', placeholder: which === 'requiredAssets' ? 'Add an asset…' : 'Add a checklist item…' }) as HTMLInputElement;
+  const addBtn = el('button', { class: 'hq-cos__withdraw', type: 'button' }, 'Add') as HTMLButtonElement;
+  addBtn.addEventListener('click', () => { if (add.value.trim()) persist(addChecklistItem(p, which, add.value), `${label} updated.`); });
+  wrap.append(el('div', { class: 'hq-cos__note-field' }, el('label', { class: 'hq-cos__note-input-label label', for: addId }, `Add to ${label.toLowerCase()}`), add, addBtn));
+  return wrap;
 }
 
 /* --- The Head of Production's receiving queue (Sprint 12E) -----------------
@@ -3109,7 +3267,97 @@ function cosOpportunities(repaint: () => void): HTMLElement {
     draftBlock.append(l);
   }
   section.append(draftBlock);
+
+  // Production Readiness Packs (Sprint 13E) — office review + Founder production review.
+  const packs = loadProduction();
+  const prodReview = productionForReview(packs);
+  const prodApproved = approvedProduction(packs);
+  const ps = productionPackStanding(packs);
+  const psBits: string[] = [];
+  if (ps.draft + ps.preparing + ps.revision) psBits.push(`${ps.draft + ps.preparing + ps.revision} in preparation`);
+  if (ps.readyForReview) psBits.push(`${ps.readyForReview} ready for review`);
+  if (ps.approved) psBits.push(`${ps.approved} approved`);
+  if (ps.routed) psBits.push(`${ps.routed} routed to work`);
+
+  const prodBlock = el('section', { class: 'hq-cos__block' },
+    el('div', { class: 'hq-cos__block-head' },
+      el('h2', { class: 'hq-cos__block-title' }, 'Production Readiness — Review'),
+      el('span', { class: 'hq-cos__count', 'aria-label': `${prodReview.length} for review` }, String(prodReview.length))),
+    el('p', { class: 'hq-cos__block-note' }, 'Production Readiness Packs from the Head of Production, awaiting your decision.'));
+  if (psBits.length) prodBlock.append(el('p', { class: 'hq-cos__line' }, psBits.join(' · ')));
+  // Review list (ready) plus approved packs kept visible to route to work.
+  const prodList = [...prodReview, ...prodApproved];
+  if (prodList.length === 0) prodBlock.append(el('p', { class: 'hq-cos__quiet' }, 'No production packs are ready for review.'));
+  else { const l = el('div', { class: 'hq-cos__decisions' }); for (const p of prodList) l.append(productionReviewCard(p, repaint)); prodBlock.append(l); }
+  section.append(prodBlock);
   return section;
+}
+
+/** The office / Founder reviews a Production Readiness Pack — the recording plan
+    and the decisions. Route to Work reuses the idempotent promotion carrying the
+    full intelligence → opportunity → assignment → draft → production → recommendation
+    chain. An approved pack shows only the route action. */
+function productionReviewCard(p: ProductionReadiness, repaint: () => void): HTMLElement {
+  const fv = founderProductionView(p);
+  const card = el('article', { class: 'hq-cos__decision hq-briefs__founder' });
+  card.append(
+    el('div', { class: 'hq-cos__chair-head' },
+      el('h3', { class: 'hq-cos__decision-title' }, `${p.title}`),
+      el('span', { class: 'hq-cos__tag label', 'data-status': 'open' }, productionStatusLabel(p.status))),
+    cosField('What will be recorded', fv.record),
+    cosField('Estimated duration', fv.duration),
+    cosField('Format', fv.format),
+    cosField('Recording environment', fv.environment),
+    cosField('Visual direction', fv.visual),
+    cosField('CTA', fv.cta),
+  );
+  if (fv.assets.length) {
+    const ul = el('ul', { class: 'hq-cos__tradeoffs' });
+    for (const a of fv.assets) ul.append(el('li', {}, a));
+    card.append(el('div', { class: 'hq-cos__field' }, el('p', { class: 'hq-cos__field-label label' }, 'Required assets'), ul));
+  }
+  card.append(cosField('Production cautions', fv.cautions), el('p', { class: 'hq-cos__decision-summary' }, `${productionAuthorLabel(p)}`));
+
+  const persist = (next: ProductionReadiness, notice: string): void => { saveProduction(upsertProduction(loadProduction(), next)); opportunitiesNotice = notice; repaint(); };
+
+  if (p.status === 'approved') {
+    card.append(el('p', { class: 'hq-cos__quiet' }, 'Approved — nothing records or publishes. The office can route it into work.'));
+    if (isProductionRoutable(p)) {
+      const rg = el('div', { class: 'hq-cos__responses', role: 'group', 'aria-label': 'Route production pack to work' });
+      const b = el('button', { class: 'hq-cos__response', type: 'button' }, 'Route to Work') as HTMLButtonElement;
+      b.addEventListener('click', () => {
+        const res = routeProductionToWork(p, loadRecommendations());
+        saveRecommendations(res.recommendations);
+        saveProduction(upsertProduction(loadProduction(), res.pack));
+        opportunitiesNotice = res.created ? 'Production pack routed to work.' : 'Already routed; existing work kept.';
+        repaint();
+      });
+      rg.append(b); card.append(rg);
+    } else {
+      card.append(el('p', { class: 'hq-cos__quiet' }, `Routed to work — recommendation ${p.promotedRecommendationId}.`));
+    }
+    return card;
+  }
+
+  const group = el('div', { class: 'hq-cos__responses', role: 'group', 'aria-label': `Your decision on “${p.title}”` });
+  const act = (label: string, cls: string, fn: () => void): void => {
+    const b = el('button', { class: cls, type: 'button' }, label) as HTMLButtonElement; b.addEventListener('click', fn); group.append(b);
+  };
+  act('Approve', 'hq-cos__response', () => persist(approveProduction(p), `${p.title} — approved.`));
+  act('Route to Work', 'hq-cos__response', () => {
+    const res = routeProductionToWork(p, loadRecommendations());
+    saveRecommendations(res.recommendations);
+    saveProduction(upsertProduction(loadProduction(), res.pack));
+    opportunitiesNotice = res.created ? 'Production pack routed to work.' : 'Already routed; existing work kept.';
+    repaint();
+  });
+  const revId = `prev_${p.id.replace(/[^a-z0-9]/gi, '')}`;
+  const rev = el('input', { class: 'hq-cos__note-input', id: revId, type: 'text', maxlength: '200', placeholder: 'What to revise (optional)' }) as HTMLInputElement;
+  act('Request Revision', 'hq-cos__withdraw', () => persist(returnProductionForRevision(p, rev.value), `${p.title} — returned for revision.`));
+  act('Hold', 'hq-cos__withdraw', () => persist(holdProduction(p), `${p.title} — held.`));
+  act('Decline', 'hq-cos__withdraw', () => persist(declineProduction(p), `${p.title} — declined.`));
+  card.append(el('div', { class: 'hq-cos__note-field' }, el('label', { class: 'hq-cos__note-input-label label', for: revId }, 'Revision instruction'), rev), group);
+  return card;
 }
 
 /** The Founder's concise draft review — the projection, the cautions, an editable

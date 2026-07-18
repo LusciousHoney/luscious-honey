@@ -209,6 +209,9 @@ export interface Recommendation {
   /** When promoted from an approved Creative Draft (Sprint 13D), the id of that
       draft — the last link in intelligence → opportunity → assignment → draft → recommendation. */
   originDraftId?: string;
+  /** When promoted from a Production Readiness Pack (Sprint 13E), the id of that
+      pack — the preparation link before recommendation. */
+  originProductionId?: string;
   /** ISO datetime created. */
   createdAt: string;
   /** ISO datetime last changed. */
@@ -262,7 +265,7 @@ export function makeRecommendation(
   input: {
     id: string; title: string; summary: string;
     type?: SubmissionType; ownerChairId?: string | null; priority?: Priority; visibility?: FounderVisibility;
-    originIntelId?: string; originOpportunityId?: string; originAssignmentId?: string; originDraftId?: string;
+    originIntelId?: string; originOpportunityId?: string; originAssignmentId?: string; originDraftId?: string; originProductionId?: string;
   },
   now: Date = new Date(),
 ): Recommendation | null {
@@ -275,6 +278,7 @@ export function makeRecommendation(
     ...(input.originOpportunityId ? { originOpportunityId: input.originOpportunityId } : {}),
     ...(input.originAssignmentId ? { originAssignmentId: input.originAssignmentId } : {}),
     ...(input.originDraftId ? { originDraftId: input.originDraftId } : {}),
+    ...(input.originProductionId ? { originProductionId: input.originProductionId } : {}),
     type: input.type && SUBMISSION_TYPE_BY_ID.has(input.type) ? input.type : DEFAULT_TYPE,
     title: input.title.trim(),
     summary: input.summary.trim(),
@@ -304,7 +308,7 @@ export function makeSubmission(
   input: {
     id: string; type: SubmissionType; title: string; description: string;
     priority?: Priority; ownerChairId?: string | null;
-    originIntelId?: string; originOpportunityId?: string; originAssignmentId?: string; originDraftId?: string;
+    originIntelId?: string; originOpportunityId?: string; originAssignmentId?: string; originDraftId?: string; originProductionId?: string;
   },
   now: Date = new Date(),
 ): Recommendation | null {
@@ -312,7 +316,8 @@ export function makeSubmission(
     { id: input.id, type: input.type, title: input.title, summary: input.description,
       priority: input.priority, ownerChairId: input.ownerChairId,
       originIntelId: input.originIntelId, originOpportunityId: input.originOpportunityId,
-      originAssignmentId: input.originAssignmentId, originDraftId: input.originDraftId },
+      originAssignmentId: input.originAssignmentId, originDraftId: input.originDraftId,
+      originProductionId: input.originProductionId },
     now,
   );
 }

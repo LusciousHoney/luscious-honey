@@ -1477,6 +1477,17 @@
   border-left: 2px solid var(--terracotta);
 }
 
+/* Production Readiness (Sprint 13E) — reuses the plaster cards and form controls;
+   adds only its own spacing and a tickable checklist. */
+.hq-prod__ready { display: grid; gap: var(--s-4); margin: var(--s-6) 0; }
+.hq-prod__editor { gap: var(--s-3); }
+.hq-prod__checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.hq-prod__check-label {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--serif); font-size: var(--fs-body-sm); color: var(--hq-ink); cursor: pointer;
+}
+.hq-prod__check .hq-briefs__chip-input:checked + span { color: var(--umber); text-decoration: line-through; }
+
 /* The six responses — quiet plaster buttons; the recorded one is marked. */
 .hq-cos__responses { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 .hq-cos__response {
