@@ -32,8 +32,9 @@ import { ROOMS } from '../src/headquarters/rooms.ts';
 
 /* --- the preference model ------------------------------------------------- */
 
-test('PREFERENCES is the closed four-verdict vocabulary', () => {
-  assert.deepEqual(PREFERENCES.map((p) => p.value), ['love', 'like', 'pass', 'favorite']);
+test('PREFERENCES is the closed verdict vocabulary', () => {
+  // `save` (Save for Later) joined the vocabulary in Sprint 002 for the Navigation Lab.
+  assert.deepEqual(PREFERENCES.map((p) => p.value), ['love', 'like', 'save', 'pass', 'favorite']);
   for (const p of PREFERENCES) {
     assert.equal(isPreferenceValue(p.value), true);
     assert.equal(preferenceLabel(p.value), p.label);
@@ -87,7 +88,7 @@ test('preferenceTally counts each verdict', () => {
   s = setPreference(s, 'b', 'love');
   s = setPreference(s, 'c', 'favorite');
   s = setPreference(s, 'd', 'pass');
-  assert.deepEqual(preferenceTally(s), { love: 2, like: 0, pass: 1, favorite: 1 });
+  assert.deepEqual(preferenceTally(s), { love: 2, like: 0, save: 0, pass: 1, favorite: 1 });
 });
 
 /* --- favorites as a pure projection --------------------------------------- */
