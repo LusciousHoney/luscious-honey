@@ -92,6 +92,10 @@ import {
   type QueueItem, type QueueOffice, type QueuePriority, type QueueFilter,
 } from './executive-work-queue.ts';
 import {
+  // EOS Milestone 1 — Founder Attention v0 (a projection over the projection; owns nothing)
+  deriveFounderAttention, attentionLineup,
+} from './executive-attention.ts';
+import {
   // Sprint 13A — Growth Intelligence (the Director of Growth's research desk)
   INTEL_SOURCES, INTEL_CATEGORIES, INTEL_CONFIDENCES, INTEL_REVIEW_OUTCOMES,
   intelSourceLabel, intelCategoryLabel, intelConfidenceLabel, intelStatusLabel, intelOutcomeLabel,
@@ -337,25 +341,24 @@ function renderScene(root: HTMLElement): void {
   mountExecSummary(execSummary);
 }
 
-/** The Executive Office summary — a few honest counts from the Work Queue, and a
-    quiet path to it. A projection, not a dashboard; no record is owned or edited. */
+/** The Executive Office summary — Founder Attention v0 (EOS Milestone 1). The
+    Work Queue is classified into the six attention dispositions and read back as
+    a calm, salience-ordered line-up: what needs the Founder now, what wants a
+    decision or a review, what to be aware of. A projection over the projection —
+    no record is owned or edited, and classification lives in executive-attention,
+    never here. */
 function mountExecSummary(host: HTMLElement): void {
-  const s = queueSummary(loadWorkQueue());
-  const lines: { label: string; n: number }[] = [
-    { label: 'Requiring your attention', n: s.founderAttention },
-    { label: 'Waiting on Creative', n: s.waitingCreative },
-    { label: 'Waiting on Production', n: s.waitingProduction },
-    { label: 'Waiting on Growth', n: s.waitingGrowth },
-    { label: 'Completed today', n: s.completedToday },
-  ].filter((l) => l.n > 0);
-  const block = el('section', { class: 'hq-execsummary__inner', 'aria-label': 'Executive summary' },
+  const queue = loadWorkQueue();
+  const lineup = attentionLineup(deriveFounderAttention(queue));
+  const s = queueSummary(queue); // reused only for the "recently finished" detail
+  const block = el('section', { class: 'hq-execsummary__inner', 'aria-label': 'Founder attention' },
     el('p', { class: 'hq-briefing__eyebrow label' }, 'The House at a glance'));
-  if (lines.length === 0) {
-    block.append(el('p', { class: 'hq-briefing__line' }, 'Nothing is waiting on you. The House is running quietly.'));
+  if (lineup.length === 0) {
+    block.append(el('p', { class: 'hq-briefing__line' }, 'Nothing is asking for your attention. The House is running quietly.'));
   } else {
     const ul = el('ul', { class: 'hq-execsummary__list' });
-    for (const l of lines) ul.append(el('li', { class: 'hq-execsummary__item' },
-      el('span', { class: 'hq-execsummary__count' }, String(l.n)), el('span', {}, ` ${l.label}`)));
+    for (const l of lineup) ul.append(el('li', { class: 'hq-execsummary__item' },
+      el('span', { class: 'hq-execsummary__count' }, String(l.count)), el('span', {}, ` ${l.label}`)));
     block.append(ul);
   }
   if (s.recentlyFinished.length) {
