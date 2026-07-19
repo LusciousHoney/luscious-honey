@@ -26,7 +26,10 @@ import { verifyAccessRequest } from './_lib/access.js'
 // infrastructure. Production Studio (creative production tools), Editorial
 // Office (editorial operations), and the Executive Team Headquarters (the
 // founder's private headquarters) are separate surfaces sharing one gate.
-const PREFIXES = ['/production-studio', '/editorial-office', '/headquarters']
+// `/invitation-review` is the Founder's private review of recorded acceptances
+// and is gated. The guest surface `/invitation` is deliberately NOT listed: the
+// invitation is reached by a private token, never by an employee Access login.
+const PREFIXES = ['/production-studio', '/editorial-office', '/headquarters', '/invitation-review']
 
 /**
  * Boundary-safe prefix test. Protects each prefix exactly — e.g.
