@@ -1,19 +1,18 @@
 /**
  * Invitation view endpoint — POST /api/invitation/view   { token }
  *
- * Resolves the private token server-side and, only on a valid match, returns the
- * recipient's display name, the governed proposal copy, and the current
- * acceptance status (so a refresh after acceptance restores the closing state
- * instead of replaying the flow).
+ * Resolves the private token against the durable invitation registry and, only on
+ * a valid match, records the first open, then returns the recipient's display
+ * name, the governed proposal copy, and the current status (so a refresh after
+ * acceptance restores the closing state instead of replaying the flow).
  *
- * Non-disclosing by design: an unknown, missing, or invalid token returns the
- * SAME neutral 200 `{ ok: false }` shape — never a different status code, never a
- * hint that a recipient exists. The token is read from the POST body only (never
- * a URL parameter), and is never logged or echoed back.
+ * Non-disclosing by design: an unknown, missing, invalid, or expired token returns
+ * the SAME neutral 200 `{ ok: false }` shape — never a different status code, never
+ * a hint that an invitation exists. The token is read from the POST body only
+ * (never a URL parameter), and is never logged or echoed back.
  */
 
-import { resolveInvitationToken } from '../../_lib/invitation.js';
-import { PROPOSAL_MARKDOWN, PROPOSAL_STATUS } from '../../_lib/invitation-content.js';
+import { resolveInvitation, markOpened, proposalFor } from '../../_lib/invitation.js';
 
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
@@ -25,7 +24,7 @@ function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
 }
 
-// Uniform neutral response for anything that is not a valid, known token.
+// Uniform neutral response for anything that is not a valid, known invitation.
 const NEUTRAL = () => json({ ok: false }, 200);
 
 export async function onRequestPost({ request, env }) {
@@ -36,31 +35,20 @@ export async function onRequestPost({ request, env }) {
     return NEUTRAL();
   }
 
-  const invitation = await resolveInvitationToken(env, body && body.token);
+  const invitation = await resolveInvitation(env, body && body.token);
   if (!invitation) return NEUTRAL();
 
   // Only genuinely published proposal copy is ever served.
-  if (PROPOSAL_STATUS !== 'published') return NEUTRAL();
+  const proposal = proposalFor(invitation.proposal_id);
+  if (!proposal) return NEUTRAL();
 
-  // Current acceptance status, if the store is reachable. If the store is not
-  // bound we still let the invitation be read; acceptance simply defaults to open.
-  let status = 'open';
-  if (env && env.LHC_DB) {
-    try {
-      const row = await env.LHC_DB
-        .prepare('SELECT status FROM invitation_acceptances WHERE invitation_id = ?')
-        .bind(invitation.id)
-        .first();
-      if (row && row.status === 'accepted') status = 'accepted';
-    } catch {
-      status = 'open';
-    }
-  }
+  // Record the first open (idempotent; never overwrites the original opened_at).
+  await markOpened(env, invitation.id);
 
   return json({
     ok: true,
-    recipientName: invitation.recipientName,
-    proposal: PROPOSAL_MARKDOWN,
-    status,
+    recipientName: invitation.recipient_name,
+    proposal,
+    status: invitation.accepted_at ? 'accepted' : 'open',
   });
 }

@@ -1,23 +1,25 @@
 /**
  * Invitation acceptance endpoint — POST /api/invitation/accept   { token }
  *
- * Records a real, durable acceptance and notifies the Founder exactly once. The
- * acceptance is idempotent: the invitation id is the PRIMARY KEY, so a repeated
- * "I'm Ready to Begin" (or a double-submit) conflicts and stores nothing new, and
- * the Founder is emailed only on the FIRST successful write.
+ * Records a real, durable acceptance in the invitation registry and notifies the
+ * Founder exactly once. Acceptance is idempotent: accepted_at is set only when it
+ * is still NULL, so a repeated "I'm Ready to Begin" (or a double-submit) records
+ * nothing new. The Founder email is guarded by notified_at, so it is sent once —
+ * and, crucially, it can be RETRIED: if acceptance persisted but the email failed,
+ * notified_at stays NULL and a later acceptance attempt tries the send again
+ * without ever duplicating the acceptance.
  *
  * Honesty guarantees:
- *   • If the store is not reachable, this returns 503 and NEVER pretends the
- *     acceptance succeeded — the client keeps DaVonna's place and offers retry.
- *   • The notification is best-effort AFTER the durable write: a mail failure
- *     does not fail the acceptance (the record is what matters) and is recorded
- *     so it is not retried into a duplicate.
+ *   • If the store is unreachable, this returns 503 and NEVER pretends success —
+ *     the client keeps DaVonna's place and offers retry.
+ *   • The notification is best-effort AFTER the durable write: a mail failure never
+ *     rolls back the acceptance.
  *
- * Non-disclosing: an invalid/absent token returns the neutral 200 `{ ok: false }`
- * shape, identical to /view. The token is read from the body only, never logged.
+ * Non-disclosing: an invalid/absent/expired token returns the neutral 200
+ * `{ ok: false }` shape. The token is read from the body only, never logged.
  */
 
-import { resolveInvitationToken, acceptanceNotification, founderNotifyAddress } from '../../_lib/invitation.js';
+import { resolveInvitation, acceptanceNotification, founderNotifyAddress } from '../../_lib/invitation.js';
 import { sendEmail } from '../../_lib/email.js';
 
 const JSON_HEADERS = {
@@ -30,6 +32,11 @@ function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
 }
 
+const RETRY_503 = () => json(
+  { ok: false, retry: true, error: 'We could not record your response just yet. Please try again in a moment.' },
+  503,
+);
+
 export async function onRequestPost({ request, env }) {
   let body;
   try {
@@ -38,61 +45,57 @@ export async function onRequestPost({ request, env }) {
     return json({ ok: false }, 200);
   }
 
-  const invitation = await resolveInvitationToken(env, body && body.token);
+  const invitation = await resolveInvitation(env, body && body.token);
   if (!invitation) return json({ ok: false }, 200);
 
   // A real response requires durable storage. Never fake success.
-  if (!env || !env.LHC_DB) {
-    return json(
-      { ok: false, retry: true, error: 'We could not record your response just yet. Please try again in a moment.' },
-      503,
-    );
-  }
+  if (!env || !env.LHC_DB) return RETRY_503();
 
-  let firstWrite = false;
+  // Set acceptance once. accepted_at is written only while still NULL, so repeats
+  // and double-submits change nothing.
   try {
-    const res = await env.LHC_DB
+    await env.LHC_DB
       .prepare(
-        `INSERT INTO invitation_acceptances (invitation_id, recipient, status, accepted_at)
-         VALUES (?, ?, 'accepted', datetime('now'))
-         ON CONFLICT(invitation_id) DO NOTHING`,
+        `UPDATE invitations
+            SET status = 'accepted', accepted_at = datetime('now')
+          WHERE id = ? AND accepted_at IS NULL`,
       )
-      .bind(invitation.id, invitation.recipientName)
+      .bind(invitation.id)
       .run();
-    firstWrite = !!(res && res.meta && res.meta.changes === 1);
   } catch {
-    return json(
-      { ok: false, retry: true, error: 'We could not record your response just yet. Please try again in a moment.' },
-      503,
-    );
+    return RETRY_503();
   }
 
-  // Notify the Founder once — only on the first write, and only if not already
-  // marked notified (guards a retry that raced the very first insert).
-  if (firstWrite) {
-    let row = null;
-    try {
-      row = await env.LHC_DB
-        .prepare('SELECT accepted_at, notified_at FROM invitation_acceptances WHERE invitation_id = ?')
-        .bind(invitation.id)
-        .first();
-    } catch { /* fall through — acceptance already stored */ }
+  // Read the durable state back to drive the (single, retryable) notification.
+  let row;
+  try {
+    row = await env.LHC_DB
+      .prepare('SELECT recipient_name, accepted_at, notified_at FROM invitations WHERE id = ?')
+      .bind(invitation.id)
+      .first();
+  } catch {
+    // Acceptance is stored; we simply couldn't read back to notify. Still success.
+    return json({ ok: true, status: 'accepted' }, 200);
+  }
 
-    const to = founderNotifyAddress(env);
-    if (to && row && !row.notified_at) {
-      const msg = acceptanceNotification(invitation.recipientName, row.accepted_at);
-      const sent = await sendEmail(env, { to, ...msg });
-      if (sent && sent.ok) {
-        try {
-          await env.LHC_DB
-            .prepare("UPDATE invitation_acceptances SET notified_at = datetime('now') WHERE invitation_id = ? AND notified_at IS NULL")
-            .bind(invitation.id)
-            .run();
-        } catch { /* notification recorded best-effort */ }
-      }
+  if (!row || !row.accepted_at) return RETRY_503(); // acceptance did not persist
+
+  // Notify once. Sent only when accepted and not yet notified — which also makes
+  // it retry safely if a previous send failed. notified_at is written only after
+  // a confirmed send, under a NULL guard so it can never fire twice.
+  const to = founderNotifyAddress(env);
+  if (to && !row.notified_at) {
+    const msg = acceptanceNotification(row.recipient_name, row.accepted_at);
+    const sent = await sendEmail(env, { to, ...msg });
+    if (sent && sent.ok) {
+      try {
+        await env.LHC_DB
+          .prepare("UPDATE invitations SET notified_at = datetime('now') WHERE id = ? AND notified_at IS NULL")
+          .bind(invitation.id)
+          .run();
+      } catch { /* notification recorded best-effort */ }
     }
   }
 
-  // Idempotent success — first write or repeat both resolve to the accepted state.
   return json({ ok: true, status: 'accepted' }, 200);
 }
