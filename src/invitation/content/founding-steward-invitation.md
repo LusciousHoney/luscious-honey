@@ -10,7 +10,7 @@
 
 Dear DaVonna,
 
-This is a letter I've taken my time writing because you're the kind of woman who is deserving of this experience and of how I intend to lead the Luscious Honey Collective house and brand.
+This is a letter I've taken my time writing. You're the kind of woman I wanted to create this experience for. It also reflects how I intend to lead The Luscious Honey Collective and welcome every person who joins it.
 
 What began as a single story became something larger than a story — a House, in the truest sense of that word: a place where writers, narrators, artists, and readers gather around the work and are changed by it. I've reached the point where a House like this cannot, and should not, be built by one person. It needs people who love the written word the way I do, who understand that making a book is an act of care — especially for an indie author making a debut, who needs the expertise and care of a doula — and who want to help shape something from its earliest hours rather than arrive after everything interesting has already happened.
 
