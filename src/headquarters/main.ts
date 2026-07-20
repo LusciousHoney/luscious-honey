@@ -3052,7 +3052,7 @@ function initiativeCard(i: Initiative, persist: (next: Initiative, note?: string
   line('Suggested Timeline', b.suggestedTimeline);
   lines('Recommended Platforms', b.recommendedPlatforms);
   lines('Required Founder Decisions', b.requiredFounderDecisions);
-  lines('Dependencies', b.dependencies.length ? b.dependencies : []);
+  lines('Dependencies', b.dependencies);
   lines('Next Actions', b.nextActions);
   card.append(brief);
 

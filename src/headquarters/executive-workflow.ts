@@ -1,6 +1,12 @@
 /* =============================================================================
    Executive Workflow Engine v1 — the orchestration layer of the Headquarters.
 
+   ★ WHY THIS EXISTS: the House organizes work so the Founder does not have to.
+   Every future executive capability builds on this foundation and must preserve
+   that principle — the Founder contributes ideas; the House contributes
+   organization. Anything that makes the Founder act as project manager (choosing
+   offices, executives, platforms, sequence, or coordination) is a regression.
+
    Headquarters is the operating headquarters of the Luscious Honey Collective —
    not a dashboard, not a tracker. The Founder brings an opportunity, idea,
    problem, or decision; the EXECUTIVE TEAM organizes, coordinates, recommends,
@@ -240,7 +246,9 @@ function assembleBrief(input: string, contributions: ExecutiveContribution[]): E
   if (has('head_of_production')) dependencies.push('Recording assets and a narration take');
   if (has('business_office')) dependencies.push('Follow-up with the new connection');
 
-  const nextActions = deliverables.map((d) => `Route "${d}" to its office`);
+  // Next Actions read as the House's own commitments, not internal routing
+  // mechanics — the Founder sees what the organization will do, not the plumbing.
+  const nextActions = deliverables.map((d) => `The House prepares the ${d}.`);
 
   return {
     purpose: 'Turn this into coordinated work across the House, with the Founder deciding once.',
