@@ -94,7 +94,9 @@ import {
 import {
   partitionInitiatives, initiativeRecord, timelineEventLine,
 } from './institutional-memory.ts';
-import { deriveHeadquartersState, arrivalBrief } from './headquarters-os.ts';
+import { arrivalBrief } from './headquarters-os.ts';
+import { deriveExecutiveLoop } from './executive-loop.ts';
+import { deriveEligibility, type Eligibility } from './execution-bridge.ts';
 import {
   // Sprint 13F — the Executive Work Queue (a projection; owns nothing)
   QUEUE_OFFICES, QUEUE_PRIORITIES, queueOfficeLabel, queuePriorityLabel,
@@ -2349,7 +2351,8 @@ function cosBriefing(): HTMLElement {
     is ready to brief, and what is continuing without her. Composed from the HOS
     derivation over every matter; the Founder investigates nothing. */
 function hosArrival(): HTMLElement {
-  const brief = arrivalBrief(deriveHeadquartersState(loadInitiatives()));
+  const loop = deriveExecutiveLoop(loadInitiatives());
+  const brief = arrivalBrief(loop.state);
   const total = brief.awaitingJudgment.length + brief.readyToBrief.length + brief.continuing.length;
   const section = el('section', { class: 'hq-cos__block hq-cos__arrival', 'aria-label': 'The House at present' });
   if (total === 0) { section.setAttribute('hidden', ''); return section; }
@@ -2357,6 +2360,11 @@ function hosArrival(): HTMLElement {
   section.append(
     el('p', { class: 'hq-cos__eyebrow label' }, 'The House, at present'),
     el('p', { class: 'hq-cos__lead' }, brief.headline));
+
+  // The House's execution posture — whether it can carry the next step out on its
+  // own, in calm language; never developer-console status.
+  const posture = executionPosture(deriveEligibility(loop.recommendation));
+  if (posture) section.append(el('p', { class: 'hq-cos__quiet' }, posture));
 
   const group = (label: string, titles: string[]): void => {
     if (!titles.length) return;
@@ -2371,6 +2379,20 @@ function hosArrival(): HTMLElement {
 
   section.append(el('a', { class: 'hq-cos__more', href: '#/chief-of-staff/initiatives' }, 'Enter the matters →'));
   return section;
+}
+
+/** The Founder-facing posture for the House's next step — calm and residential;
+    never developer-console language. Empty when nothing further is warranted. */
+function executionPosture(e: Eligibility): string {
+  switch (e) {
+    case 'auto_executable':
+    case 'executable_with_safeguards':  return 'The House can carry the next step out on its own.';
+    case 'founder_approval_required':   return 'The next step awaits your judgment.';
+    case 'in_progress':                 return 'The House is carrying the next step out.';
+    case 'awaiting_verification':       return 'Completed work is being checked before it reaches you.';
+    case 'blocked':                     return 'A matter is held for your judgment.';
+    case 'not_executable':              return '';
+  }
 }
 
 /* --- 1b. Operational picture — derived from the Chief of Staff's real record.
