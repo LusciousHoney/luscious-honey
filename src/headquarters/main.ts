@@ -3002,7 +3002,7 @@ function cosInitiatives(repaint: () => void): HTMLElement {
   };
 
   // --- intake: the Founder's single act ---
-  const intake = el('section', { class: 'hq-cos__block' },
+  const intake = el('section', { class: 'hq-cos__block hq-cos__intake' },
     el('h2', { class: 'hq-cos__block-title' }, 'What would you like to bring in?'));
   const input = el('textarea', {
     class: 'hq-research__textarea', id: 'initiative_input', rows: '4', maxlength: '1200',
@@ -3032,13 +3032,23 @@ function cosInitiatives(repaint: () => void): HTMLElement {
 /** One initiative: the assembled Executive Brief, the Founder's one decision,
     and — once approved — execution and its entry into institutional history. */
 function initiativeCard(i: Initiative, persist: (next: Initiative, note?: string) => void): HTMLElement {
-  const card = el('article', { class: 'hq-cos__card' },
-    el('p', { class: 'hq-cos__eyebrow label' }, `Initiative · ${statusLabel(i.status)}`),
-    el('h3', { class: 'hq-cos__card-title' }, i.title));
+  const card = el('article', { class: 'hq-cos__card' });
+  const team = i.participants.map((p) => executiveLabel(p)).join(' · ');
 
-  // Who the Chief of Staff enlisted — so the Founder feels the House working.
-  card.append(cosField('The Chief of Staff coordinated',
-    i.participants.map((p) => executiveLabel(p)).join(' · ')));
+  // The executive transition — answered before anything else: the House
+  // coordinated its team, finished its work, and now awaits the Founder's word.
+  if (i.status === 'brief_ready') {
+    card.append(el('div', { class: 'hq-cos__handoff' },
+      el('p', { class: 'hq-cos__handoff-eyebrow label' }, 'The Chief of Staff coordinated the Executive Team'),
+      el('p', { class: 'hq-cos__handoff-title' }, 'The Executive Team has completed its recommendation — for your review.'),
+      el('p', { class: 'hq-cos__handoff-team' }, team)));
+    card.append(el('h3', { class: 'hq-cos__card-title' }, i.title));
+  } else {
+    card.append(el('p', { class: 'hq-cos__eyebrow label' }, `Initiative · ${statusLabel(i.status)}`));
+    card.append(el('h3', { class: 'hq-cos__card-title' }, i.title));
+    // Who the Chief of Staff enlisted — so the Founder feels the House working.
+    card.append(cosField('The Chief of Staff coordinated', team));
+  }
 
   // The ONE Brief — the eight prepared sections.
   const b = i.brief;
@@ -3056,19 +3066,23 @@ function initiativeCard(i: Initiative, persist: (next: Initiative, note?: string
   lines('Next Actions', b.nextActions);
   card.append(brief);
 
-  // The Founder's one decision — only while the Brief is awaiting a word.
+  // The Founder's one decision — the conclusion of the recommendation, set apart
+  // by a ruled band and led by a weighted primary action so it is never hunted for.
   if (i.status === 'brief_ready') {
+    const bar = el('div', { class: 'hq-cos__decision-bar' },
+      el('p', { class: 'hq-cos__decision-cue label' }, 'Your decision'));
     const acts = el('div', { class: 'hq-cos__responses' });
-    const act = (label: string, decision: FounderDecision, note: string) => {
-      const btn = el('button', { class: 'hq-cos__response', type: 'button' }, label) as HTMLButtonElement;
+    const act = (label: string, decision: FounderDecision, note: string, primary = false) => {
+      const btn = el('button', { class: primary ? 'hq-cos__response hq-cos__response--primary' : 'hq-cos__response', type: 'button' }, label) as HTMLButtonElement;
       btn.addEventListener('click', () => persist(decideInitiative(i, decision, undefined), note));
       acts.append(btn);
     };
-    act('Approve', 'approve', 'Approved — the work is routing into the offices.');
+    act('Approve', 'approve', 'Approved — the work is routing into the offices.', true);
     act('Revise', 'revise', 'Sent back for revision.');
     act('Pause', 'pause', 'Paused — nothing will move until you return.');
     act('Decline', 'decline', 'Declined — the House will let it rest.');
-    card.append(acts);
+    bar.append(acts);
+    card.append(bar);
   }
 
   // Execution — the routed work, and where it went. No external publishing.
