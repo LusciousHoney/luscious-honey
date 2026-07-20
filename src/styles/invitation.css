@@ -31,8 +31,16 @@ body {
 }
 .inv-screen.is-active { opacity: 1; }
 
-/* Reading screens scroll; single-idea screens center. */
-.inv-proposal { place-items: start center; }
+/* Reading screens scroll; single-idea screens center. A reading screen scrolls
+   its (progressively revealed) content within itself, so a long movement — and
+   its closing cue — is always fully reachable on any viewport, while a short one
+   still starts at the top and fills the House. */
+.inv-proposal {
+  place-items: start center;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
 
 .inv-frame {
   width: min(100%, var(--w-text));
@@ -193,6 +201,33 @@ body {
 /* --- Movement pacing: a soft rule between grouped sections ------------------ */
 .inv-letter hr.inv-soft { border-top: 1px solid rgba(var(--ink-rgb), 0.09); margin: var(--s-4) 0; }
 
+/* --- The letter, unfolding: each line arrives at a reading pace ------------- */
+.inv-block {
+  opacity: 0;
+  transform: translateY(9px);
+  transition: opacity 1000ms var(--ease-dissolve), transform 1000ms var(--ease-dissolve);
+}
+.inv-block.is-revealed { opacity: 1; transform: none; }
+
+/* A quiet cue that appears only once the movement has fully arrived — a soft
+   invitation to continue, not a button to hunt for. Tapping/clicking anywhere,
+   or Space/Enter, continues just the same. */
+.inv-cue { min-height: var(--s-6); display: grid; justify-items: start; align-content: start; }
+.inv-cue-btn {
+  justify-self: start;
+  appearance: none; background: none; border: 0; cursor: pointer;
+  font-family: var(--serif); font-style: italic; font-size: var(--fs-body);
+  color: var(--inv-accent);
+  padding: var(--s-2) 0;
+  opacity: 0; transform: translateY(4px);
+  transition: opacity 1400ms var(--ease-dissolve), transform 1400ms var(--ease-dissolve),
+              color var(--motion-quick) var(--ease-settle);
+  pointer-events: none;
+}
+.inv-cue-btn.is-shown { opacity: 0.72; transform: none; pointer-events: auto; }
+.inv-cue-btn.is-shown:hover { opacity: 1; }
+.inv-cue-btn:focus-visible { outline: none; box-shadow: var(--focus-ring); opacity: 1; border-radius: var(--radius); }
+
 /* --- The decision: four unhurried choices ---------------------------------- */
 .inv-decision .inv-frame,
 .inv-sub .inv-frame { gap: var(--s-3); }
@@ -237,4 +272,7 @@ body {
   .inv-screen { transition: opacity 0.001ms; }
   .inv-open .inv-letter { animation: none; }
   .inv-ember { animation: none; opacity: 0.7; }
+  .inv-block { transition: none; opacity: 1; transform: none; }
+  .inv-cue-btn { transition: none; }
+  .inv-cue-btn.is-shown { transform: none; }
 }
