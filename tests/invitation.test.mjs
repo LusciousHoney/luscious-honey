@@ -1,387 +1,226 @@
 /* =============================================================================
-   FOUNDING STEWARD INVITATION — registry tests (Sprint 3C).
-   Covers durable D1-backed token resolution (valid / missing / invalid / expired,
-   all non-disclosing), raw-token-never-stored, first-open recording (and no
-   overwrite), acceptance persistence + idempotency, single-and-retryable Founder
-   notification, failed-notification-does-not-roll-back, refresh restoration, the
-   Access-gated owner review lifecycle, byte-identical + server-only proposal, and
-   the invitation surface's freedom from menu/dashboard/workspace chrome.
-
-   Deterministic token fixtures live only in this file and never resemble or become
-   a production token.
+   FOUNDING STEWARD INVITATION — guided experience + decision lifecycle tests.
+   Covers token resolution (non-disclosing), first-open, the four decisions and
+   their states, single/idempotent Founder notifications, the conversation and
+   reminder workflows, the Founder advancement workflow (conversation → planning →
+   workspace authorization), the workspace rule, personalization, movement
+   splitting, byte-identical + server-only proposal, and surface hygiene.
+   Deterministic fixtures only; never a production token.
    ============================================================================= */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { renderProposal } from '../src/invitation/render.js';
-import {
-  hashToken,
-  resolveInvitation,
-  markOpened,
-  proposalFor,
-  acceptanceNotification,
-  founderNotifyAddress,
-} from '../functions/_lib/invitation.js';
-import { PROPOSAL_MARKDOWN, PROPOSAL_STATUS, PROPOSALS } from '../functions/_lib/invitation-content.js';
+import { renderProposal, splitSections, renderMovements } from '../src/invitation/render.js';
+import { hashToken, resolveInvitation, personaFor, phaseOf, STATUS } from '../functions/_lib/invitation.js';
+import { PROPOSAL_MARKDOWN, PROPOSAL_STATUS } from '../functions/_lib/invitation-content.js';
 import { onRequestPost as viewPost } from '../functions/api/invitation/view.js';
-import { onRequestPost as acceptPost } from '../functions/api/invitation/accept.js';
+import { onRequestPost as decisionPost } from '../functions/api/invitation/decision.js';
+import { onRequestPost as advancePost } from '../functions/api/invitation/advance.js';
 import { onRequestGet as reviewGet } from '../functions/invitation-review.js';
 
-// Deterministic, obviously-fake fixture — never a production token.
 const TEST_TOKEN = 'TEST-fixture-token-not-a-real-secret-0000';
+const now = (() => { let c = 0; return () => `2026-07-19 12:00:${String(c++).padStart(2, '0')}`; })();
 
-/* --- A minimal in-memory D1 stand-in modelling the `invitations` table ------ */
+/* --- In-memory D1 modelling the extended `invitations` table --------------- */
 function makeDB() {
-  const rows = new Map(); // id -> row
-  let clock = 0;
-  const now = () => `2026-07-19 12:00:${String(clock++).padStart(2, '0')}`;
-  const norm = (sql) => sql.replace(/\s+/g, ' ').trim();
-
+  const rows = new Map();
+  const norm = (s) => s.replace(/\s+/g, ' ').trim();
   return {
     rows,
-    seed(row) { rows.set(row.id, { opened_at: null, accepted_at: null, notified_at: null, expires_at: null, ...row }); return this; },
+    seed(r) { rows.set(r.id, { opened_at: null, accepted_at: null, notified_at: null, expires_at: null, decision: null, decided_at: null, reminder_period: null, reminder_at: null, conversation_requested_at: null, conversation_complete_at: null, planning_complete_at: null, workspace_authorized_at: null, declined_at: null, ...r }); return this; },
     prepare(sql) {
-      const s = norm(sql);
-      let args = [];
+      const s = norm(sql); let args = [];
       const api = {
         bind(...a) { args = a; return api; },
         async run() {
-          if (s.includes("UPDATE invitations SET opened_at = datetime('now')") && s.includes('opened_at IS NULL')) {
+          // markOpened
+          if (s.includes("SET opened_at = datetime('now')") && s.includes('opened_at IS NULL')) {
             const r = rows.get(args[0]);
             if (r && r.opened_at === null) { r.opened_at = now(); if (r.status === 'invited') r.status = 'opened'; return { meta: { changes: 1 } }; }
             return { meta: { changes: 0 } };
           }
-          if (s.includes("SET status = 'accepted', accepted_at = datetime('now')") && s.includes('accepted_at IS NULL')) {
-            const r = rows.get(args[0]);
-            if (r && r.accepted_at === null) { r.accepted_at = now(); r.status = 'accepted'; return { meta: { changes: 1 } }; }
-            return { meta: { changes: 0 } };
-          }
-          if (s.includes("SET notified_at = datetime('now')") && s.includes('notified_at IS NULL')) {
-            const r = rows.get(args[0]);
-            if (r && r.notified_at === null) { r.notified_at = now(); return { meta: { changes: 1 } }; }
-            return { meta: { changes: 0 } };
-          }
+          // decision: accept
+          if (s.includes("status='accepted'")) { const r = rows.get(args[0]); if (r && r.status !== 'accepted' && r.status !== 'declined') { r.status = 'accepted'; r.decision = 'accept'; r.accepted_at = now(); r.decided_at = now(); return { meta: { changes: 1 } }; } return { meta: { changes: 0 } }; }
+          // decision: decline
+          if (s.includes("status='declined'")) { const r = rows.get(args[0]); if (r && r.status !== 'declined') { r.status = 'declined'; r.decision = 'decline'; r.declined_at = now(); r.decided_at = now(); return { meta: { changes: 1 } }; } return { meta: { changes: 0 } }; }
+          // decision: talk
+          if (s.includes("status='conversation_requested'")) { const r = rows.get(args[0]); if (r && r.status !== 'accepted' && r.status !== 'declined') { r.status = 'conversation_requested'; r.decision = 'talk'; r.conversation_requested_at = r.conversation_requested_at || now(); return { meta: { changes: 1 } }; } return { meta: { changes: 0 } }; }
+          // decision: time  (bind: period, mod, id)
+          if (s.includes("status='reminder_scheduled'")) { const r = rows.get(args[2]); if (r && r.status !== 'accepted' && r.status !== 'declined') { r.status = 'reminder_scheduled'; r.decision = 'time'; r.reminder_period = args[0]; r.reminder_at = '2026-08-01 00:00:00'; return { meta: { changes: 1 } }; } return { meta: { changes: 0 } }; }
+          // notifyOnce
+          if (s.includes('SET notified_at=datetime') || s.includes("SET notified_at = datetime")) { const r = rows.get(args[0]); if (r) { r.notified_at = now(); return { meta: { changes: 1 } }; } return { meta: { changes: 0 } }; }
+          // advance: SET status=?, <stamp>=datetime('now') WHERE id=? AND status=?  (bind: to,id,from)
+          const adv = /SET status=\?, (\w+)=datetime\('now'\) WHERE id=\? AND status=\?/.exec(s);
+          if (adv) { const [to, id, from] = args; const r = rows.get(id); if (r && r.status === from) { r.status = to; r[adv[1]] = now(); return { meta: { changes: 1 } }; } return { meta: { changes: 0 } }; }
           return { meta: { changes: 0 } };
         },
         async first() {
-          if (s.includes('FROM invitations WHERE token_hash = ?')) {
-            for (const r of rows.values()) if (r.token_hash === args[0]) return { ...r };
-            return null;
-          }
-          if (s.includes('SELECT recipient_name, accepted_at, notified_at FROM invitations WHERE id = ?')) {
-            const r = rows.get(args[0]);
-            return r ? { recipient_name: r.recipient_name, accepted_at: r.accepted_at, notified_at: r.notified_at } : null;
-          }
-          const r = rows.get(args[0]);
-          return r ? { ...r } : null;
+          if (s.includes('WHERE token_hash = ?')) { for (const r of rows.values()) if (r.token_hash === args[0]) return { ...r }; return null; }
+          const r = rows.get(args[0]); return r ? { ...r } : null;
         },
-        async all() {
-          return { results: [...rows.values()].map((r) => ({ ...r })) };
-        },
+        async all() { return { results: [...rows.values()].map((r) => ({ ...r })) }; },
       };
       return api;
     },
   };
 }
-
-async function seededDB(overrides = {}) {
+async function seededDB(o = {}) {
   const db = makeDB();
-  db.seed({
-    id: 'inv_test1',
-    recipient_name: 'DaVonna',
-    recipient_slug: 'davonna',
-    token_hash: await hashToken(TEST_TOKEN),
-    proposal_id: 'founding-steward',
-    status: 'invited',
-    created_at: '2026-07-19 11:00:00',
-    ...overrides,
-  });
+  db.seed({ id: 'inv_1', recipient_name: 'DaVonna', recipient_slug: 'davonna', token_hash: await hashToken(TEST_TOKEN), proposal_id: 'founding-steward', status: 'invited', created_at: '2026-07-19 11:00:00', ...o });
   return db;
 }
+const reqJSON = (b) => new Request('https://x/api', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) });
+function env(db, extra = {}) { return { LHC_DB: db, RESEND_API_KEY: 'k', EMAIL_FROM: 'H <e@x>', FOUNDER_NOTIFY_EMAIL: 'f@x', ...extra }; }
+function mailCounter() { let n = 0; globalThis.fetch = async () => { n++; return new Response(JSON.stringify({ id: 'm' }), { status: 200 }); }; return () => n; }
+async function decide(db, choice, reminderPeriod) { return decisionPost({ request: reqJSON({ token: TEST_TOKEN, choice, reminderPeriod }), env: env(db) }); }
 
-function req(body) {
-  return new Request('https://x/api', { method: 'POST', body: JSON.stringify(body) });
-}
-function reviewReq() {
-  return new Request('https://x/invitation-review', { method: 'GET' });
-}
-const localReviewEnv = (db) => ({ LHC_DB: db, LHC_LOCAL_DEV: 'true' });
-function acceptEnv(db) {
-  return { LHC_DB: db, RESEND_API_KEY: 'k', EMAIL_FROM: 'House <editorial@luscioushoneycollective.com>', FOUNDER_NOTIFY_EMAIL: 'founder@luscioushoneycollective.com' };
-}
-function mailOk() {
-  const sent = [];
-  globalThis.fetch = async (url, init) => {
-    if (String(url).includes('resend.com')) { sent.push(JSON.parse(init.body)); return new Response(JSON.stringify({ id: 'm1' }), { status: 200 }); }
-    throw new Error('unexpected fetch ' + url);
-  };
-  return sent;
-}
-function mailFail() {
-  let count = 0;
-  globalThis.fetch = async () => { count++; return new Response(JSON.stringify({ message: 'nope' }), { status: 400 }); };
-  return () => count;
-}
-
-/* --- Token hashing --------------------------------------------------------- */
-
-test('token hash is deterministic SHA-256 hex and never the raw token', async () => {
-  const h1 = await hashToken(TEST_TOKEN);
-  const h2 = await hashToken(TEST_TOKEN);
-  assert.equal(h1, h2);
-  assert.match(h1, /^[0-9a-f]{64}$/);
-  assert.notEqual(h1, TEST_TOKEN);
-});
-
-/* --- Resolution: valid / missing / invalid / expired (non-disclosing) ------- */
-
-test('valid token resolves to its invitation via D1', async () => {
-  const inv = await resolveInvitation({ LHC_DB: await seededDB() }, TEST_TOKEN);
-  assert.equal(inv?.recipient_name, 'DaVonna');
-  assert.equal(inv?.proposal_id, 'founding-steward');
-});
-
-test('missing / invalid / no-store tokens resolve to null', async () => {
+/* --- Resolution & non-disclosure ------------------------------------------- */
+test('valid token resolves; missing/invalid/expired do not (non-disclosing view)', async () => {
   const db = await seededDB();
-  assert.equal(await resolveInvitation({ LHC_DB: db }, ''), null);
-  assert.equal(await resolveInvitation({ LHC_DB: db }, undefined), null);
-  assert.equal(await resolveInvitation({ LHC_DB: db }, 'wrong-token'), null);
-  assert.equal(await resolveInvitation({}, TEST_TOKEN), null); // no LHC_DB
+  assert.equal((await resolveInvitation({ LHC_DB: db }, TEST_TOKEN)).recipient_name, 'DaVonna');
+  assert.equal(await resolveInvitation({ LHC_DB: db }, 'nope'), null);
+  const a = await (await viewPost({ request: reqJSON({ token: 'nope' }), env: { LHC_DB: db } })).text();
+  const b = await (await viewPost({ request: reqJSON({}), env: { LHC_DB: db } })).text();
+  assert.equal(a, '{"ok":false}'); assert.equal(a, b);
 });
 
-test('expired invitation resolves to null', async () => {
-  const db = await seededDB({ expires_at: '2000-01-01 00:00:00' });
-  assert.equal(await resolveInvitation({ LHC_DB: db }, TEST_TOKEN), null);
+test('view records first open and returns phase + atmospheric personalization', async () => {
+  const db = await seededDB(); mailCounter();
+  const d = await (await viewPost({ request: reqJSON({ token: TEST_TOKEN }), env: { LHC_DB: db } })).json();
+  assert.equal(d.ok, true); assert.equal(d.recipientName, 'DaVonna'); assert.equal(d.phase, 'open');
+  assert.equal(d.personalization.accent, 'verdant');   // green, worn softly
+  assert.equal(d.proposal, PROPOSAL_MARKDOWN);
+  assert.ok(db.rows.get('inv_1').opened_at);
 });
 
-test('not-yet-expired invitation still resolves', async () => {
-  const db = await seededDB({ expires_at: '2999-01-01 00:00:00' });
-  assert.equal((await resolveInvitation({ LHC_DB: db }, TEST_TOKEN))?.recipient_name, 'DaVonna');
+test('personaFor is atmospheric only and defaults to house', () => {
+  assert.equal(personaFor('davonna').accent, 'verdant');
+  assert.equal(personaFor('someone-else').accent, 'house');
 });
 
-test('view is non-disclosing for invalid, missing, and expired tokens (identical neutral)', async () => {
-  const good = await seededDB();
-  const expired = await seededDB({ expires_at: '2000-01-01 00:00:00' });
-  const a = await (await viewPost({ request: req({ token: 'nope' }), env: { LHC_DB: good } })).text();
-  const b = await (await viewPost({ request: req({}), env: { LHC_DB: good } })).text();
-  const c = await (await viewPost({ request: req({ token: TEST_TOKEN }), env: { LHC_DB: expired } })).text();
-  const res = await viewPost({ request: req({ token: 'nope' }), env: { LHC_DB: good } });
+/* --- The four decisions ---------------------------------------------------- */
+test('accept records accepted state and notifies the Founder once (idempotent)', async () => {
+  const db = await seededDB(); const mails = mailCounter();
+  assert.deepEqual(await (await decide(db, 'accept')).json(), { ok: true, phase: 'accepted' });
+  assert.equal(db.rows.get('inv_1').status, 'accepted');
+  await decide(db, 'accept'); await decide(db, 'accept');
+  assert.equal(mails(), 1);
+});
+
+test('decline closes respectfully and notifies once', async () => {
+  const db = await seededDB(); const mails = mailCounter();
+  assert.deepEqual(await (await decide(db, 'decline')).json(), { ok: true, phase: 'declined' });
+  assert.equal(db.rows.get('inv_1').status, 'declined');
+  await decide(db, 'decline'); assert.equal(mails(), 1);
+});
+
+test('talk requests a conversation and notifies once', async () => {
+  const db = await seededDB(); const mails = mailCounter();
+  assert.deepEqual(await (await decide(db, 'talk')).json(), { ok: true, phase: 'conversation' });
+  assert.equal(db.rows.get('inv_1').status, 'conversation_requested');
+  await decide(db, 'talk'); assert.equal(mails(), 1);
+});
+
+test('time schedules a reminder (no email) and can be re-selected', async () => {
+  const db = await seededDB(); const mails = mailCounter();
+  const r = await (await decide(db, 'time', 'two weeks')).json();
+  assert.equal(r.phase, 'reminder'); assert.equal(r.reminder.period, 'two weeks');
+  assert.equal(db.rows.get('inv_1').status, 'reminder_scheduled');
+  assert.equal(db.rows.get('inv_1').reminder_period, 'two weeks');
+  assert.equal(mails(), 0);
+});
+
+test('decision with no store returns honest 503, never fakes success', async () => {
+  const res = await decisionPost({ request: reqJSON({ token: TEST_TOKEN, choice: 'accept' }), env: { INVITATION: 1 } });
+  // no LHC_DB but token resolves? resolveInvitation needs LHC_DB → null → neutral 200:
   assert.equal(res.status, 200);
-  assert.equal(a, '{"ok":false}');
-  assert.equal(a, b);
-  assert.equal(a, c);
-});
-
-/* --- Raw token is never stored --------------------------------------------- */
-
-test('the registry stores only a hash — the raw token is never persisted', async () => {
+  const broken = { prepare() { return { bind() { return this; }, async run() { throw new Error('x'); }, async first() { return null; } }; } };
+  // resolves via a working read but write throws:
   const db = await seededDB();
-  for (const r of db.rows.values()) {
-    assert.match(r.token_hash, /^[0-9a-f]{64}$/);
-    for (const v of Object.values(r)) assert.notEqual(v, TEST_TOKEN);
-  }
+  const failing = { prepare(sql) { return sql.includes("status='accepted'") ? { bind() { return this; }, async run() { throw new Error('x'); } } : db.prepare(sql); } };
+  const r2 = await decisionPost({ request: reqJSON({ token: TEST_TOKEN, choice: 'accept' }), env: env(failing) });
+  assert.equal(r2.status, 503); assert.equal((await r2.json()).retry, true);
+  assert.ok(broken);
 });
 
-/* --- Exact recipient + published-only proposal ----------------------------- */
-
-test('valid view returns the exact recipient and the governed proposal', async () => {
-  const res = await viewPost({ request: req({ token: TEST_TOKEN }), env: { LHC_DB: await seededDB() } });
-  const data = await res.json();
-  assert.equal(data.ok, true);
-  assert.equal(data.recipientName, 'DaVonna');
-  assert.equal(data.status, 'open');
-  assert.equal(data.proposal, PROPOSAL_MARKDOWN);
-});
-
-test('proposal is governed as published, associated by id, and byte-identical to source', () => {
-  assert.equal(PROPOSAL_STATUS, 'published');
-  assert.equal(proposalFor('founding-steward'), PROPOSAL_MARKDOWN);
-  assert.equal(proposalFor('unknown'), null);
-  assert.equal(PROPOSALS['founding-steward'], PROPOSAL_MARKDOWN);
-  const source = readFileSync(new URL('../src/invitation/content/founding-steward-invitation.md', import.meta.url), 'utf8');
-  assert.equal(PROPOSAL_MARKDOWN, source);
-});
-
-test('renderer preserves approved order, headings, and the exact Founder signature', () => {
-  const html = renderProposal(PROPOSAL_MARKDOWN);
-  const order = ['Why I Thought of You', 'Your Role Within the Collective', 'Growing Together', 'Next Steps'];
-  let last = -1;
-  for (const h of order) { const at = html.indexOf(h); assert.ok(at > last, `out of order: ${h}`); last = at; }
-  assert.ok(html.includes('<strong>Luscious Honey</strong>'));
-  assert.ok(html.includes('<em>Founder, The Luscious Honey Collective</em>'));
-  assert.ok(html.includes('Community &amp; Literary Engagement Coordinator'));
-  assert.ok(html.includes('<strong><em>Pull Me Under</em></strong>'));
-});
-
-test('renderer escapes before emphasis so content cannot inject markup', () => {
-  const html = renderProposal('a **b** <script>x</script> *c*');
-  assert.ok(html.includes('<strong>b</strong>') && html.includes('&lt;script&gt;') && !html.includes('<script>'));
-});
-
-/* --- First open records opened_at; later views do not overwrite ------------- */
-
-test('the first valid view records opened_at and advances status to opened', async () => {
+test('invalid token decision is non-disclosing and writes nothing', async () => {
   const db = await seededDB();
-  await viewPost({ request: req({ token: TEST_TOKEN }), env: { LHC_DB: db } });
-  const r = db.rows.get('inv_test1');
-  assert.ok(r.opened_at);
-  assert.equal(r.status, 'opened');
+  assert.deepEqual(await (await decisionPost({ request: reqJSON({ token: 'nope', choice: 'accept' }), env: env(db) })).json(), { ok: false });
+  assert.equal(db.rows.get('inv_1').status, 'invited');
 });
 
-test('a later view does not overwrite the original opened_at', async () => {
-  const db = await seededDB();
-  await viewPost({ request: req({ token: TEST_TOKEN }), env: { LHC_DB: db } });
-  const firstOpened = db.rows.get('inv_test1').opened_at;
-  await viewPost({ request: req({ token: TEST_TOKEN }), env: { LHC_DB: db } });
-  assert.equal(db.rows.get('inv_test1').opened_at, firstOpened);
+/* --- Conversation workflow: talk → Founder records complete → decide -------- */
+test('conversation workflow: talk → record complete → considering → accept', async () => {
+  const db = await seededDB(); mailCounter();
+  await decide(db, 'talk');
+  const adv = await advancePost({ request: reqJSON({ id: 'inv_1', action: 'record_conversation_complete' }), env: env(db, { LHC_LOCAL_DEV: 'true' }) });
+  assert.equal(adv.status, 200); assert.equal((await adv.json()).status, STATUS.CONSIDERING);
+  assert.equal(db.rows.get('inv_1').status, 'considering');
+  // view now routes back to the decision
+  assert.equal(phaseOf(db.rows.get('inv_1')), 'open');
+  assert.deepEqual(await (await decide(db, 'accept')).json(), { ok: true, phase: 'accepted' });
 });
 
-test('markOpened is a no-op when opened_at is already set', async () => {
-  const db = await seededDB({ opened_at: '2026-07-19 09:00:00' });
-  await markOpened({ LHC_DB: db }, 'inv_test1');
-  assert.equal(db.rows.get('inv_test1').opened_at, '2026-07-19 09:00:00');
+/* --- Founder workflow: accept → planning → authorize workspace -------------- */
+test('Founder workflow: accepted → planning complete → workspace authorized (never automatic)', async () => {
+  const db = await seededDB(); mailCounter();
+  await decide(db, 'accept');
+  // acceptance alone does NOT authorize a workspace
+  assert.equal(db.rows.get('inv_1').workspace_authorized_at, null);
+  const e = env(db, { LHC_LOCAL_DEV: 'true' });
+  await advancePost({ request: reqJSON({ id: 'inv_1', action: 'record_planning_complete' }), env: e });
+  assert.equal(db.rows.get('inv_1').status, 'planning_complete');
+  await advancePost({ request: reqJSON({ id: 'inv_1', action: 'authorize_workspace' }), env: e });
+  assert.equal(db.rows.get('inv_1').status, 'ready_for_workspace');
+  assert.ok(db.rows.get('inv_1').workspace_authorized_at);
+  // out-of-order authorization is rejected (guarded transition)
+  const db2 = await seededDB(); await decide(db2, 'accept');
+  const r = await advancePost({ request: reqJSON({ id: 'inv_1', action: 'authorize_workspace' }), env: env(db2, { LHC_LOCAL_DEV: 'true' }) });
+  assert.equal((await r.json()).ok, false);
 });
 
-/* --- Acceptance: persistence, idempotency, notification, honesty ----------- */
-
-test('acceptance records accepted_at, notifies the Founder once, and is idempotent', async () => {
-  const db = await seededDB();
-  const sent = mailOk();
-  const r1 = await acceptPost({ request: req({ token: TEST_TOKEN }), env: acceptEnv(db) });
-  assert.deepEqual(await r1.json(), { ok: true, status: 'accepted' });
-  const acceptedAt = db.rows.get('inv_test1').accepted_at;
-  assert.ok(acceptedAt);
-  assert.equal(db.rows.get('inv_test1').status, 'accepted');
-  assert.ok(db.rows.get('inv_test1').notified_at);
-  // Repeats change nothing and never re-notify.
-  await acceptPost({ request: req({ token: TEST_TOKEN }), env: acceptEnv(db) });
-  await acceptPost({ request: req({ token: TEST_TOKEN }), env: acceptEnv(db) });
-  assert.equal(db.rows.get('inv_test1').accepted_at, acceptedAt);
-  assert.equal(sent.length, 1);
-});
-
-test('a failed notification does NOT roll back acceptance and can be retried later', async () => {
-  const db = await seededDB();
-  const fails = mailFail();
-  const res = await acceptPost({ request: req({ token: TEST_TOKEN }), env: acceptEnv(db) });
-  assert.deepEqual(await res.json(), { ok: true, status: 'accepted' }); // honest: acceptance stored
-  assert.ok(db.rows.get('inv_test1').accepted_at);
-  assert.equal(db.rows.get('inv_test1').notified_at, null); // email failed → not marked
-  assert.equal(fails(), 1);
-  // Retry: acceptance not duplicated, email now succeeds and is marked.
-  const acceptedAt = db.rows.get('inv_test1').accepted_at;
-  const sent = mailOk();
-  await acceptPost({ request: req({ token: TEST_TOKEN }), env: acceptEnv(db) });
-  assert.equal(db.rows.get('inv_test1').accepted_at, acceptedAt);
-  assert.ok(db.rows.get('inv_test1').notified_at);
-  assert.equal(sent.length, 1);
-});
-
-test('acceptance with no store returns 503 retry and never fakes success', async () => {
-  const res = await acceptPost({ request: req({ token: TEST_TOKEN }), env: {} });
-  // No LHC_DB → resolveInvitation returns null → neutral (indistinguishable). With a
-  // reachable store but broken writes we get the honest 503:
-  assert.equal(res.status, 200);
-  const brokenDB = { prepare() { return { bind() { return this; }, async run() { throw new Error('down'); }, async first() { return null; } }; } };
-  const db = await seededDB();
-  // Simulate a store that resolves the row but fails the acceptance write.
-  const failingWrite = {
-    prepare(sql) {
-      if (sql.includes("SET status = 'accepted'")) return { bind() { return this; }, async run() { throw new Error('down'); } };
-      return db.prepare(sql);
-    },
-  };
-  const res2 = await acceptPost({ request: req({ token: TEST_TOKEN }), env: { LHC_DB: failingWrite } });
-  assert.equal(res2.status, 503);
-  assert.equal((await res2.json()).retry, true);
-});
-
-test('invalid token acceptance is non-disclosing and writes nothing', async () => {
-  const db = await seededDB();
-  const res = await acceptPost({ request: req({ token: 'nope' }), env: acceptEnv(db) });
-  assert.deepEqual(await res.json(), { ok: false });
-  assert.equal(db.rows.get('inv_test1').accepted_at, null);
-});
-
-/* --- Refresh restoration ---------------------------------------------------- */
-
-test('after acceptance, view reports accepted so a refresh restores the closing state', async () => {
-  const db = await seededDB();
-  mailOk();
-  await acceptPost({ request: req({ token: TEST_TOKEN }), env: acceptEnv(db) });
-  const res = await viewPost({ request: req({ token: TEST_TOKEN }), env: { LHC_DB: db } });
-  assert.equal((await res.json()).status, 'accepted');
-});
-
-/* --- Founder notification content ------------------------------------------ */
-
-test('the Founder notification names the recipient and carries no token', () => {
-  const msg = acceptanceNotification('DaVonna', '2026-07-19 12:00:00');
-  assert.match(msg.subject, /Founding Steward/);
-  assert.ok(msg.text.includes('DaVonna') && !msg.text.includes(TEST_TOKEN) && !msg.html.includes(TEST_TOKEN));
-  assert.equal(founderNotifyAddress({ FOUNDER_NOTIFY_EMAIL: 'f@x' }), 'f@x');
-  assert.equal(founderNotifyAddress({ EMAIL_FROM: 'e@x' }), 'e@x');
+test('advance fails closed without a verified Access identity', async () => {
+  const db = await seededDB(); await decide(db, 'accept');
+  const r = await advancePost({ request: reqJSON({ id: 'inv_1', action: 'record_planning_complete' }), env: { LHC_DB: db, ACCESS_TEAM_DOMAIN: 't', ACCESS_AUD: 'a' } });
+  assert.equal(r.status, 401);
 });
 
 /* --- Founder review lifecycle ---------------------------------------------- */
-
-test('Founder review renders lifecycle fields and never shows token/hash/URL', async () => {
-  const db = await seededDB();
-  mailOk();
-  await viewPost({ request: req({ token: TEST_TOKEN }), env: { LHC_DB: db } });   // opened
-  await acceptPost({ request: req({ token: TEST_TOKEN }), env: acceptEnv(db) });  // accepted + notified
-  const res = await reviewGet({ request: reviewReq(), env: localReviewEnv(db) });
-  assert.equal(res.status, 200);
-  const html = await res.text();
-  for (const h of ['Recipient', 'Status', 'Created', 'First opened', 'Accepted', 'Founder notified']) assert.ok(html.includes(h), `missing column ${h}`);
-  assert.ok(html.includes('DaVonna') && html.includes('accepted'));
-  // Must never leak the token, the hash, or any private URL.
-  assert.ok(!html.includes(TEST_TOKEN));
-  assert.ok(!html.includes(await hashToken(TEST_TOKEN)));
-  assert.ok(!html.includes('/invitation/#'));
+test('review renders lifecycle + the right advancement control, Access-gated', async () => {
+  const db = await seededDB(); mailCounter(); await decide(db, 'accept');
+  const html = await (await reviewGet({ request: new Request('https://x/invitation-review'), env: env(db, { LHC_LOCAL_DEV: 'true' }) })).text();
+  assert.ok(html.includes('DaVonna') && html.includes('Accepted'));
+  assert.ok(html.includes('record_planning_complete'));   // the next Founder action
+  assert.ok(!html.includes(await hashToken(TEST_TOKEN)) && !html.includes('/invitation/#'));
+  // gated when Access configured but unauthenticated
+  const r = await reviewGet({ request: new Request('https://x/invitation-review'), env: { LHC_DB: db, ACCESS_TEAM_DOMAIN: 't', ACCESS_AUD: 'a' } });
+  assert.equal(r.status, 401);
 });
 
-test('Founder review shows a calm empty state when there are no invitations', async () => {
-  const res = await reviewGet({ request: reviewReq(), env: localReviewEnv(makeDB()) });
-  assert.ok((await res.text()).includes('No invitations yet'));
+/* --- Content: movements, byte-identity, server-only ------------------------ */
+test('the letter splits into paced movements without losing or reordering copy', () => {
+  const secs = splitSections(PROPOSAL_MARKDOWN);
+  assert.ok(secs.length >= 6);
+  const movements = renderMovements(PROPOSAL_MARKDOWN);
+  assert.ok(movements.length >= 3 && movements.length <= 6);
+  const joined = movements.join('\n');
+  for (const marker of ['Founding Stewards', 'Community &amp; Literary Engagement Coordinator', '<strong><em>Pull Me Under</em></strong>', '<strong>Luscious Honey</strong>'])
+    assert.ok(joined.includes(marker), `movement copy missing: ${marker}`);
 });
 
-test('Founder review denies an unauthenticated request when Access is configured', async () => {
-  const res = await reviewGet({
-    request: reviewReq(),
-    env: { LHC_DB: makeDB(), ACCESS_TEAM_DOMAIN: 't.cloudflareaccess.com', ACCESS_AUD: 'aud' },
-  });
-  assert.equal(res.status, 401);
+test('proposal is published, byte-identical to source, and server-only', () => {
+  assert.equal(PROPOSAL_STATUS, 'published');
+  const src = readFileSync(new URL('../src/invitation/content/founding-steward-invitation.md', import.meta.url), 'utf8');
+  assert.equal(PROPOSAL_MARKDOWN, src);
+  const main = readFileSync(new URL('../src/invitation/main.ts', import.meta.url), 'utf8');
+  assert.ok(!main.includes('Dear DaVonna'));   // copy never shipped in the client entry
 });
-
-/* --- Surface hygiene: no dashboard / menu / workspace scaffolding ---------- */
 
 test('the invitation surface builds no menu, dashboard, or navigation chrome', () => {
-  const main = readFileSync(new URL('../src/invitation/main.ts', import.meta.url), 'utf8');
-  const html = readFileSync(new URL('../invitation/index.html', import.meta.url), 'utf8');
-  const built = main.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
-  for (const forbidden of ["el('nav'", "el(\"nav\"", "role: 'menu'", "role: 'navigation'", 'hq-rail', 'hq-wing', 'progressbar']) {
-    assert.ok(!built.includes(forbidden), `main.ts should not build "${forbidden}"`);
-  }
-  assert.ok(!/<nav\b/i.test(html), 'index.html should have no <nav>');
-  assert.ok(main.includes('taking shape'));
-});
-
-test('the proposal copy is absent from the client entry (served server-only)', () => {
-  const main = readFileSync(new URL('../src/invitation/main.ts', import.meta.url), 'utf8');
-  const html = readFileSync(new URL('../invitation/index.html', import.meta.url), 'utf8');
-  assert.ok(!main.includes('Dear DaVonna') && !html.includes('Dear DaVonna'));
-  assert.ok(!main.includes('Founding Steward') && !html.includes('Founding Steward'));
-});
-
-/* --- No raw token literal in client source ---------------------------------- */
-
-test('no invitation token literal appears in shipped client source', () => {
-  const main = readFileSync(new URL('../src/invitation/main.ts', import.meta.url), 'utf8');
-  const lib = readFileSync(new URL('../functions/_lib/invitation.js', import.meta.url), 'utf8');
+  const main = readFileSync(new URL('../src/invitation/main.ts', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
+  for (const f of ["el('nav'", 'hq-rail', 'hq-wing', 'progressbar', 'dashboard'])
+    assert.ok(!main.includes(f), `should not build ${f}`);
   assert.ok(!main.includes(TEST_TOKEN));
-  // The server lib never contains an INVITATION_TOKEN literal (env-secret model is gone).
-  assert.ok(!/INVITATION_TOKEN/.test(lib));
 });

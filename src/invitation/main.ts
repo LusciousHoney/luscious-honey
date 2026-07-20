@@ -1,10 +1,10 @@
 /* =============================================================================
-   THE FOUNDING STEWARD INVITATION — entry for /invitation/.
-   An isolated, single-path editorial experience: Welcome → Open Your Invitation
-   → the approved proposal → I'm Ready to Begin → Welcome to the House → Your
-   Workspace Is Taking Shape. It imports the locked design system but inherits no
-   Headquarters rail, room router, toolbar, or application chrome. One idea and
-   one primary action per screen; the House never rushes.
+   THE FOUNDING STEWARD INVITATION — a guided, paced experience.
+   Welcome → the letter revealed in a few unhurried movements → a considered
+   decision (Accept · Some Time · Talk First · Decline) → the state that follows.
+   Imports the locked design system; no Headquarters chrome. One idea per screen;
+   the House never rushes. Personalization is atmospheric only (a per-recipient
+   accent) — it never speaks in the Founder's voice.
    ============================================================================= */
 
 import '../styles/tokens.css';
@@ -12,208 +12,239 @@ import '../styles/base.css';
 import '../styles/responsive.css';
 import '../styles/invitation.css';
 
-import { renderProposal } from './render.js';
+import { renderMovements } from './render.js';
 
-type ViewOk = { ok: true; recipientName: string; proposal: string; status: 'open' | 'accepted' };
+type Persona = { accent: string };
+type ViewOk = {
+  ok: true; recipientName: string; proposal: string;
+  phase: 'open' | 'accepted' | 'declined' | 'reminder' | 'conversation';
+  personalization: Persona; reminder: { period: string; at?: string } | null;
+};
 type ViewResult = ViewOk | { ok: false };
 
 const root = document.getElementById('invitation') as HTMLElement;
+let TOKEN = '';
 
-function el<K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  attrs: Record<string, string> = {},
-  ...children: (Node | string)[]
-): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
-  for (const c of children) node.append(c);
-  return node;
+function el<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, string> = {}, ...kids: (Node | string)[]): HTMLElementTagNameMap[K] {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  for (const c of kids) n.append(c);
+  return n;
 }
+const takeToken = () => location.hash.replace(/^#\/?/, '').trim();
+const titleCase = (s: string) => s.replace(/\b\w/g, (c) => c.toUpperCase());
+const postJSON = (url: string, body: object) => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 
-/** Read the private token from the URL fragment. The token is the private link
-    itself, so it is kept in the fragment (never a query parameter): a refresh can
-    re-resolve it and restore the accepted closing state instead of the neutral
-    page, and the fragment is never sent in a request URL or a Referer header. */
-function takeToken(): string {
-  return location.hash.replace(/^#\/?/, '').trim();
-}
-
-async function postJSON(url: string, token: string): Promise<Response> {
-  return fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ token }),
-  });
-}
-
-/* --- Screen scaffolding ---------------------------------------------------- */
-
-let current: HTMLElement | null = null;
-
-function mount(section: HTMLElement, focusTarget?: HTMLElement): void {
-  const prev = current;
+/* --- Screen scaffolding ----------------------------------------------------
+   Exactly one screen is active at a time. The incoming screen fades in (double
+   rAF so the browser paints opacity:0 before transitioning); any outgoing screens
+   fade out and are removed on a fixed timer. Deterministic — no transitionend
+   race, no stacking under quick taps. */
+function mount(section: HTMLElement): void {
+  const dying = Array.from(root.querySelectorAll<HTMLElement>('.inv-screen'));
+  for (const s of dying) { s.classList.remove('is-active'); setTimeout(() => s.remove(), 900); }
   root.append(section);
-  // Force a frame so the incoming section can transition in.
-  requestAnimationFrame(() => {
+  requestAnimationFrame(() => requestAnimationFrame(() => {
     section.classList.add('is-active');
-    if (prev) {
-      prev.classList.remove('is-active');
-      prev.addEventListener('transitionend', () => prev.remove(), { once: true });
-      // Fallback removal in case transitionend does not fire (reduced motion).
-      setTimeout(() => prev.remove(), 900);
-    }
-    (focusTarget ?? section.querySelector<HTMLElement>('h1, h2, [tabindex]') ?? section)?.focus();
-  });
-  current = section;
+    (section.querySelector<HTMLElement>('h1, h2, [tabindex]') ?? section)?.focus();
+  }));
+}
+const screen = (cls: string) => el('section', { class: `inv-screen ${cls}`, tabindex: '-1' });
+const eyebrow = (t: string) => el('p', { class: 'inv-eyebrow label' }, t);
+function action(label: string, onClick: () => void, cls = ''): HTMLButtonElement {
+  const b = el('button', { class: `inv-action ${cls}`, type: 'button' }, label);
+  b.addEventListener('click', onClick);
+  return b;
+}
+const frame = (...kids: (Node | string)[]) => el('div', { class: 'inv-frame' }, ...kids);
+
+/* --- Simple screens -------------------------------------------------------- */
+function neutralScreen() {
+  return screen('inv-neutral').appendAnd(frame(
+    eyebrow('The Luscious Honey Collective'),
+    el('h1', { class: 'inv-quiet', tabindex: '-1' }, 'This page is resting.'),
+    el('p', { class: 'inv-lede' }, 'If you were expecting something here, the link may be incomplete. There is nothing you need to do.'),
+  ));
+}
+function welcomeScreen(name: string, onOpen: () => void) {
+  return screen('inv-welcome').appendAnd(frame(
+    eyebrow('A private invitation'),
+    el('h1', { class: 'inv-display', tabindex: '-1' }, name + ','),
+    el('p', { class: 'inv-lede' }, 'A letter has been written for you.'),
+    action('Open Your Invitation', onOpen),
+  ));
 }
 
-function screen(cls: string): HTMLElement {
-  return el('section', { class: `inv-screen ${cls}`, tabindex: '-1' });
-}
+// appendAnd helper on HTMLElement
+declare global { interface HTMLElement { appendAnd(...n: (Node | string)[]): HTMLElement; } }
+HTMLElement.prototype.appendAnd = function (...n) { this.append(...n); return this; };
 
-function eyebrow(text: string): HTMLElement {
-  return el('p', { class: 'inv-eyebrow label' }, text);
-}
-
-function primaryAction(label: string, onActivate: () => void): HTMLButtonElement {
-  const btn = el('button', { class: 'inv-action', type: 'button' }, label);
-  btn.addEventListener('click', onActivate);
-  return btn;
-}
-
-/* --- The screens ----------------------------------------------------------- */
-
-function neutralScreen(): HTMLElement {
-  const s = screen('inv-neutral');
-  s.append(
-    el('div', { class: 'inv-frame' },
-      eyebrow('The Luscious Honey Collective'),
-      el('h1', { class: 'inv-quiet', tabindex: '-1' }, 'This page is resting.'),
-      el('p', { class: 'inv-lede' }, 'If you were expecting something here, the link may be incomplete. There is nothing you need to do.'),
-    ),
-  );
+/* --- The letter, revealed in movements ------------------------------------- */
+function movementScreen(name: string, movements: string[], i: number, onNext: () => void) {
+  const s = screen('inv-proposal inv-open');
+  const article = el('article', { class: 'inv-letter plate' });
+  article.innerHTML = movements[i];
+  const last = i === movements.length - 1;
+  s.append(el('div', { class: 'inv-frame inv-reading' },
+    el('h1', { class: 'inv-sr-only', tabindex: '-1' }, `An invitation for ${name} — part ${i + 1} of ${movements.length}`),
+    article,
+    el('div', { class: 'inv-begin' }, action(last ? 'Consider Your Reply' : 'Continue', onNext)),
+  ));
   return s;
 }
 
-function welcomeScreen(recipientName: string, onOpen: () => void): HTMLElement {
-  const s = screen('inv-welcome');
-  s.append(
-    el('div', { class: 'inv-frame' },
-      eyebrow('A private invitation'),
-      el('h1', { class: 'inv-display', tabindex: '-1' }, recipientName + ','),
-      el('p', { class: 'inv-lede' }, 'A letter has been written for you.'),
-      primaryAction('Open Your Invitation', onOpen),
+/* --- The decision ---------------------------------------------------------- */
+function decisionScreen(name: string) {
+  const s = screen('inv-decision');
+  s.append(frame(
+    eyebrow('When you are ready'),
+    el('h1', { class: 'inv-display', tabindex: '-1' }, 'How would you like to reply?'),
+    el('p', { class: 'inv-lede' }, 'There is no wrong answer, and no hurry. Choose what is true for you.'),
+    el('div', { class: 'inv-choices' },
+      action('I Accept the Invitation', () => decide('accept'), 'inv-choice inv-choice--accept'),
+      action("I'd Like Some Time", () => mount(timeScreen(name)), 'inv-choice'),
+      action("Let's Talk Before I Decide", () => decide('talk'), 'inv-choice'),
+      action('I Respectfully Decline', () => mount(declineConfirmScreen(name)), 'inv-choice inv-choice--quiet'),
     ),
-  );
+  ));
   return s;
 }
 
-function acceptingState(beginButton: HTMLButtonElement): void {
-  beginButton.disabled = true;
-  beginButton.textContent = 'One moment…';
-  beginButton.classList.add('is-working');
+function timeScreen(name: string) {
+  const s = screen('inv-sub');
+  const periods = ['a few days', 'one week', 'two weeks'];
+  s.append(frame(
+    eyebrow('Take the time you need'),
+    el('h1', { class: 'inv-quiet', tabindex: '-1' }, 'When shall the House check back?'),
+    el('p', { class: 'inv-lede' }, 'The invitation will be held for you, exactly as it is.'),
+    el('div', { class: 'inv-choices' },
+      ...periods.map((p) => action(titleCase(p), () => decide('time', p), 'inv-choice')),
+      action('Actually, take me back', () => mount(decisionScreen(name)), 'inv-choice inv-choice--quiet'),
+    ),
+  ));
+  return s;
 }
 
-function welcomeToHouseScreen(onSettle: () => void): HTMLElement {
+function declineConfirmScreen(name: string) {
+  const s = screen('inv-sub');
+  s.append(frame(
+    eyebrow('Only if it is right for you'),
+    el('h1', { class: 'inv-quiet', tabindex: '-1' }, 'Respectfully decline?'),
+    el('p', { class: 'inv-lede' }, 'This closes the invitation gently. It changes nothing about the regard behind it.'),
+    el('div', { class: 'inv-choices' },
+      action('Yes, respectfully decline', () => decide('decline'), 'inv-choice inv-choice--quiet'),
+      action('No, take me back', () => mount(decisionScreen(name)), 'inv-choice'),
+    ),
+  ));
+  return s;
+}
+
+/* --- Outcome screens ------------------------------------------------------- */
+function heldScreen(name: string, period?: string) {
+  const s = screen('inv-held');
+  s.append(frame(
+    eyebrow('The House will wait'),
+    el('h1', { class: 'inv-display', tabindex: '-1' }, 'It will keep.'),
+    el('p', { class: 'inv-lede' }, period ? `We'll hold your invitation for ${period}. Come back whenever you're ready — there's no rush.` : "We'll hold your invitation. Come back whenever you're ready."),
+    action("I'm ready to decide", () => mount(decisionScreen(name)), 'inv-quiet-action'),
+  ));
+  return s;
+}
+function waitingScreen() {
+  return screen('inv-wait').appendAnd(frame(
+    eyebrow('A conversation first'),
+    el('h1', { class: 'inv-display', tabindex: '-1' }, "Let's talk soon."),
+    el('p', { class: 'inv-lede' }, 'Luscious Honey has been let know. When you have spoken, return to this same link and your reply will be waiting.'),
+  ));
+}
+function declinedScreen() {
+  return screen('inv-declined').appendAnd(frame(
+    eyebrow('With warmth'),
+    el('h1', { class: 'inv-display', tabindex: '-1' }, 'Thank you for reading.'),
+    el('p', { class: 'inv-lede' }, 'The invitation has closed, and the regard behind it has not. You are always welcome to the work.'),
+  ));
+}
+function welcomeToHouseScreen(onSettle: () => void) {
   const s = screen('inv-house');
-  s.append(
-    el('div', { class: 'inv-frame' },
-      eyebrow('The Luscious Honey Collective'),
-      el('h1', { class: 'inv-display', tabindex: '-1' }, 'Welcome to the House.'),
-      el('p', { class: 'inv-lede' }, 'You are received. There is nothing more to sign, and nothing to hurry.'),
-    ),
-  );
-  // The arrival settles, unhurried, into the closing screen.
+  s.append(frame(
+    eyebrow('The Luscious Honey Collective'),
+    el('h1', { class: 'inv-display', tabindex: '-1' }, 'Welcome to the House.'),
+    el('p', { class: 'inv-lede' }, 'You are received. The next step is simply a conversation — we will shape what comes next together.'),
+  ));
   setTimeout(onSettle, 4200);
   return s;
 }
-
-function takingShapeScreen(): HTMLElement {
-  const s = screen('inv-shape');
-  s.append(
-    el('div', { class: 'inv-frame' },
-      el('div', { class: 'inv-ember', 'aria-hidden': 'true' }),
-      el('h1', { class: 'inv-display', tabindex: '-1' }, 'Your workspace is taking shape.'),
-      el('p', { class: 'inv-lede' }, 'A place is being prepared for you. When it is ready, we will begin it together.'),
-    ),
-  );
-  return s;
+function takingShapeScreen() {
+  return screen('inv-shape').appendAnd(frame(
+    el('div', { class: 'inv-ember', 'aria-hidden': 'true' }),
+    el('h1', { class: 'inv-display', tabindex: '-1' }, 'Something is taking shape.'),
+    el('p', { class: 'inv-lede' }, 'When we have spoken and planned together, your place in the House will be made ready. Nothing is rushed.'),
+  ));
 }
+const goClosing = () => mount(welcomeToHouseScreen(() => mount(takingShapeScreen())));
 
-/* --- Flow ------------------------------------------------------------------ */
-
-function runAcceptance(beginButton: HTMLButtonElement, token: string): void {
-  acceptingState(beginButton);
-  postJSON('/api/invitation/accept', token)
+/* --- Decision submission --------------------------------------------------- */
+let deciding = false;
+function decide(choice: string, reminderPeriod?: string): void {
+  if (deciding) return;
+  deciding = true;
+  const active = root.querySelector<HTMLElement>('.inv-screen.is-active');
+  active?.classList.add('is-working');
+  postJSON('/api/invitation/decision', { token: TOKEN, choice, reminderPeriod })
     .then(async (res) => {
       const data = await res.json().catch(() => ({}));
-      if (res.ok && data && data.ok) {
-        goToClosing();
-        return;
-      }
-      throw new Error((data && data.error) || 'not stored');
+      deciding = false;
+      active?.classList.remove('is-working');
+      if (!res.ok || !data.ok) throw new Error(data.error || 'not stored');
+      route(data.phase, data.reminder);
     })
     .catch(() => {
-      // Keep DaVonna's place; never imply success. Offer a warm retry.
-      beginButton.disabled = false;
-      beginButton.classList.remove('is-working');
-      beginButton.textContent = 'Try Again';
-      const holder = beginButton.parentElement!;
-      if (!holder.querySelector('.inv-retry')) {
-        holder.prepend(el('p', { class: 'inv-retry', role: 'status' },
-          'We could not record your response just yet. Your place is kept — please try again in a moment.'));
+      deciding = false;
+      active?.classList.remove('is-working');
+      if (active && !active.querySelector('.inv-retry')) {
+        (active.querySelector('.inv-frame') || active).append(
+          el('p', { class: 'inv-retry', role: 'status' }, 'We could not record your reply just yet. Your place is kept — please try again in a moment.'));
       }
     });
 }
 
-function goToClosing(): void {
-  mount(welcomeToHouseScreen(() => mount(takingShapeScreen())));
+/* --- Routing --------------------------------------------------------------- */
+let RECIPIENT = '';
+function route(phase: string, reminder?: { period?: string } | null): void {
+  switch (phase) {
+    case 'accepted': goClosing(); break;
+    case 'declined': mount(declinedScreen()); break;
+    case 'conversation': mount(waitingScreen()); break;
+    case 'reminder': mount(heldScreen(RECIPIENT, reminder?.period)); break;
+    default: mount(decisionScreen(RECIPIENT));
+  }
 }
 
-function start(recipientName: string, proposalMarkdown: string, token: string): void {
-  const begin = () => {
-    // Build the proposal screen with a Begin action wired to acceptance.
-    const btn = primaryAction("I'm Ready to Begin", () => {});
-    const proposal = proposalScreenWithButton(recipientName, proposalMarkdown, btn);
-    btn.addEventListener('click', () => runAcceptance(btn, token));
-    mount(proposal);
+function beginExperience(name: string, proposal: string): void {
+  const movements = renderMovements(proposal);
+  const showMovement = (i: number): void => {
+    mount(movementScreen(name, movements, i, () => {
+      if (i + 1 < movements.length) showMovement(i + 1);
+      else mount(decisionScreen(name));
+    }));
   };
-  mount(welcomeScreen(recipientName, begin));
-}
-
-/** Proposal screen variant that accepts a pre-built Begin button. */
-function proposalScreenWithButton(recipientName: string, proposalMarkdown: string, btn: HTMLButtonElement): HTMLElement {
-  const s = screen('inv-proposal inv-open');
-  const article = el('article', { class: 'inv-letter plate' });
-  article.innerHTML = renderProposal(proposalMarkdown);
-  s.append(
-    el('div', { class: 'inv-frame inv-reading' },
-      el('h1', { class: 'inv-sr-only', tabindex: '-1' }, `An invitation for ${recipientName}`),
-      article,
-      el('div', { class: 'inv-begin' }, btn),
-    ),
-  );
-  return s;
+  mount(welcomeScreen(name, () => showMovement(0)));
 }
 
 async function boot(): Promise<void> {
-  const token = takeToken();
-  if (!token) { mount(neutralScreen()); return; }
-
+  TOKEN = takeToken();
+  if (!TOKEN) { mount(neutralScreen()); return; }
   let result: ViewResult;
-  try {
-    const res = await postJSON('/api/invitation/view', token);
-    result = await res.json();
-  } catch {
-    result = { ok: false };
-  }
-
+  try { result = await (await postJSON('/api/invitation/view', { token: TOKEN })).json(); }
+  catch { result = { ok: false }; }
   if (!result.ok) { mount(neutralScreen()); return; }
 
-  // A refresh after acceptance resolves straight to the closing state.
-  if (result.status === 'accepted') { goToClosing(); return; }
-
-  start(result.recipientName, result.proposal, token);
+  RECIPIENT = result.recipientName;
+  if (result.personalization?.accent && result.personalization.accent !== 'house') {
+    root.classList.add(`inv-accent-${result.personalization.accent}`);
+  }
+  if (result.phase === 'open') beginExperience(result.recipientName, result.proposal);
+  else route(result.phase, result.reminder);
 }
 
 boot();

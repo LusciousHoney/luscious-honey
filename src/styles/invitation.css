@@ -182,6 +182,57 @@ body {
   white-space: nowrap; border: 0;
 }
 
+/* --- Personalization: an atmospheric accent (never themed decoration) ------ */
+#invitation { --inv-accent: var(--brass-hi); }
+#invitation.inv-accent-verdant { --inv-accent: #86a692; }  /* a quiet love of green, worn softly */
+.inv-eyebrow { color: var(--inv-accent); }
+.inv-accent-verdant .inv-ember {
+  background: radial-gradient(circle at 50% 50%, rgba(134, 166, 146, 0.24) 0%, transparent 68%);
+}
+
+/* --- Movement pacing: a soft rule between grouped sections ------------------ */
+.inv-letter hr.inv-soft { border-top: 1px solid rgba(var(--ink-rgb), 0.09); margin: var(--s-4) 0; }
+
+/* --- The decision: four unhurried choices ---------------------------------- */
+.inv-decision .inv-frame,
+.inv-sub .inv-frame { gap: var(--s-3); }
+.inv-choices {
+  display: grid;
+  gap: var(--s-2);
+  justify-items: stretch;
+  margin-top: var(--s-2);
+  max-width: 32rem;
+}
+.inv-choice {
+  justify-self: stretch;
+  text-align: left;
+  padding: var(--s-3) var(--s-3);
+}
+.inv-choice--accept {
+  border-color: var(--inv-accent);
+  box-shadow: inset 0 0 0 1px rgba(176, 138, 79, 0.25);
+}
+.inv-choice--accept:hover { box-shadow: var(--glow-brass), inset 0 0 0 1px var(--inv-accent); }
+.inv-choice--quiet { border-color: rgba(var(--alabaster-rgb), 0.22); color: var(--plaster); }
+.inv-quiet-action {
+  justify-self: start;
+  background: none; border: 0; cursor: pointer;
+  font-family: var(--serif); font-style: italic; font-size: var(--fs-body);
+  color: var(--brass-hi); padding: var(--s-2) 0; margin-top: var(--s-2);
+  text-decoration: underline; text-underline-offset: 4px;
+}
+.inv-quiet-action:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* --- Submission feedback --------------------------------------------------- */
+.inv-screen.is-working { pointer-events: none; }
+.inv-screen.is-working .inv-choices,
+.inv-screen.is-working .inv-begin { opacity: 0.5; transition: opacity var(--motion-quick); }
+
+/* --- Outcome screens (held / waiting / declined) --------------------------- */
+.inv-held .inv-frame,
+.inv-wait .inv-frame,
+.inv-declined .inv-frame { gap: var(--s-3); }
+
 @media (prefers-reduced-motion: reduce) {
   .inv-screen { transition: opacity 0.001ms; }
   .inv-open .inv-letter { animation: none; }

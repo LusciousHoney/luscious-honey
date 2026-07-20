@@ -52,3 +52,31 @@ export function renderProposal(markdown) {
   flush();
   return out.join('\n');
 }
+
+/** Split the approved Markdown into ordered sections at each top-level `## `
+    heading. The block before the first `## ` is the masthead (index 0). Returns
+    [{ title, html }] — copy is never rewritten, only partitioned for pacing. */
+export function splitSections(markdown) {
+  const src = String(markdown).replace(/\r\n/g, '\n');
+  const parts = src.split(/\n(?=## )/);
+  return parts.map((chunk) => {
+    const m = /^##\s+(.+)$/m.exec(chunk);
+    return { title: m ? m[1].trim() : '', html: renderProposal(chunk.replace(/^---\s*$|\n---\s*$/gm, '').trim()) };
+  });
+}
+
+/** Group the sections into a small number of unhurried "movements" so the letter
+    is read a few paced screens at a time rather than one long scroll. Grouping is
+    by position and degrades gracefully if the section count changes. */
+export function renderMovements(markdown) {
+  const s = splitSections(markdown);
+  const groups = [[0, 1], [2], [3, 4], [5, 6, 7], [8, 9]];
+  const movements = [];
+  for (const g of groups) {
+    const html = g.map((i) => s[i] && s[i].html).filter(Boolean).join('\n<hr class="inv-soft">\n');
+    if (html) movements.push(html);
+  }
+  // Fallback: if the expected structure isn't present, one movement per section.
+  if (movements.length <= 1 && s.length > 1) return s.map((x) => x.html);
+  return movements;
+}
