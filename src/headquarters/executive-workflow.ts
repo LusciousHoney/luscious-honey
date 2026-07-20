@@ -163,6 +163,13 @@ export interface Initiative {
   history?: { recommended: HistoryDisposition; chosen?: HistoryDisposition };
   createdAt: string;
   updatedAt: string;
+  /** Milestone timestamps the lifecycle would otherwise lose (updatedAt is
+      overwritten each transition). Optional and backward-compatible: legacy
+      records simply lack them, and the institutional timeline falls back to
+      updatedAt for those. The rest of the chronology is derived from createdAt
+      and the decision — never re-stored. */
+  completedAt?: string;
+  archivedAt?: string;
 }
 
 /* --- the conductor: who participates -------------------------------------- */
@@ -427,6 +434,7 @@ export function completeInitiative(initiative: Initiative, now: Date = new Date(
     status: 'completed',
     execution: initiative.execution.map((w) => ({ ...w, status: 'done' })),
     history: { recommended: recommendHistory(initiative), chosen: initiative.history?.chosen },
+    completedAt: initiative.completedAt ?? now.toISOString(),
     updatedAt: now.toISOString(),
   };
 }
@@ -435,7 +443,8 @@ export function completeInitiative(initiative: Initiative, now: Date = new Date(
     it passes into the institutional record. */
 export function archiveInitiative(initiative: Initiative, chosen: HistoryDisposition, now: Date = new Date()): Initiative {
   const recommended = initiative.history?.recommended ?? recommendHistory(initiative);
-  return { ...initiative, status: 'archived', history: { recommended, chosen }, updatedAt: now.toISOString() };
+  return { ...initiative, status: 'archived', history: { recommended, chosen },
+    archivedAt: initiative.archivedAt ?? now.toISOString(), updatedAt: now.toISOString() };
 }
 
 /* --- persistence (own store; never a decision or institutional record store) */

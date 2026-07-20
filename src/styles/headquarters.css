@@ -1708,6 +1708,41 @@
   color: var(--umber); margin: 0;
 }
 
+/* ============================================================================
+   The House Register — the institutional record.
+
+   A bound register of completed and closed matters; each opens into its whole
+   story (direction → recommendation → decision → responsibility → chronology →
+   outcome → disposition). Reuses the House's plaster surface and the existing
+   editorial chronology. Never an audit log, a spreadsheet, or an event stream.
+   ============================================================================ */
+.hq-cos__register {
+  display: grid; gap: var(--s-3);
+  margin-top: var(--s-5); padding-top: var(--s-5);
+  border-top: 1.5px solid var(--hq-brass-hair);
+}
+.hq-cos__record {
+  padding: var(--s-4) clamp(var(--s-3), 4vw, var(--s-5));
+  background: linear-gradient(152deg, var(--hq-plaster) 0%, var(--hq-plaster-2) 100%);
+  border: var(--hairline);
+}
+.hq-cos__record[open] { display: grid; gap: var(--s-3); }
+.hq-cos__record + .hq-cos__record { margin-top: var(--s-3); }
+.hq-cos__record-summary {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3);
+  cursor: pointer; list-style: none;
+}
+.hq-cos__record-summary::-webkit-details-marker { display: none; }
+.hq-cos__record-summary:focus-visible { outline: 2px solid var(--brass); outline-offset: 3px; }
+.hq-cos__record-title {
+  font-family: var(--serif); font-weight: 400; font-size: var(--fs-body); color: var(--hq-ink);
+}
+.hq-cos__record-meta {
+  font-family: var(--sans); font-size: var(--fs-label); letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--umber); flex: none;
+}
+.hq-cos__record-chronology { display: grid; gap: 6px; }
+
 /* The Brokerage (Sprint 12H) — the office's collaboration desk. Reuses the plaster
    decision cards; adds only a live region, queue heads, a route control, and a
    collapsible history. No redesign of the workspace. */
