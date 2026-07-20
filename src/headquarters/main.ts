@@ -86,6 +86,12 @@ import {
 } from './chief-of-staff-ops.ts';
 import { CHAIRS as EXECUTIVE_CHAIRS, CHAIR_CHIEF_OF_STAFF } from './executive-register.ts';
 import {
+  openInitiative, decide as decideInitiative, completeInitiative, archiveInitiative,
+  loadInitiatives, saveInitiatives, upsertInitiative, executiveLabel,
+  HISTORY_DISPOSITIONS,
+  type Initiative, type FounderDecision,
+} from './executive-workflow.ts';
+import {
   // Sprint 13F — the Executive Work Queue (a projection; owns nothing)
   QUEUE_OFFICES, QUEUE_PRIORITIES, queueOfficeLabel, queuePriorityLabel,
   loadWorkQueue, activeQueue, filterQueue, queueSummary, queueOwners,
@@ -2264,6 +2270,7 @@ function renderChiefOfStaff(root: HTMLElement): void {
 function cosSectionView(section: CosSectionId, repaint: () => void): HTMLElement {
   switch (section) {
     case 'briefing':   return cosBriefing();
+    case 'initiatives': return cosInitiatives(repaint);
     case 'work-queue': return cosWorkQueue(repaint);
     case 'inbox':      return cosInbox(repaint);
     case 'decisions':  return cosDecisions(repaint);
@@ -2958,7 +2965,153 @@ function cosField(label: string, body: string): HTMLElement {
     el('p', { class: 'hq-cos__field-body' }, body));
 }
 
+/** A labelled field whose body is a list of lines (reuses the field label style). */
+function cosLines(label: string, xs: string[]): HTMLElement {
+  const list = el('ul', { class: 'hq-cos__lines' });
+  for (const x of xs) list.append(el('li', { class: 'hq-cos__line' }, x));
+  return el('div', { class: 'hq-cos__field' },
+    el('p', { class: 'hq-cos__field-label label' }, label), list);
+}
+
 /* --- 3. Docket ------------------------------------------------------------ */
+let initiativeNotice: string | null = null;
+
+/* --- Bring an Initiative — the Founder's front door ----------------------- *
+   The Founder brings an idea, opportunity, problem, or decision in their own
+   words. The Chief of Staff conducts: the Executive Team coordinates and the
+   Founder receives ONE Executive Brief, then makes ONE decision. Approval routes
+   work into the offices; completion proposes how it enters institutional
+   history. The Founder never picks an executive, office, or platform. */
+function cosInitiatives(repaint: () => void): HTMLElement {
+  const view = el('div', { class: 'hq-cos__section' });
+  view.append(cosIntro('Bring an Initiative',
+    'Tell the House what happened or what you have in mind. The Executive Team will organise it and bring you one recommendation.'));
+
+  // A show-once confirmation line, in the House's notice style.
+  if (initiativeNotice) {
+    const notice = el('p', { class: 'hq-cos__notice is-ok', role: 'status' });
+    notice.append(el('span', { class: 'hq-cos__notice-mark', 'aria-hidden': 'true' }, '✓'), el('span', {}, initiativeNotice));
+    view.append(notice);
+    initiativeNotice = null;
+  }
+
+  const persist = (next: Initiative, note?: string) => {
+    saveInitiatives(upsertInitiative(loadInitiatives(), next));
+    initiativeNotice = note ?? null;
+    repaint();
+  };
+
+  // --- intake: the Founder's single act ---
+  const intake = el('section', { class: 'hq-cos__block' },
+    el('h2', { class: 'hq-cos__block-title' }, 'What would you like to bring in?'));
+  const input = el('textarea', {
+    class: 'hq-research__textarea', id: 'initiative_input', rows: '4', maxlength: '1200',
+    placeholder: 'e.g. I went to a book signing yesterday, met another creator, and someone complimented my narration voice. I’d like to turn this into content.',
+  }) as HTMLTextAreaElement;
+  const open = el('button', { class: 'hq-cos__response', type: 'button' }, 'Bring it to the House') as HTMLButtonElement;
+  open.addEventListener('click', () => {
+    const text = input.value.trim();
+    if (!text) { initiativeNotice = 'Add a line first — anything at all.'; repaint(); return; }
+    persist(openInitiative(text), 'The Executive Team has prepared your Brief.');
+  });
+  intake.append(input, el('div', { class: 'hq-cos__responses' }, open));
+  view.append(intake);
+
+  // --- the open initiatives, most recent first ---
+  const initiatives = loadInitiatives().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  if (initiatives.length === 0) {
+    view.append(el('p', { class: 'hq-cos__quiet' },
+      'Nothing brought in yet. When you do, the House organises it and returns one Brief here.'));
+    return view;
+  }
+
+  for (const i of initiatives) view.append(initiativeCard(i, persist));
+  return view;
+}
+
+/** One initiative: the assembled Executive Brief, the Founder's one decision,
+    and — once approved — execution and its entry into institutional history. */
+function initiativeCard(i: Initiative, persist: (next: Initiative, note?: string) => void): HTMLElement {
+  const card = el('article', { class: 'hq-cos__card' },
+    el('p', { class: 'hq-cos__eyebrow label' }, `Initiative · ${statusLabel(i.status)}`),
+    el('h3', { class: 'hq-cos__card-title' }, i.title));
+
+  // Who the Chief of Staff enlisted — so the Founder feels the House working.
+  card.append(cosField('The Chief of Staff coordinated',
+    i.participants.map((p) => executiveLabel(p)).join(' · ')));
+
+  // The ONE Brief — the eight prepared sections.
+  const b = i.brief;
+  const brief = el('section', { class: 'hq-cos__block' },
+    el('h4', { class: 'hq-cos__field-label label' }, 'Your Executive Brief'));
+  const line = (label: string, value: string) => brief.append(cosField(label, value));
+  const lines = (label: string, xs: string[]) => { if (xs.length) brief.append(cosLines(label, xs)); };
+  line('Purpose', b.purpose);
+  lines('Recommended Deliverables', b.recommendedDeliverables);
+  line('Priority', b.priority === 'high' ? 'High — the moment is fresh' : 'Normal');
+  line('Suggested Timeline', b.suggestedTimeline);
+  lines('Recommended Platforms', b.recommendedPlatforms);
+  lines('Required Founder Decisions', b.requiredFounderDecisions);
+  lines('Dependencies', b.dependencies.length ? b.dependencies : []);
+  lines('Next Actions', b.nextActions);
+  card.append(brief);
+
+  // The Founder's one decision — only while the Brief is awaiting a word.
+  if (i.status === 'brief_ready') {
+    const acts = el('div', { class: 'hq-cos__responses' });
+    const act = (label: string, decision: FounderDecision, note: string) => {
+      const btn = el('button', { class: 'hq-cos__response', type: 'button' }, label) as HTMLButtonElement;
+      btn.addEventListener('click', () => persist(decideInitiative(i, decision, undefined), note));
+      acts.append(btn);
+    };
+    act('Approve', 'approve', 'Approved — the work is routing into the offices.');
+    act('Revise', 'revise', 'Sent back for revision.');
+    act('Pause', 'pause', 'Paused — nothing will move until you return.');
+    act('Decline', 'decline', 'Declined — the House will let it rest.');
+    card.append(acts);
+  }
+
+  // Execution — the routed work, and where it went. No external publishing.
+  if (i.execution.length > 0) {
+    card.append(cosLines('In Execution — routed to the offices',
+      i.execution.map((w) => `${w.title} → ${executiveLabel(w.office)} · ${w.platform}${w.status === 'done' ? ' (done)' : ''}`)));
+    if (i.status === 'executing') {
+      const complete = el('button', { class: 'hq-cos__response', type: 'button' }, 'Mark the work complete') as HTMLButtonElement;
+      complete.addEventListener('click', () => persist(completeInitiative(i), 'Complete — the House is proposing how it enters history.'));
+      card.append(el('div', { class: 'hq-cos__responses' }, complete));
+    }
+  }
+
+  // Institutional history — the workflow proposes; the Founder confirms once.
+  if (i.status === 'completed' && i.history) {
+    const recommended = HISTORY_DISPOSITIONS.find((h) => h.id === i.history!.recommended)!;
+    card.append(cosField('The House proposes it enter history as', recommended.label));
+    const acts = el('div', { class: 'hq-cos__responses' });
+    const confirm = el('button', { class: 'hq-cos__response', type: 'button' }, `Record as ${recommended.label}`) as HTMLButtonElement;
+    confirm.addEventListener('click', () => persist(archiveInitiative(i, recommended.id), 'Recorded in the institutional history.'));
+    const internal = el('button', { class: 'hq-cos__response', type: 'button' }, 'Keep internal') as HTMLButtonElement;
+    internal.addEventListener('click', () => persist(archiveInitiative(i, 'internal'), 'Kept internal.'));
+    acts.append(confirm);
+    if (recommended.id !== 'internal') acts.append(internal);
+    card.append(acts);
+  }
+  if (i.status === 'archived' && i.history?.chosen) {
+    const chosen = HISTORY_DISPOSITIONS.find((h) => h.id === i.history!.chosen)!;
+    card.append(cosField('In institutional history as', chosen.label));
+  }
+  return card;
+}
+
+/** The Founder-facing label for an initiative status. */
+function statusLabel(s: Initiative['status']): string {
+  const map: Record<Initiative['status'], string> = {
+    brief_ready: 'Brief ready for you', approved: 'Approved', revising: 'In revision',
+    paused: 'Paused', declined: 'Declined', executing: 'In execution',
+    completed: 'Complete', archived: 'In institutional history',
+  };
+  return map[s];
+}
+
 function cosDocket(): HTMLElement {
   const list = el('div', { class: 'hq-cos__docket' });
   for (const item of DOCKET) {
