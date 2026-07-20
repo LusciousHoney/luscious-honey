@@ -89,9 +89,11 @@ import {
   openInitiative, decide as decideInitiative, completeInitiative, archiveInitiative,
   loadInitiatives, saveInitiatives, upsertInitiative, executiveLabel,
   executionResponsibilities, houseAttention, HISTORY_DISPOSITIONS,
-  type HouseAttention,
-  type Initiative, type FounderDecision,
+  type HouseAttention, type Initiative, type FounderDecision,
 } from './executive-workflow.ts';
+import {
+  partitionInitiatives, initiativeRecord, timelineEventLine,
+} from './institutional-memory.ts';
 import {
   // Sprint 13F — the Executive Work Queue (a projection; owns nothing)
   QUEUE_OFFICES, QUEUE_PRIORITIES, queueOfficeLabel, queuePriorityLabel,
@@ -3024,15 +3026,62 @@ function cosInitiatives(repaint: () => void): HTMLElement {
   intake.append(input, el('div', { class: 'hq-cos__responses' }, open));
   view.append(intake);
 
-  // --- the open initiatives, most recent first ---
+  // --- two calm modes: matters in motion, then the institutional record ---
   if (initiatives.length === 0) {
     view.append(el('p', { class: 'hq-cos__quiet' },
       'Nothing brought in yet. When you do, the House organises it and returns one Brief here.'));
     return view;
   }
 
-  for (const i of initiatives) view.append(initiativeCard(i, persist));
+  const { active, record } = partitionInitiatives(initiatives);
+  for (const i of active) view.append(initiativeCard(i, persist));
+  if (record.length > 0) view.append(houseRegister(record));
   return view;
+}
+
+const DECISION_WORD: Record<FounderDecision, string> = {
+  approve: 'Approved', revise: 'Revision requested', pause: 'Paused', decline: 'Declined',
+};
+
+/** The House Register — completed and closed matters, kept as the institutional
+    record. A calm bound register, not an audit log: each matter opens into its
+    whole story, in reading order. */
+function houseRegister(records: Initiative[]): HTMLElement {
+  const section = el('section', { class: 'hq-cos__register', 'aria-label': 'The House Register' },
+    el('p', { class: 'hq-cos__eyebrow label' }, 'The House Register'),
+    el('p', { class: 'hq-cos__quiet' }, 'Completed and closed matters, kept as the House’s institutional record.'));
+  for (const i of records) section.append(initiativeRecordView(i));
+  return section;
+}
+
+/** One matter as an institutional record — direction, recommendation, decision,
+    responsibility, chronology, outcome, and current disposition, in one place. */
+function initiativeRecordView(i: Initiative): HTMLElement {
+  const r = initiativeRecord(i);
+  const rec = el('details', { class: 'hq-cos__record' });
+  rec.append(el('summary', { class: 'hq-cos__record-summary' },
+    el('span', { class: 'hq-cos__record-title' }, r.title),
+    el('span', { class: 'hq-cos__record-meta' }, `${r.status} · ${formatWhen(i.completedAt ?? i.archivedAt ?? i.updatedAt)}`)));
+
+  rec.append(cosField('You brought to the House', r.direction));
+  rec.append(cosField('The Executive Team recommended', i.brief.purpose));
+  if (i.brief.recommendedDeliverables.length) rec.append(cosLines('Prepared', i.brief.recommendedDeliverables));
+  if (i.decision) rec.append(cosField('Your decision', `${DECISION_WORD[i.decision.decision]} · ${formatWhen(i.decision.at)}`));
+  if (r.responsibilities.length) rec.append(cosField('Responsibility held by',
+    r.responsibilities.map((x) => executiveLabel(x.executive)).join(' · ')));
+
+  // The chronology — an editorial register of how the matter moved.
+  const ol = el('ol', { class: 'hq-cos__history-list' });
+  for (const e of r.timeline) ol.append(el('li', { class: 'hq-cos__history-item' },
+    el('span', { class: 'hq-cos__history-when' }, formatWhen(e.at)),
+    el('span', {}, timelineEventLine(e))));
+  rec.append(el('div', { class: 'hq-cos__record-chronology' },
+    el('p', { class: 'hq-cos__field-label label' }, 'How it moved'), ol));
+
+  if (r.outcome) rec.append(cosField('Outcome', r.outcome));
+  const disp = r.disposition ? HISTORY_DISPOSITIONS.find((h) => h.id === r.disposition)?.label : undefined;
+  rec.append(cosField('The House considers this', disp ? `In its history as ${disp}` : r.status));
+  return rec;
 }
 
 /** The House's single institutional attention — one calm line, never a
