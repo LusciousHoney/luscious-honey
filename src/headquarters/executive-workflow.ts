@@ -345,6 +345,37 @@ export function advanceToExecution(initiative: Initiative, now: Date = new Date(
   return { ...initiative, status: 'executing', execution, updatedAt: at };
 }
 
+/* --- execution ownership: the House assuming responsibility ---------------- *
+   The Founder sees executive OWNERSHIP, never tasks: one standing responsibility
+   per participating executive, in calm executive language. Derived, presentation
+   -agnostic, and pure — the same data whether shown on a desk or read aloud. */
+
+export interface ExecutiveResponsibility {
+  executive: ExecutiveId;
+  responsibility: string;   // the executive's charge, in one calm line
+  status: string;           // calm executive status — never software language
+}
+
+const EXECUTION_CHARGE: Record<ExecutiveId, { responsibility: string; status: string }> = {
+  creative_director:  { responsibility: 'Developing the editorial direction.',         status: 'Developing' },
+  head_of_production: { responsibility: 'Preparing narration and production strategy.', status: 'Preparing' },
+  director_of_growth: { responsibility: 'Planning audience and distribution.',          status: 'Planning' },
+  publishing:         { responsibility: 'Preparing the publication schedule.',          status: 'Preparing' },
+  business_office:    { responsibility: 'Recording the institutional relationship.',    status: 'Documenting' },
+};
+
+/** The executive ownership of an initiative under execution — one standing charge
+    per participating executive. Once the work is finished every charge reads
+    'Completed'. Pure; derived from participants and status. */
+export function executionResponsibilities(initiative: Initiative): ExecutiveResponsibility[] {
+  const done = initiative.status === 'completed' || initiative.status === 'archived';
+  return initiative.participants.map((id) => ({
+    executive: id,
+    responsibility: EXECUTION_CHARGE[id].responsibility,
+    status: done ? 'Completed' : EXECUTION_CHARGE[id].status,
+  }));
+}
+
 /* --- institutional history: the workflow decides, not the Founder's memory - */
 
 /** Recommend how a completed initiative should enter institutional history.
