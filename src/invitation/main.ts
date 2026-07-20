@@ -79,17 +79,79 @@ function welcomeScreen(name: string, onOpen: () => void) {
 declare global { interface HTMLElement { appendAnd(...n: (Node | string)[]): HTMLElement; } }
 HTMLElement.prototype.appendAnd = function (...n) { this.append(...n); return this; };
 
-/* --- The letter, revealed in movements ------------------------------------- */
+/* --- The letter, unfolding at a human, reading-paced tempo -----------------
+   One movement at a time; its lines arrive progressively, timed to the act of
+   reading rather than a fixed clock — a fast reader is never delayed, a slow
+   reader never rushed. The whole screen is a quiet affordance: a tap, click,
+   Space or Enter draws the rest of the current thought in at once, and once it
+   has fully arrived, carries you gently onward. Nothing to hunt for. Under
+   reduced-motion the whole movement is simply present, already at rest. */
+const READ_WPMS = 2.7 / 1000;            // ~162 wpm — unhurried, reflective
+const READ_MIN_MS = 700;
+const READ_MAX_MS = 4800;
+function readingPause(node: Element): number {
+  if (node.tagName === 'HR') return 360;
+  const words = (node.textContent || '').trim().split(/\s+/).filter(Boolean).length;
+  if (!words) return 300;
+  return Math.min(READ_MAX_MS, Math.max(READ_MIN_MS, words / READ_WPMS));
+}
+
 function movementScreen(name: string, movements: string[], i: number, onNext: () => void) {
   const s = screen('inv-proposal inv-open');
   const article = el('article', { class: 'inv-letter plate' });
   article.innerHTML = movements[i];
-  const last = i === movements.length - 1;
+  const blocks = Array.from(article.children) as HTMLElement[];
+  for (const b of blocks) b.classList.add('inv-block');
+
+  const cueBtn = el('button', { class: 'inv-cue-btn', type: 'button' }, "When you're ready");
   s.append(el('div', { class: 'inv-frame inv-reading' },
     el('h1', { class: 'inv-sr-only', tabindex: '-1' }, `An invitation for ${name} — part ${i + 1} of ${movements.length}`),
     article,
-    el('div', { class: 'inv-begin' }, action(last ? 'Consider Your Reply' : 'Continue', onNext)),
+    el('div', { class: 'inv-cue' }, cueBtn),
   ));
+
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let idx = 0;
+  let timer = 0;
+  let advanced = false;
+
+  const showCue = (): void => { cueBtn.classList.add('is-shown'); };
+  const revealAll = (): void => { while (idx < blocks.length) blocks[idx++].classList.add('is-revealed'); showCue(); };
+  const step = (): void => {
+    const node = blocks[idx++];
+    node.classList.add('is-revealed');
+    timer = window.setTimeout(idx < blocks.length ? step : showCue, readingPause(node));
+  };
+
+  const teardown = (): void => {
+    if (timer) { clearTimeout(timer); timer = 0; }
+    s.removeEventListener('click', onScreen);
+    document.removeEventListener('keydown', onKey);
+  };
+  const goNext = (): void => { if (advanced) return; advanced = true; teardown(); onNext(); };
+  const hasten = (): void => {
+    if (idx < blocks.length) { if (timer) { clearTimeout(timer); timer = 0; } revealAll(); }
+    else goNext();
+  };
+  // A click (not a scroll-drag — a scroll gesture never fires click) anywhere on
+  // the screen quietly continues. Selections and controls are left alone.
+  function onScreen(e: MouseEvent): void {
+    const t = e.target as HTMLElement | null;
+    if (t && t.closest('button, a')) return;              // the cue owns its own activation
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed) return;                  // let a reader select / re-read freely
+    hasten();
+  }
+  function onKey(e: KeyboardEvent): void {
+    if (e.key === ' ' || e.key === 'Enter' || e.key === 'Spacebar') { e.preventDefault(); hasten(); }
+  }
+
+  cueBtn.addEventListener('click', goNext);
+  s.addEventListener('click', onScreen);
+  document.addEventListener('keydown', onKey);
+
+  if (reduce || !blocks.length) revealAll();
+  else timer = window.setTimeout(step, 420);              // the first line, once the plate has settled
   return s;
 }
 
