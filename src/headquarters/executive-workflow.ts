@@ -61,7 +61,7 @@ export const EXECUTIVES: WorkflowExecutive[] = [
   {
     id: 'head_of_production', label: 'Head of Production', chairId: CHAIR_HEAD_OF_PRODUCTION, core: false,
     charter: ['format', 'deliverables', 'recording plan', 'assets required'],
-    domains: ['record', 'recording', 'video', 'audio', 'voice', 'narration', 'podcast', 'film', 'shoot', 'format', 'produce'],
+    domains: ['content', 'record', 'recording', 'video', 'audio', 'voice', 'narration', 'podcast', 'film', 'shoot', 'format', 'produce'],
   },
   {
     id: 'director_of_growth', label: 'Director of Growth', chairId: CHAIR_DIRECTOR_OF_GROWTH, core: true,
@@ -71,7 +71,7 @@ export const EXECUTIVES: WorkflowExecutive[] = [
   {
     id: 'publishing', label: 'Publishing', core: false,
     charter: ['article', 'newsletter', 'journal', 'podcast', 'editorial placement'],
-    domains: ['write', 'writing', 'article', 'essay', 'newsletter', 'journal', 'substack', 'editorial', 'podcast', 'publish', 'book'],
+    domains: ['content', 'write', 'writing', 'article', 'essay', 'newsletter', 'journal', 'substack', 'editorial', 'podcast', 'publish', 'book'],
   },
   {
     id: 'business_office', label: 'Business Office', core: false,

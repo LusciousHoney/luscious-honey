@@ -30,6 +30,19 @@ test('core executives are always enlisted; others join by domain — Founder pic
   assert.ok(jk.includes('business_office'), 'meeting a creator at a signing calls the Business Office');
 });
 
+/* --- a plain "content" ask mobilizes the content-producing team ----------- */
+test('a terse content initiative yields a real content program, not a stub', () => {
+  // The Founder should not have to name formats/platforms to get real work.
+  const i = openInitiative('I attended a signing yesterday. I’d like to turn it into content.');
+  assert.ok(i.participants.includes('head_of_production'), 'content calls Production to produce');
+  assert.ok(i.participants.includes('publishing'), 'content calls Publishing for the written companion');
+  // concrete deliverables the Founder can recognise — beyond internal "Creative direction"
+  const d = i.brief.recommendedDeliverables;
+  assert.ok(d.some((x) => x.includes('TikTok')), 'a short-form video piece is recommended');
+  assert.ok(d.some((x) => /Substack|Journal/.test(x)), 'a written piece is recommended');
+  assert.ok(i.brief.recommendedPlatforms.length >= 2, 'the House proposes the platforms');
+});
+
 /* --- one initiative in → one Brief out ------------------------------------ */
 test('openInitiative returns a single assembled Brief ready for the Founder', () => {
   const i = openInitiative(JK, NOW);
