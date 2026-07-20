@@ -1678,6 +1678,36 @@
 }
 .hq-cos__quiet-action:hover, .hq-cos__quiet-action:focus-visible { color: var(--terracotta); outline: none; }
 
+/* ============================================================================
+   Founder Attention — the House's single institutional voice.
+
+   One calm line telling the Founder whether she is needed. A quiet linen band by
+   default; a brass rule and plaster ground only when judgment is genuinely
+   required. Never a notification centre, never red, never a badge.
+   ============================================================================ */
+.hq-cos__attention {
+  display: grid; gap: 4px;
+  padding: var(--s-3) var(--s-4);
+  background: rgba(var(--alabaster-rgb), 0.64);   /* linen */
+  border-left: 2px solid var(--hq-brass-hair);
+}
+/* When the Founder is genuinely needed, the voice gains material presence —
+   plaster ground and a full brass rule — but stays calm. */
+.hq-cos__attention[data-state='decision_required'],
+.hq-cos__attention[data-state='review_needed'] {
+  border-left-color: var(--brass);
+  background: linear-gradient(152deg, var(--hq-plaster) 0%, var(--hq-plaster-2) 100%);
+}
+.hq-cos__attention-eyebrow { color: var(--brass); margin: 0; }
+.hq-cos__attention-line {
+  font-family: var(--serif); font-size: var(--fs-body); color: var(--hq-ink);
+  margin: 0; line-height: 1.4; max-width: 60ch;
+}
+.hq-cos__attention-subject {
+  font-family: var(--sans); font-size: var(--fs-body-sm); letter-spacing: 0.01em;
+  color: var(--umber); margin: 0;
+}
+
 /* The Brokerage (Sprint 12H) — the office's collaboration desk. Reuses the plaster
    decision cards; adds only a live region, queue heads, a route control, and a
    collapsible history. No redesign of the workspace. */

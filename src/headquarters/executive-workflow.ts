@@ -36,6 +36,7 @@
 
 import { loadCollection, saveCollection, getChair,
   CHAIR_CREATIVE_DIRECTOR, CHAIR_HEAD_OF_PRODUCTION, CHAIR_DIRECTOR_OF_GROWTH } from './executive-register.ts';
+import { resolveAttention, attentionKind, type AttentionState, type AttentionKind } from './founder-attention.ts';
 
 const WORKFLOW_KEY = 'lhc.hq.executive-workflow.v1';
 
@@ -374,6 +375,37 @@ export function executionResponsibilities(initiative: Initiative): ExecutiveResp
     responsibility: EXECUTION_CHARGE[id].responsibility,
     status: done ? 'Completed' : EXECUTION_CHARGE[id].status,
   }));
+}
+
+/* --- Founder attention: this domain's adapter to the shared model ---------- *
+   The Workflow domain maps an initiative to the House's shared attention states
+   (founder-attention.ts). The House resolves all initiatives into ONE voice —
+   the Chief of Staff's — so the Founder is interrupted only when the model says
+   she must be. Derived, never assigned. */
+
+/** The attention an initiative asks of the Founder, derived from its state. */
+export function attentionForInitiative(i: Initiative): AttentionState {
+  switch (i.status) {
+    case 'brief_ready': return 'decision_required'; // the House cannot proceed without a word
+    case 'completed':   return 'completed';         // work concluded; ready to brief on history
+    default:            return 'working';           // executing / revising / paused / declined / archived
+  }
+}
+
+export interface HouseAttention {
+  state: AttentionState;
+  kind: AttentionKind;
+  /** The initiative(s) driving the current state (empty when merely 'working'). */
+  driving: Initiative[];
+}
+
+/** The single institutional attention across all initiatives — the one calm
+    voice. Highest-priority state wins (the blocking rule); the driving
+    initiatives are those in that state, except 'working', which names none. */
+export function houseAttention(initiatives: Initiative[]): HouseAttention {
+  const state = resolveAttention(initiatives.map(attentionForInitiative));
+  const driving = state === 'working' ? [] : initiatives.filter((i) => attentionForInitiative(i) === state);
+  return { state, kind: attentionKind(state), driving };
 }
 
 /* --- institutional history: the workflow decides, not the Founder's memory - */
