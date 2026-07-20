@@ -88,7 +88,8 @@ import { CHAIRS as EXECUTIVE_CHAIRS, CHAIR_CHIEF_OF_STAFF } from './executive-re
 import {
   openInitiative, decide as decideInitiative, completeInitiative, archiveInitiative,
   loadInitiatives, saveInitiatives, upsertInitiative, executiveLabel,
-  executionResponsibilities, HISTORY_DISPOSITIONS,
+  executionResponsibilities, houseAttention, HISTORY_DISPOSITIONS,
+  type HouseAttention,
   type Initiative, type FounderDecision,
 } from './executive-workflow.ts';
 import {
@@ -3001,6 +3002,12 @@ function cosInitiatives(repaint: () => void): HTMLElement {
     repaint();
   };
 
+  // --- the House's one institutional voice: a single attention panel, derived
+  // across every initiative. The Chief of Staff speaks; the Founder is told when
+  // she is needed and, just as clearly, when she is not.
+  const initiatives = loadInitiatives().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  if (initiatives.length > 0) view.append(attentionPanel(houseAttention(initiatives)));
+
   // --- intake: the Founder's single act ---
   const intake = el('section', { class: 'hq-cos__block hq-cos__intake' },
     el('h2', { class: 'hq-cos__block-title' }, 'What would you like to bring in?'));
@@ -3018,7 +3025,6 @@ function cosInitiatives(repaint: () => void): HTMLElement {
   view.append(intake);
 
   // --- the open initiatives, most recent first ---
-  const initiatives = loadInitiatives().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   if (initiatives.length === 0) {
     view.append(el('p', { class: 'hq-cos__quiet' },
       'Nothing brought in yet. When you do, the House organises it and returns one Brief here.'));
@@ -3027,6 +3033,22 @@ function cosInitiatives(repaint: () => void): HTMLElement {
 
   for (const i of initiatives) view.append(initiativeCard(i, persist));
   return view;
+}
+
+/** The House's single institutional attention — one calm line, never a
+    notification centre. `data-state` lets the surface carry a quiet brass accent
+    when the Founder is genuinely needed; nothing here alarms. */
+function attentionPanel(house: HouseAttention): HTMLElement {
+  const panel = el('section', { class: 'hq-cos__attention', 'data-state': house.state, 'aria-live': 'polite' },
+    el('p', { class: 'hq-cos__attention-eyebrow label' }, 'The House'),
+    el('p', { class: 'hq-cos__attention-line' }, house.kind.line));
+  // Name the matter under judgment, so the one voice stays specific — but only
+  // when the Founder is actually needed (never for quiet, working states).
+  if (house.kind.interrupts && house.driving.length > 0) {
+    const titles = house.driving.map((i) => i.title).join(' · ');
+    panel.append(el('p', { class: 'hq-cos__attention-subject' }, titles));
+  }
+  return panel;
 }
 
 /** One initiative: the assembled Executive Brief, the Founder's one decision,
