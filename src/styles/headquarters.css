@@ -1544,6 +1544,88 @@
 }
 .hq-cos__withdraw:hover, .hq-cos__withdraw:focus-visible { color: var(--terracotta); outline: none; }
 
+/* ============================================================================
+   Founder Review — the Executive Brief as one recommendation on the desk.
+
+   The recommendation is the PRIMARY reading object: a solid editorial plaster
+   panel that lifts the Brief clear of the room, so the Headquarters supports the
+   moment without competing with it. The room stays present; the reading is
+   unmistakable. Visual order: what just happened → the recommendation → the
+   Founder's decision → the actions.
+   ============================================================================ */
+
+/* The intake — the Founder's single act, on a quiet panel (secondary to the
+   Brief, so the recommendation is never rivalled for attention). */
+.hq-cos__intake {
+  display: grid; gap: var(--s-3);
+  padding: var(--s-4) clamp(var(--s-3), 4vw, var(--s-5));
+  background: rgba(var(--alabaster-rgb), 0.70);
+  border: var(--hairline);
+}
+
+/* The Brief — the solid plaster record. Brass top-rule, material depth, and a
+   settling rise, matching the House's decision records but reading as the one
+   object on the desk. */
+.hq-cos__card {
+  display: grid; gap: var(--s-4);
+  padding: var(--s-6) clamp(var(--s-4), 5vw, var(--s-6));
+  background:
+    linear-gradient(var(--brass), var(--brass)) top left / 100% 2px no-repeat,
+    linear-gradient(152deg, var(--hq-plaster) 0%, var(--hq-plaster-2) 100%);
+  border: var(--hairline);
+  box-shadow: var(--hq-shadow-card);
+  animation: hq-rise var(--motion-settle) var(--ease-settle) both;
+}
+.hq-cos__card + .hq-cos__card { margin-top: var(--s-4); }
+
+/* The executive transition — 'what just happened', answered before any section:
+   the House coordinated, the House finished, your judgment is now required. */
+.hq-cos__handoff {
+  display: grid; gap: var(--s-1);
+  padding-bottom: var(--s-3);
+  border-bottom: 1px solid var(--hq-brass-hair);
+}
+.hq-cos__handoff-eyebrow { color: var(--brass); margin: 0; }
+.hq-cos__handoff-title {
+  font-family: var(--serif); font-weight: 300; font-size: var(--fs-h3);
+  color: var(--hq-ink); margin: 0; line-height: 1.25;
+}
+.hq-cos__handoff-team {
+  font-family: var(--sans); font-size: var(--fs-body-sm); color: var(--umber);
+  margin: 0; letter-spacing: 0.01em;
+}
+.hq-cos__card-title {
+  font-family: var(--serif); font-weight: 300; font-size: var(--fs-h2);
+  color: var(--hq-ink); margin: 0; line-height: 1.2;
+}
+/* 'Your Executive Brief' heading sits calmer than the initiative title. */
+.hq-cos__card .hq-cos__block-title { font-size: var(--fs-h3); }
+
+/* The Founder's decision — the natural conclusion of the recommendation, never
+   below the fold in spirit: a ruled band, a cue, and a weighted primary act. */
+.hq-cos__decision-bar {
+  display: grid; gap: var(--s-3);
+  margin-top: var(--s-2); padding-top: var(--s-4);
+  border-top: 1.5px solid var(--brass);
+}
+.hq-cos__decision-cue {
+  color: var(--umber); margin: 0;
+}
+.hq-cos__response--primary {
+  color: var(--alabaster); background: var(--ink); border-color: var(--ink);
+  font-weight: 600; padding-inline: var(--s-4);
+}
+.hq-cos__response--primary:hover,
+.hq-cos__response--primary:focus-visible {
+  color: var(--alabaster); background: var(--ink-900); border-color: var(--ink-900);
+}
+
+@media (max-width: 640px) {
+  .hq-cos__card { padding: var(--s-5) var(--s-4); }
+  .hq-cos__card .hq-cos__responses { display: grid; }
+  .hq-cos__card .hq-cos__response { width: 100%; text-align: center; }
+}
+
 /* The Brokerage (Sprint 12H) — the office's collaboration desk. Reuses the plaster
    decision cards; adds only a live region, queue heads, a route control, and a
    collapsible history. No redesign of the workspace. */
