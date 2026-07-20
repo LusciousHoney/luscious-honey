@@ -94,6 +94,7 @@ import {
 import {
   partitionInitiatives, initiativeRecord, timelineEventLine,
 } from './institutional-memory.ts';
+import { deriveHeadquartersState, arrivalBrief } from './headquarters-os.ts';
 import {
   // Sprint 13F — the Executive Work Queue (a projection; owns nothing)
   QUEUE_OFFICES, QUEUE_PRIORITIES, queueOfficeLabel, queuePriorityLabel,
@@ -2330,6 +2331,7 @@ function cosBriefing(): HTMLElement {
     el('section', { class: 'hq-cos__welcome' },
       el('p', { class: 'hq-cos__eyebrow label' }, `${greeting(tod)}`),
       el('p', { class: 'hq-cos__welcome-line' }, BRIEFING.goodMorning)),
+    hosArrival(),
     cosBlock('Today’s Priorities', BRIEFING.todaysPriorities),
     decisionsWaiting,
     cosOperational(),
@@ -2340,6 +2342,35 @@ function cosBriefing(): HTMLElement {
       el('p', { class: 'hq-cos__note-label label' }, 'A note from your Chief of Staff'),
       el('p', { class: 'hq-cos__note-body' }, BRIEFING.chiefOfStaffNote)),
   );
+}
+
+/** The Headquarters Operating System's arrival brief — what the House already
+    knows when the Founder enters: what needs her judgment, what completed work
+    is ready to brief, and what is continuing without her. Composed from the HOS
+    derivation over every matter; the Founder investigates nothing. */
+function hosArrival(): HTMLElement {
+  const brief = arrivalBrief(deriveHeadquartersState(loadInitiatives()));
+  const total = brief.awaitingJudgment.length + brief.readyToBrief.length + brief.continuing.length;
+  const section = el('section', { class: 'hq-cos__block hq-cos__arrival', 'aria-label': 'The House at present' });
+  if (total === 0) { section.setAttribute('hidden', ''); return section; }
+
+  section.append(
+    el('p', { class: 'hq-cos__eyebrow label' }, 'The House, at present'),
+    el('p', { class: 'hq-cos__lead' }, brief.headline));
+
+  const group = (label: string, titles: string[]): void => {
+    if (!titles.length) return;
+    const ul = el('ul', { class: 'hq-cos__lines' });
+    for (const t of titles) ul.append(el('li', { class: 'hq-cos__line' }, t));
+    section.append(el('div', { class: 'hq-cos__arrival-group' },
+      el('p', { class: 'hq-cos__field-label label' }, label), ul));
+  };
+  group('Awaiting your judgment', brief.awaitingJudgment);
+  group('Completed — ready to brief you', brief.readyToBrief);
+  group('Continuing without you', brief.continuing);
+
+  section.append(el('a', { class: 'hq-cos__more', href: '#/chief-of-staff/initiatives' }, 'Enter the matters →'));
+  return section;
 }
 
 /* --- 1b. Operational picture — derived from the Chief of Staff's real record.

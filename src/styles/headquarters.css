@@ -1743,6 +1743,11 @@
 }
 .hq-cos__record-chronology { display: grid; gap: 6px; }
 
+/* HOS arrival brief — the House's calm standing at the Founder's arrival point.
+   Reuses the briefing block; only the internal grouping needs rhythm. */
+.hq-cos__arrival { gap: var(--s-3); }
+.hq-cos__arrival-group { display: grid; gap: var(--s-1); margin-top: var(--s-2); }
+
 /* The Brokerage (Sprint 12H) — the office's collaboration desk. Reuses the plaster
    decision cards; adds only a live region, queue heads, a route control, and a
    collapsible history. No redesign of the workspace. */
