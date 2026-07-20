@@ -1626,6 +1626,58 @@
   .hq-cos__card .hq-cos__response { width: 100%; text-align: center; }
 }
 
+/* ============================================================================
+   Execution Layer — the House assuming responsibility.
+
+   After approval the card leads with the Chief of Staff's narration and a
+   register of executive OWNERSHIP: one calm charge per executive — never tasks,
+   never a dashboard. An executive briefing left on the desk, the House at work.
+   ============================================================================ */
+.hq-cos__execution {
+  display: grid; gap: var(--s-4);
+  margin-top: var(--s-2); padding-top: var(--s-4);
+  border-top: 1.5px solid var(--brass);
+}
+/* The narrator's line — the handoff voice, tuned for a longer sentence. */
+.hq-cos__handoff--execution .hq-cos__handoff-title { font-size: var(--fs-body); line-height: 1.4; }
+
+/* The register of ownership — one executive, one standing charge. A warm walnut
+   edge marks each seat; the whole reads as a briefing, not a checklist. */
+.hq-cos__ownership { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-3); }
+.hq-cos__owner {
+  display: grid; gap: 4px;
+  padding: 0 0 var(--s-3) var(--s-3);
+  border-left: 2px solid var(--umber);
+}
+.hq-cos__owner + .hq-cos__owner { padding-top: var(--s-3); border-top: 1px solid var(--hq-brass-hair); }
+.hq-cos__owner-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3);
+}
+.hq-cos__owner-name {
+  font-family: var(--serif); font-weight: 400; font-size: var(--fs-body);
+  color: var(--hq-ink); margin: 0; line-height: 1.2;
+}
+.hq-cos__owner-status { color: var(--brass); flex: none; }
+.hq-cos__owner-status[data-done='true'] { color: var(--umber); }
+.hq-cos__owner-charge {
+  font-family: var(--serif); font-size: var(--fs-body-sm); color: var(--umber);
+  margin: 0; line-height: 1.5; max-width: 60ch;
+}
+
+/* The Founder may leave; the House continues. */
+.hq-cos__execution-close {
+  font-family: var(--serif); font-style: italic; font-size: var(--fs-body-sm);
+  color: var(--umber); margin: 0; max-width: 60ch; line-height: 1.5;
+}
+/* Completion is the House's own quiet report — never a task control. */
+.hq-cos__quiet-action {
+  justify-self: start;
+  font-family: var(--sans); font-size: var(--fs-label); letter-spacing: 0.03em;
+  color: var(--umber); background: transparent; border: none; cursor: pointer;
+  padding: 4px 0; text-decoration: underline; text-underline-offset: 3px;
+}
+.hq-cos__quiet-action:hover, .hq-cos__quiet-action:focus-visible { color: var(--terracotta); outline: none; }
+
 /* The Brokerage (Sprint 12H) — the office's collaboration desk. Reuses the plaster
    decision cards; adds only a live region, queue heads, a route control, and a
    collapsible history. No redesign of the workspace. */

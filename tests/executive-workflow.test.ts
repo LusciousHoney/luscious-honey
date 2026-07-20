@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import {
   EXECUTIVES, selectParticipants, openInitiative, deriveTitle, decide,
   advanceToExecution, recommendHistory, completeInitiative, archiveInitiative,
-  upsertInitiative, HISTORY_DISPOSITIONS, executiveLabel,
+  upsertInitiative, HISTORY_DISPOSITIONS, executiveLabel, executionResponsibilities,
 } from '../src/headquarters/executive-workflow.ts';
 
 const NOW = new Date('2026-07-19T09:00:00.000Z');
@@ -122,6 +122,20 @@ test('completion proposes a history disposition; archiving records the choice', 
   assert.equal(archived.status, 'archived');
   assert.equal(archived.history!.chosen, 'institutional_milestone');
   assert.equal(archived.history!.recommended, done.history!.recommended);
+});
+
+/* --- execution ownership: the House assumes responsibility ---------------- */
+test('execution shows one calm charge per executive; completion reads Completed', () => {
+  const executing = decide(openInitiative(JK, NOW), 'approve', undefined, NOW);
+  const own = executionResponsibilities(executing);
+  assert.deepEqual(own.map((o) => o.executive), executing.participants);
+  for (const o of own) {
+    assert.ok(o.responsibility.length > 0);
+    // calm executive language — never software words
+    assert.ok(!/process|run|load|queue|dispatch|execut/i.test(o.status), `${o.status} is calm`);
+  }
+  const done = completeInitiative(advanceToExecution(openInitiative(JK, NOW), NOW), NOW);
+  assert.ok(executionResponsibilities(done).every((o) => o.status === 'Completed'));
 });
 
 /* --- persistence is its own store; upsert is idempotent ------------------- */

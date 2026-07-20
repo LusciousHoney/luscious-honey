@@ -88,7 +88,7 @@ import { CHAIRS as EXECUTIVE_CHAIRS, CHAIR_CHIEF_OF_STAFF } from './executive-re
 import {
   openInitiative, decide as decideInitiative, completeInitiative, archiveInitiative,
   loadInitiatives, saveInitiatives, upsertInitiative, executiveLabel,
-  HISTORY_DISPOSITIONS,
+  executionResponsibilities, HISTORY_DISPOSITIONS,
   type Initiative, type FounderDecision,
 } from './executive-workflow.ts';
 import {
@@ -3046,25 +3046,33 @@ function initiativeCard(i: Initiative, persist: (next: Initiative, note?: string
   } else {
     card.append(el('p', { class: 'hq-cos__eyebrow label' }, `Initiative · ${statusLabel(i.status)}`));
     card.append(el('h3', { class: 'hq-cos__card-title' }, i.title));
-    // Who the Chief of Staff enlisted — so the Founder feels the House working.
-    card.append(cosField('The Chief of Staff coordinated', team));
+    // Held states — a single calm line; no re-litigating the recommendation.
+    if (i.status === 'revising' || i.status === 'paused' || i.status === 'declined') {
+      const note = i.status === 'revising' ? 'Sent back to the Executive Team for a fresh recommendation.'
+        : i.status === 'paused' ? 'Paused at your word — nothing will move until you return.'
+        : 'Declined — the House has let it rest.';
+      card.append(el('p', { class: 'hq-cos__execution-close' }, note));
+    }
   }
 
-  // The ONE Brief — the eight prepared sections.
-  const b = i.brief;
-  const brief = el('section', { class: 'hq-cos__block' },
-    el('h4', { class: 'hq-cos__field-label label' }, 'Your Executive Brief'));
-  const line = (label: string, value: string) => brief.append(cosField(label, value));
-  const lines = (label: string, xs: string[]) => { if (xs.length) brief.append(cosLines(label, xs)); };
-  line('Purpose', b.purpose);
-  lines('Recommended Deliverables', b.recommendedDeliverables);
-  line('Priority', b.priority === 'high' ? 'High — the moment is fresh' : 'Normal');
-  line('Suggested Timeline', b.suggestedTimeline);
-  lines('Recommended Platforms', b.recommendedPlatforms);
-  lines('Required Founder Decisions', b.requiredFounderDecisions);
-  lines('Dependencies', b.dependencies);
-  lines('Next Actions', b.nextActions);
-  card.append(brief);
+  // The ONE Brief — the eight prepared sections, shown only while the Founder is
+  // deciding. After approval the card leads with execution, not the plan again.
+  if (i.status === 'brief_ready') {
+    const b = i.brief;
+    const brief = el('section', { class: 'hq-cos__block' },
+      el('h4', { class: 'hq-cos__field-label label' }, 'Your Executive Brief'));
+    const line = (label: string, value: string) => brief.append(cosField(label, value));
+    const lines = (label: string, xs: string[]) => { if (xs.length) brief.append(cosLines(label, xs)); };
+    line('Purpose', b.purpose);
+    lines('Recommended Deliverables', b.recommendedDeliverables);
+    line('Priority', b.priority === 'high' ? 'High — the moment is fresh' : 'Normal');
+    line('Suggested Timeline', b.suggestedTimeline);
+    lines('Recommended Platforms', b.recommendedPlatforms);
+    lines('Required Founder Decisions', b.requiredFounderDecisions);
+    lines('Dependencies', b.dependencies);
+    lines('Next Actions', b.nextActions);
+    card.append(brief);
+  }
 
   // The Founder's one decision — the conclusion of the recommendation, set apart
   // by a ruled band and led by a weighted primary action so it is never hunted for.
@@ -3077,7 +3085,7 @@ function initiativeCard(i: Initiative, persist: (next: Initiative, note?: string
       btn.addEventListener('click', () => persist(decideInitiative(i, decision, undefined), note));
       acts.append(btn);
     };
-    act('Approve', 'approve', 'Approved — the work is routing into the offices.', true);
+    act('Approve', 'approve', 'The Executive Team has accepted your direction.', true);
     act('Revise', 'revise', 'Sent back for revision.');
     act('Pause', 'pause', 'Paused — nothing will move until you return.');
     act('Decline', 'decline', 'Declined — the House will let it rest.');
@@ -3085,15 +3093,42 @@ function initiativeCard(i: Initiative, persist: (next: Initiative, note?: string
     card.append(bar);
   }
 
-  // Execution — the routed work, and where it went. No external publishing.
-  if (i.execution.length > 0) {
-    card.append(cosLines('In Execution — routed to the offices',
-      i.execution.map((w) => `${w.title} → ${executiveLabel(w.office)} · ${w.platform}${w.status === 'done' ? ' (done)' : ''}`)));
+  // Executive Execution — the House assuming responsibility. Ownership, never
+  // tasks: the Chief of Staff narrates, then each executive holds one charge.
+  if (i.status === 'executing' || i.status === 'completed' || i.status === 'archived') {
+    const exec = el('section', { class: 'hq-cos__execution' });
     if (i.status === 'executing') {
-      const complete = el('button', { class: 'hq-cos__response', type: 'button' }, 'Mark the work complete') as HTMLButtonElement;
-      complete.addEventListener('click', () => persist(completeInitiative(i), 'Complete — the House is proposing how it enters history.'));
-      card.append(el('div', { class: 'hq-cos__responses' }, complete));
+      exec.append(el('div', { class: 'hq-cos__handoff hq-cos__handoff--execution' },
+        el('p', { class: 'hq-cos__handoff-eyebrow label' }, 'The Chief of Staff'),
+        el('p', { class: 'hq-cos__handoff-title' },
+          'The Executive Team has accepted your direction. The House has begun coordinating execution.'),
+        el('p', { class: 'hq-cos__handoff-team' },
+          'You will be notified only if additional judgment is required.')));
+    } else {
+      exec.append(el('p', { class: 'hq-cos__eyebrow label' }, 'Executive Execution'));
     }
+
+    // Executive ownership — one standing responsibility per executive.
+    const roster = el('ul', { class: 'hq-cos__ownership' });
+    for (const r of executionResponsibilities(i)) {
+      roster.append(el('li', { class: 'hq-cos__owner' },
+        el('div', { class: 'hq-cos__owner-head' },
+          el('p', { class: 'hq-cos__owner-name' }, executiveLabel(r.executive)),
+          el('span', { class: 'hq-cos__owner-status label', 'data-done': String(r.status === 'Completed') }, r.status)),
+        el('p', { class: 'hq-cos__owner-charge' }, r.responsibility)));
+    }
+    exec.append(roster);
+
+    // The Founder may leave; the House continues. Completion is the House's own
+    // report — a quiet, secondary control, never a task the Founder must manage.
+    if (i.status === 'executing') {
+      exec.append(el('p', { class: 'hq-cos__execution-close' },
+        'You may leave Headquarters. The House will continue its work and return only if your judgment is needed.'));
+      const complete = el('button', { class: 'hq-cos__quiet-action', type: 'button' }, 'Record the House’s completion') as HTMLButtonElement;
+      complete.addEventListener('click', () => persist(completeInitiative(i), 'The House reports the work complete.'));
+      exec.append(complete);
+    }
+    card.append(exec);
   }
 
   // Institutional history — the workflow proposes; the Founder confirms once.
