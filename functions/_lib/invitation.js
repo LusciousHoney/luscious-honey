@@ -1,73 +1,77 @@
 /**
  * Invitation registry — server-side token hashing, D1 resolution, proposal
- * association, and the Founder notification template. Server-side only (imported
- * by Pages Functions).
+ * association, per-recipient personalization, and the notification templates.
+ * Server-side only (imported by Pages Functions).
  *
- * Privacy model:
- *   • Each invitation carries its own unguessable TOKEN, delivered only in the
- *     private link's URL fragment. The raw token is NEVER stored: D1 holds only a
- *     deterministic SHA-256 hash (token_hash). A submitted token is hashed here and
- *     matched against the stored hash — the token appears in no source, client
- *     bundle, log, review page, email, or error.
- *   • recipient_name / recipient_slug are NOT secret — they are the visible
- *     experience, not the credential.
- *   • A missing / unknown / expired token resolves to null, and every caller
- *     responds with the SAME neutral shape, never revealing whether an invitation
- *     exists. Resolution is a single indexed hash lookup (constant-length key), so
- *     it does not leak the token through timing in any reasonably avoidable way.
+ * Privacy model unchanged from the registry: the raw token is never stored (only
+ * its SHA-256 hash); a missing/unknown/expired token resolves to null and every
+ * caller returns the same neutral shape.
  */
 
 import { PROPOSALS, PROPOSAL_STATUS } from './invitation-content.js';
 
-/** Deterministic SHA-256 hash (hex) of a raw token. Shared by the server and the
-    admin creation script so a stored hash always matches a submitted token. */
+/* --- Lifecycle states ------------------------------------------------------ */
+export const STATUS = Object.freeze({
+  INVITED: 'invited',
+  OPENED: 'opened',
+  CONSIDERING: 'considering',                 // after a talk, back to decide
+  CONVERSATION_REQUESTED: 'conversation_requested',
+  REMINDER_SCHEDULED: 'reminder_scheduled',
+  ACCEPTED: 'accepted',
+  DECLINED: 'declined',
+  PLANNING_COMPLETE: 'planning_complete',
+  READY_FOR_WORKSPACE: 'ready_for_workspace',
+});
+
+/* --- Personalization (ATMOSPHERIC ONLY) -----------------------------------
+   Per-recipient accent + pacing hint. Deliberately NON-VERBAL: it never puts
+   words in the Founder's mouth. 'accent' is a restrained mood the experience
+   wears (e.g. a deep verdant whisper for a green-lover), never themed decoration.
+   Recipients not listed here simply use the House's default brass. */
+const PERSONAS = {
+  davonna: { accent: 'verdant' },   // a quiet love of green, worn softly
+};
+export function personaFor(slug) {
+  const p = PERSONAS[slug];
+  return { accent: (p && p.accent) || 'house' };
+}
+
+/* --- Token hashing --------------------------------------------------------- */
 export async function hashToken(token) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(token)));
-  const bytes = new Uint8Array(digest);
   let hex = '';
-  for (const b of bytes) hex += b.toString(16).padStart(2, '0');
+  for (const b of new Uint8Array(digest)) hex += b.toString(16).padStart(2, '0');
   return hex;
 }
 
-/** The governed proposal markdown associated with an invitation, or null if the
-    proposal is not published or the id is unknown. */
 export function proposalFor(proposalId) {
   if (PROPOSAL_STATUS !== 'published') return null;
   return PROPOSALS[proposalId] ?? null;
 }
 
-/**
- * Resolve a presented token to its invitation registry row, or null. Returns null
- * (never throws, never leaks) when the token is absent, the store is unreachable,
- * the hash is unknown, or the invitation has expired.
- */
+/** Resolve a presented token to its invitation row, or null (never throws). */
 export async function resolveInvitation(env, presented) {
-  if (!presented || typeof presented !== 'string') return null;
-  if (!env || !env.LHC_DB) return null;
+  if (!presented || typeof presented !== 'string' || !env || !env.LHC_DB) return null;
   let row;
   try {
-    const tokenHash = await hashToken(presented);
     row = await env.LHC_DB
       .prepare(
-        `SELECT id, recipient_name, recipient_slug, proposal_id, status,
-                created_at, opened_at, accepted_at, notified_at, expires_at
-           FROM invitations
-          WHERE token_hash = ?`,
+        `SELECT id, recipient_name, recipient_slug, proposal_id, status, created_at,
+                opened_at, accepted_at, notified_at, expires_at, decision, decided_at,
+                reminder_period, reminder_at, conversation_requested_at,
+                conversation_complete_at, planning_complete_at, workspace_authorized_at,
+                declined_at
+           FROM invitations WHERE token_hash = ?`,
       )
-      .bind(tokenHash)
+      .bind(await hashToken(presented))
       .first();
-  } catch {
-    return null;
-  }
+  } catch { return null; }
   if (!row) return null;
-  // Expired invitations resolve to null (indistinguishable from unknown).
   if (row.expires_at && row.expires_at <= isoNow()) return null;
   return row;
 }
 
-/** Record the first open. Sets opened_at (and advances status) once; a later view
-    never overwrites the original opened_at. Best-effort — a failure here must not
-    break the reading experience. */
+/** Record the first open once; never overwrite, and never regress a later state. */
 export async function markOpened(env, invitationId) {
   if (!env || !env.LHC_DB) return;
   try {
@@ -80,38 +84,55 @@ export async function markOpened(env, invitationId) {
       )
       .bind(invitationId)
       .run();
-  } catch { /* opening is best-effort telemetry, never a blocker */ }
+  } catch { /* opening is best-effort */ }
 }
 
-/** The address that receives Founder notifications. */
+/** The reader-facing phase the client should route to, derived from a row. */
+export function phaseOf(row) {
+  switch (row.status) {
+    case STATUS.ACCEPTED:
+    case STATUS.PLANNING_COMPLETE:
+    case STATUS.READY_FOR_WORKSPACE:
+      return 'accepted';
+    case STATUS.DECLINED:               return 'declined';
+    case STATUS.REMINDER_SCHEDULED:     return 'reminder';
+    case STATUS.CONVERSATION_REQUESTED: return 'conversation';
+    default:                            return 'open'; // invited | opened | considering
+  }
+}
+
+/* --- Notifications --------------------------------------------------------- */
 export function founderNotifyAddress(env) {
   return (env && (env.FOUNDER_NOTIFY_EMAIL || env.EMAIL_FROM)) || null;
 }
 
-/** Founder notification for a recorded acceptance. Content only; the transport is
-    supplied by functions/_lib/email.js. The token is never included. */
-export function acceptanceNotification(recipientName, acceptedAtISO) {
-  const name = String(recipientName || 'A guest');
-  return {
-    subject: `${name} has accepted the Founding Steward invitation`,
-    text:
-      `${name} has accepted the invitation to join The Luscious Honey Collective ` +
-      `as a Founding Steward.\n\nRecorded: ${acceptedAtISO}\n\n` +
-      `The next step is a conversation — nothing else is required of you here.`,
-    html:
-      `<p>${escapeText(name)} has accepted the invitation to join ` +
-      `The Luscious Honey Collective as a <strong>Founding Steward</strong>.</p>` +
-      `<p style="color:#4A3428">Recorded: ${escapeText(acceptedAtISO)}</p>` +
-      `<p>The next step is a conversation — nothing else is required of you here.</p>`,
-  };
+const NOTES = {
+  accept: (n) => ({
+    subject: `${n} has accepted the Founding Steward invitation`,
+    body: `${n} has accepted the invitation to join The Luscious Honey Collective as a Founding Steward.\n\nNext step: the planning conversation. A workspace is authorized only after you and ${n} meet and you approve it.`,
+  }),
+  talk: (n) => ({
+    subject: `${n} would like to talk before deciding`,
+    body: `${n} has read the Founding Steward invitation and would like a conversation before deciding.\n\nWhen you have spoken, mark the conversation complete in the review so ${n} can return and decide.`,
+  }),
+  decline: (n) => ({
+    subject: `${n} has respectfully declined`,
+    body: `${n} has read the Founding Steward invitation and respectfully declined. The invitation has closed. Nothing further is required.`,
+  }),
+};
+
+/** Content-only notification for a recipient decision; transport is email.js. */
+export function decisionNotification(kind, recipientName) {
+  const n = String(recipientName || 'A guest');
+  const t = NOTES[kind];
+  if (!t) return null;
+  const { subject, body } = t(n);
+  return { subject, text: body, html: `<p>${escapeText(body).replace(/\n\n/g, '</p><p>')}</p>` };
 }
 
 function isoNow() {
-  // SQLite datetime('now') format: 'YYYY-MM-DD HH:MM:SS' (UTC). Match it so string
-  // comparison against expires_at is correct.
   return new Date().toISOString().slice(0, 19).replace('T', ' ');
 }
-
 function escapeText(s) {
   return String(s).replace(/[&<>"']/g, (c) => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
