@@ -639,3 +639,66 @@ Visual Art and Book do not, as derived).
 tests) · production build OK · `check:prod` passes (13 pages) · browser vertical-slice
 verification green (15/15, desktop + mobile; the only failing network request is the
 sandbox-blocked external Google Fonts stylesheet).
+
+---
+
+## 15. Version 1 — Institutional Completion Certification
+
+*Recorded by the Institutional Completion Loop after driving Version 1 to its
+defined completion state on the merged `main` (through PR #58 and PR #59). Every
+criterion below is backed by repository evidence and runtime verification — not
+assumption. No new engine, workflow, state model, or source of truth was
+introduced; the lifecycle is composed entirely from existing architecture.*
+
+### The Version 1 lifecycle, end to end
+
+```
+Submission (7 types)  →  Editorial Office review  →  Founder decision (accept)
+   →  Approved Creative Matter (derived, one per submission, idempotent)
+   →  Collective responsibilities derived (Creator Relationships · Editorial ·
+       Production · Publishing · Growth), by type + requested involvement
+   →  Production → Voice Notes Studio handoff (audio-eligible matters only)
+   →  next institutional recommendation (opens the correct existing workspace)
+   →  completion (published)  →  the Archive / institutional record
+```
+
+### Completion criteria — all TRUE
+
+| Criterion | Evidence |
+|---|---|
+| Creative opportunities enter the Collective | 7 registered types (`submission-types.js` + `shared/submission-forms.js`); `/submit` + `/artist-features.html`; intake 201 verified for all 7 |
+| Editorial review complete | Editorial Office (`editorial-office/` + `/api/submissions`), authoritative workflow |
+| Founder decisions complete | Inline decisions at the Founder's Desk (`renderDetail` + `advanceStatus`), server-re-validated |
+| Creative matters activate | `creative-matter.ts` derivation; matter panel renders for all 7 types |
+| Creator Relationships participates | Derived responsibility carrying the artist + requester context |
+| Production participates | Derived responsibility + Voice Notes Studio handoff |
+| Voice Notes Studio integrated | Production Suite entrance (§13) + per-matter handoff (§14); audio types only |
+| Publishing participates | Derived responsibility; settled matter → Archive record |
+| Growth participates | Derived responsibility |
+| Institutional Memory records completed work | Published matters of all 7 types appear in the Archive (`mountLibrary` → `fetchInbox('published')` → `archiveTree`; `CATEGORY_OF` maps all 7) — verified |
+| Every supported type completes one end-to-end lifecycle | 7/7 verified in-browser: intake → approve → matter (correct handoff) → publish → Archive |
+| No duplicate workflows | The matter is a derivation, not a parallel workflow; one record per submission |
+| No orphan workflows | Additive; the Council Phase III pipeline is existing Headquarters V1 |
+| No Version 1 placeholders | The Production recording note is a real entrance; no `reserved` rooms; remaining not-connected items (Notifications) are honest Version 2 seams |
+| Documentation reflects implementation | §13 (Intake), §14 (Activation), §15 (this certification) |
+| Production builds clean | `npm run build` OK; `check:prod` passes (13 pages) |
+| Tests pass | `tsc` clean; **543/543 tests pass** |
+
+### Ownership (unchanged, preserved)
+
+Headquarters (Operating System, Institutional Executive Loop, Founder Attention,
+Autonomous Execution Bridge, Execution Runtime Boundary, Institutional Memory,
+Executive Workflow) remains complete and authoritative — modified only at approved
+integration points. Artist Submission owns intake; Editorial owns review; the
+Founder owns the decision; the Collective areas own their responsibilities.
+
+### Remaining beyond Version 1 (genuine, deferred by design — NOT V1 gaps)
+
+- No creator-facing status portal (submitters receive the emailed acknowledgment only).
+- No automatic accepted-matter → public work-object promotion (Press/Reader read `content/*`).
+- The Voice Notes Studio has no parameter intake; context is carried beside the entrance.
+- Executive Workflow's Initiative store is not fed by matters (matter is a
+  presentation-time derivation, by design for V1).
+
+**Certification:** _The Luscious Honey Collective Version 1 has reached institutional
+completion._
