@@ -531,3 +531,111 @@ behind the same Cloudflare Access gate (`functions/_middleware.js`, unchanged).
 production build OK (`submit` bundle emitted) · `check:prod` passes (13 pages) ·
 browser verification green (25/25 app checks; the only failing network request is the
 sandbox-blocked external Google Fonts stylesheet).
+
+---
+
+## 14. Version 1 Activation — Approved Creative Matter
+
+*Implemented after §13, on the merged main. Completes the first real operational
+lifecycle for the Artist Studio: an accepted submission becomes a coordinated
+creative matter across the Collective's existing areas of responsibility. Pure
+derivation — no new store, no new engine, no new workflow state, no fabricated
+activity.*
+
+### Approved-submission activation (the seam)
+
+Before this milestone, the Founder's Desk dead-ended after acceptance
+(`inlineActions('approved') → []` → "Nothing to decide here"). That seam
+(`renderDetail` in `src/headquarters/main.ts`) now derives and presents an
+**accepted creative matter** whenever a submission's status is `approved`,
+`scheduled`, or `published`. The derivation lives in
+`src/headquarters/creative-matter.ts` — a pure projection over the existing
+submissions spine + canonical workflow status:
+
+- keeps a **durable reference** (`submissionId`) to the origin, never a copy;
+- carries only the institutional fields needed to coordinate (type, artist,
+  requester + relationship, approved direction, assets/links, requested
+  involvement, decision, status, responsible areas, key dates, disposition);
+- is **idempotent** — one submission derives exactly one matter
+  (`activateMatters` keys by id), so re-processing never activates twice;
+- introduces **no new workflow state** — `active` vs `settled` is read from the
+  existing `approved`/`scheduled` vs `published` statuses.
+
+### Ownership boundaries (unchanged)
+
+Artist Submission owns intake; Editorial owns review; the Founder owns the decision
+(accept / revise / pause / decline); Executive Workflow owns advancing accepted
+matters; Creator Relationships, Editorial, Production, Publishing, and Growth own
+their existing responsibilities; Institutional Memory owns settled outcomes. This
+module only **derives and presents** — it transfers and duplicates nothing.
+
+### Responsibility derivation (by creative type + requested involvement)
+
+`matterResponsibilities(type, involvement)` returns the responsible areas from a
+per-type base, refined by the requested involvement — never a claim that work has
+happened. Book/Visual Art pull in Production only when a recording/reading/spoken
+element is requested; Event pulls in Editorial/Publishing only when coverage is
+requested; **Other Creative Proposal never silently assigns every area** — it needs
+the requested involvement or the Founder's direction.
+
+### Voice Notes Studio handoff
+
+`voiceNotesEligibility(...)` marks a matter audio-eligible for inherently-audio
+types (Interview/Artist Feature, Music, Podcast) or when a spoken/recorded element
+was requested. Production then presents a **direct handoff** to the existing
+`/production-studio/voice-notes/` surface with the matter's context (artist,
+purpose, notes) shown beside the entrance. **Non-audio matters are never routed to
+the Studio.** The Studio is linked, not rebuilt or embedded.
+
+**Limitation (documented, not worked around):** the existing Voice Notes Studio has
+no parameter intake, so context is carried in the Headquarters panel beside the
+entrance rather than injected into the Studio. No parallel state model was invented.
+
+### Founder experience
+
+After acceptance the Founder sees institutional stewardship, e.g. *"The Executive
+Team has accepted your direction. Creator Relationships will hold the relationship
+with the artist and their context, Editorial will prepare the feature, Production
+will coordinate the interview recording in the Voice Notes Studio…"* — only areas
+actually derived, and **no implementation language** (adapter/runtime/engine/
+ledger/pipeline/localStorage/work order). A single next recommendation opens the
+correct existing workspace (Voice Notes Studio, Editorial Office, or the Archive).
+
+### Active Creative Matter view
+
+Surfaced on the **existing** Executive Office → Founder's Desk (a new **In
+Coordination** grouping over the existing statuses; no new dashboard). All status
+derives from authoritative state; there are no decorative progress percentages.
+
+### Attended automation limitations
+
+The House derives responsibilities, prepares the recommendation, and opens the
+correct workspace. It does **not** claim Production, Publishing, or Growth completed
+work, and it introduces no scheduler or headless runtime. Execution remains
+attended: the Founder opens the Studio / Office and carries the work forward.
+
+### Complete Artist Feature / Interview lifecycle (verified)
+
+Submission → Editorial Office review → Founder acceptance at the Desk → accepted
+creative matter (Creator Relationships + Editorial + Production + Publishing +
+Growth) → direct Voice Notes Studio handoff → next recommendation → completion
+(`published`) settling into the House's record. Verified in-browser end-to-end
+(desktop + mobile) plus the other registered types (Music routes to the Studio;
+Visual Art and Book do not, as derived).
+
+### Remaining genuine Artist Studio gaps
+
+- No creator-facing status portal (submitters still receive only the emailed
+  acknowledgment).
+- No automatic accepted-matter → published-work object promotion (Press/Reader read
+  `content/*`, not `submissions`).
+- The Voice Notes Studio cannot yet ingest matter context as parameters.
+- Executive Workflow's Initiative store is not fed by matters (the matter is a
+  presentation-time derivation, by design for V1).
+
+### Verification (this milestone)
+
+`tsc` clean · **543/543 tests pass** (incl. new `tests/creative-matter.test.ts`, 12
+tests) · production build OK · `check:prod` passes (13 pages) · browser vertical-slice
+verification green (15/15, desktop + mobile; the only failing network request is the
+sandbox-blocked external Google Fonts stylesheet).
