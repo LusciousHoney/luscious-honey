@@ -1024,6 +1024,18 @@
   line-height: var(--leading-tight); letter-spacing: -0.01em;
   color: var(--hq-ink); margin: 0; max-width: 30ch;
 }
+/* The institutional breadcrumb above the desk — a place, not a utility link. */
+.hq-narration__crumb {
+  color: var(--umber); margin: 0 0 var(--s-3); display: flex; flex-wrap: wrap; gap: 0.35em;
+}
+.hq-narration__crumb-here { color: var(--hq-ink); }
+.hq-narration__crumb-sep { opacity: 0.6; }
+/* The Studio blurb + the working entrance. */
+.hq-narration__blurb {
+  font-family: var(--serif); font-style: italic; color: var(--umber);
+  margin: var(--s-3) 0 var(--s-4); max-width: 46ch; line-height: var(--leading-body);
+}
+.hq-narration__enter { align-self: start; }
 
 /* --- The review room: a quiet plaster note (environmental only) ------------ */
 .hq-review {

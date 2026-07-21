@@ -61,7 +61,8 @@ export default defineConfig({
         publishing: resolve(__dirname, 'publishing.html'), // /publishing  Editorial wing
         reader: resolve(__dirname, 'reader.html'),         // /publishing/:work  the Reader
         press: resolve(__dirname, 'press.html'),           // /press      House Journal archive
-        artistFeatures: resolve(__dirname, 'artist-features.html'), // /artist-features  Artist Features intake
+        artistFeatures: resolve(__dirname, 'artist-features.html'), // /artist-features  Artist Features intake (Interview / Artist Feature)
+        submit: resolve(__dirname, 'submit.html'),         // /submit     The Submissions Desk (all creative pathways)
         tribute: resolve(__dirname, 'tk-tribute.html'),    // /tk-tribute Permanent Collection · Tribute No. 01
         // Private making tools. Gated by Cloudflare Access on /production-studio*
         // (see docs/DEPLOY.md). Emitted as production-studio/index.html so the

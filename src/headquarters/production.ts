@@ -90,12 +90,33 @@ export function productionSprint(
   return { lanes, total };
 }
 
-/* --- Honest in-residence copy (no doorway out of the residence) -------------- */
+/* --- Honest in-residence copy ------------------------------------------------ */
 
-/** The recording position — ready, never routing out. A placeholder holds the
-    seat until an in-residence capture destination exists (founder decision). */
+/** The recording position — now a real, working entrance. The Narration Desk
+    opens the Collective's private Voice Notes Studio (its own established surface
+    under Production); Headquarters links to it, and never rebuilds or embeds it. */
 export const RECORDING_NOTE =
-  'The recording position is ready — the lamp quiet and warm. A place to narrate opens here inside the residence soon.';
+  'The recording position is ready — the lamp quiet and warm. The Voice Notes Studio, the House’s private recording room, opens from here.';
+
+/** The Production entrance to the existing Voice Notes Studio. Data only — the
+    residence renders it. The Studio is a separate private surface served under
+    /production-studio; this is a link into it, preserving the institutional
+    hierarchy (The Luscious Honey Collective → Production → Voice Notes Studio).
+    Access protection is unchanged: both surfaces sit behind Cloudflare Access. */
+export interface StudioEntrance {
+  href: string;
+  label: string;
+  /** Institutional breadcrumb, outermost first. */
+  breadcrumb: string[];
+  blurb: string;
+}
+export const VOICE_NOTES_STUDIO: StudioEntrance = {
+  href: '/production-studio/voice-notes/',
+  label: 'Enter the Voice Notes Studio',
+  breadcrumb: ['The Luscious Honey Collective', 'Production', 'Voice Notes Studio'],
+  blurb:
+    'Build an episode: private artist collaboration, per-note audio, and finished video export — in the Collective’s own recording room.',
+};
 
 /** The glass review room — environmental only; it merely suggests review happens
     there, in the light. No dashboard, no controls. */

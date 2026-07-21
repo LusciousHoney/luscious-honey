@@ -34,6 +34,8 @@ interface Submission {
   email: string;
   fields: Record<string, any>;
   created_at: string;
+  /** One-line editorial summary from the type's own renderer (server-provided). */
+  summary?: string;
 }
 
 interface Message {
@@ -63,6 +65,8 @@ interface DetailSubmission extends Submission {
 let statuses: string[] = [];
 let statusLabels: Record<string, string> = {};
 let knownTypes: string[] = [];
+/** Institutional type titles from the registry (id → "Book or Literary Work"). */
+let typeTitles: Record<string, string> = {};
 
 /* Presentation grouping of the workflow — for status TONE only. The set of
    statuses and their transitions remain the backend's; this only chooses a
@@ -117,6 +121,9 @@ function relDay(iso: string): string {
 }
 
 function typeLabel(id: string): string {
+  // Prefer the institutional title from the registry so a reviewer never infers
+  // the creative type from a de-slugged id.
+  if (typeTitles[id]) return typeTitles[id];
   return id
     .replace(/_/g, ' ')
     .replace(/([a-z])([A-Z])/g, '$1 $2')
@@ -134,12 +141,14 @@ function initials(name: string): string {
   return (first + last).toUpperCase();
 }
 
-/** A one-line editorial summary from the type-specific fields (presentation). */
-function summarize(fields: Record<string, any>): string {
-  const f = fields || {};
-  const promoting = String(f.promoting || '').replace(/\s+/g, ' ').trim();
-  const short = promoting.length > 96 ? promoting.slice(0, 95) + '…' : promoting;
-  return [f.interest, short].filter(Boolean).join(' · ');
+/** A one-line editorial summary. Prefer the server's type-aware summary (each
+    submission type renders its own); fall back to a local read for older rows. */
+function summaryOf(s: Submission): string {
+  if (s.summary && s.summary.trim()) return s.summary.trim();
+  const f = s.fields || {};
+  const lead = String(f.promoting || f.description || '').replace(/\s+/g, ' ').trim();
+  const short = lead.length > 96 ? lead.slice(0, 95) + '…' : lead;
+  return [f.interest || f.submittedBy, short].filter(Boolean).join(' · ');
 }
 
 function isHttpUrl(url: unknown): url is string {
@@ -203,6 +212,10 @@ async function apiPost(payload: object): Promise<any> {
 function absorbMeta(data: any, subs: Submission[]): void {
   statuses = data.statuses || statuses;
   statusLabels = data.statusLabels || statusLabels;
+  // Institutional type titles from the registry, so the type reads clearly.
+  if (Array.isArray(data.types)) {
+    for (const t of data.types) if (t && t.id && t.title) typeTitles[t.id] = t.title;
+  }
   for (const s of subs) if (s.type && !knownTypes.includes(s.type)) knownTypes.push(s.type);
 }
 
@@ -244,7 +257,7 @@ function navBar(active: 'dashboard' | 'review'): string {
 }
 
 function briefingItem(s: Submission): string {
-  const summary = summarize(s.fields);
+  const summary = summaryOf(s);
   return `
     <li>
       <a class="eo-item" href="${href({ submission: s.id })}" data-open="${s.id}">
@@ -359,7 +372,7 @@ function statusControl(sub: Submission): string {
 }
 
 function reviewCard(sub: Submission): string {
-  const summary = summarize(sub.fields);
+  const summary = summaryOf(sub);
   return `
     <article class="eo-card" data-id="${sub.id}">
       <div class="eo-card__lead">
@@ -477,12 +490,19 @@ function responsesList(sub: DetailSubmission): string {
     if (value == null || value === '') continue;
     const label = typeLabel(key);
     let rendered: string;
-    if (key === 'musicUrl' || (typeof value === 'string' && /music|listen|track|song/i.test(key) && isHttpUrl(value))) {
+    if (Array.isArray(value)) {
+      // Multi-select fields (e.g. proposed Collective involvement).
+      if (!value.length) continue;
+      rendered = value.map((v) => `<span class="eo-tag">${esc(v)}</span>`).join(' ');
+    } else if (key === 'musicUrl' || (typeof value === 'string' && /music|listen|track|song/i.test(key) && isHttpUrl(value))) {
       rendered = isHttpUrl(value)
         ? `<span class="eo-listen"><span class="eo-listen__label">Listening reference</span> ${safeLink(value, `Listen · ${hostOf(value)}`)}</span>`
         : esc(value);
     } else if (isHttpUrl(value)) {
       rendered = safeLink(value, `Open · ${hostOf(value)}`);
+    } else if (typeof value === 'string' && value.includes('\n')) {
+      // Multi-line entries (e.g. links, one per line) keep their line breaks.
+      rendered = esc(value).replace(/\n/g, '<br>');
     } else {
       rendered = esc(value);
     }

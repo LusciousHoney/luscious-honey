@@ -43,7 +43,7 @@ import {
 } from './calendar.ts';
 import { DICTATION_DESTINATIONS, makeDraft } from './dictation.ts';
 import {
-  productionSprint, RECORDING_NOTE, REVIEW_NOTE,
+  productionSprint, RECORDING_NOTE, REVIEW_NOTE, VOICE_NOTES_STUDIO,
   type ProductionSprint,
 } from './production.ts';
 import { RELATIONSHIPS, SALON_LEDE, HORIZON_NOTE } from './growth.ts';
@@ -1601,9 +1601,28 @@ function cosReturnButton(
  * architecture, exactly as the Executive Office and Creative Director do.
  */
 function buildNarrationDesk(): HTMLElement {
+  // The institutional breadcrumb, so the entrance reads as a place within the
+  // House, not an external utility link: Collective → Production → Voice Notes Studio.
+  const crumb = el('p', { class: 'hq-narration__crumb label', 'aria-label': 'Location' });
+  VOICE_NOTES_STUDIO.breadcrumb.forEach((step, i) => {
+    if (i > 0) crumb.append(el('span', { class: 'hq-narration__crumb-sep', 'aria-hidden': 'true' }, ' → '));
+    const last = i === VOICE_NOTES_STUDIO.breadcrumb.length - 1;
+    crumb.append(el('span', { class: last ? 'hq-narration__crumb-here' : 'hq-narration__crumb-step' }, step));
+  });
+
+  // A real entrance. It routes to the existing Voice Notes Studio surface (served
+  // under /production-studio, behind the same Cloudflare Access); Headquarters
+  // links to it and never embeds or rebuilds it.
+  const enter = el('a', {
+    class: 'hq-narration__enter button', href: VOICE_NOTES_STUDIO.href,
+  }, VOICE_NOTES_STUDIO.label) as HTMLAnchorElement;
+
   return el('section', { class: 'hq-narration', role: 'group', 'aria-label': 'The Narration Desk' },
+    crumb,
     el('p', { class: 'hq-narration__eyebrow label' }, 'The Narration Desk'),
-    el('p', { class: 'hq-narration__line' }, RECORDING_NOTE));
+    el('p', { class: 'hq-narration__line' }, RECORDING_NOTE),
+    el('p', { class: 'hq-narration__blurb' }, VOICE_NOTES_STUDIO.blurb),
+    enter);
 }
 
 /** THE REVIEW ROOM — environmental only, in the residence's own language: a quiet
