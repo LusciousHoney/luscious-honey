@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en" data-env="development" data-tod="evening">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Submit to the Collective — Luscious Honey Collective</title>
+    <meta
+      name="description"
+      content="Bring music, a book, a podcast, visual art, an event, or another creative proposal to Luscious Honey Collective. One submission desk — the type you choose shapes the questions."
+    />
+    <meta name="color-scheme" content="dark" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,200;0,6..72,300;1,6..72,200;1,6..72,300&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <a class="skip-link" href="#type-picker">Skip to the submission form</a>
+
+    <div class="container">
+      <header class="site-header">
+        <span class="wordmark">Luscious&nbsp;Honey <b>Collective</b></span>
+        <span class="label" aria-hidden="true">Submissions</span>
+      </header>
+    </div>
+
+    <main id="main">
+      <section class="wing-hero" aria-labelledby="submit-title">
+        <div class="container">
+          <p class="wing-hero__eyebrow label">The Submissions Desk</p>
+          <h1 id="submit-title" class="wing-hero__title">Bring your work to the House.</h1>
+          <p class="wing-hero__intro">
+            Music, a book, a podcast, visual art, an event, or something that fits
+            no category yet — there’s one desk for all of it. Choose what you’re
+            bringing, and the form will ask only what matters for it. You can submit
+            your own work, or propose an artist you believe in.
+          </p>
+        </div>
+      </section>
+
+      <section class="feature-body">
+        <div class="container">
+          <p class="sub-picker__eyebrow label">What are you bringing?</p>
+          <div id="type-picker" class="sub-picker" role="radiogroup" aria-label="Submission type"></div>
+
+          <!-- The chosen type's form renders here. -->
+          <div id="submit-host" class="sub-host" aria-live="polite"></div>
+
+          <noscript>
+            <p class="editorial" style="margin-top: var(--s-4);">
+              This submission desk needs JavaScript to render its form. You can still
+              introduce yourself through the
+              <a href="/artist-features.html">Artist Features form</a>.
+            </p>
+          </noscript>
+        </div>
+      </section>
+
+      <div class="container back-line">
+        <a href="/">← Back to the House</a>
+      </div>
+    </main>
+
+    <footer class="colophon">
+      <div class="container">
+        <p class="wordmark">Luscious Honey Collective</p>
+        <p class="meta">A house for storytellers · MMXXVI</p>
+      </div>
+    </footer>
+
+    <script type="module" src="/src/submit.ts"></script>
+  </body>
+</html>

@@ -49,8 +49,18 @@ const TAXON_ORDER = new Map(ARCHIVE_TAXONOMY.map((t, i) => [t.id, i]));
 const TAXON_LABEL = new Map(ARCHIVE_TAXONOMY.map((t) => [t.id, t.label]));
 
 /** Map a submission TYPE to an archive category. Artist Features are interviews /
-    conversations, so they live under Interviews. Future types map here. */
-const CATEGORY_OF: Record<string, string> = { artist_feature: 'interviews' };
+    conversations, so they live under Interviews. The Version 1 creative pathways
+    slot into existing taxa; unmapped types fall through to Research. (Extension
+    point only — the taxonomy itself is unchanged.) */
+const CATEGORY_OF: Record<string, string> = {
+  artist_feature: 'interviews',
+  music: 'production',
+  book: 'books',
+  podcast: 'narration',
+  visual_art: 'assets',
+  event: 'production',
+  // other_proposal → Research (default)
+};
 function categoryOf(type: string): string { return CATEGORY_OF[type] || 'research'; }
 
 function facet(s: Submission): string {

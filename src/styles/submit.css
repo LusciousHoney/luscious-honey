@@ -1,0 +1,58 @@
+/* =============================================================================
+   THE SUBMISSIONS DESK — the type picker.
+   A thin layer over the shared intake surfaces (artist-features.css supplies the
+   .field / .choice / .intro-form language). This adds only the pathway-picker
+   grid and the route-out panel. No new design language — spacing + layout only.
+   ============================================================================= */
+
+.sub-picker__eyebrow { display: block; color: var(--umber); margin: 0 0 var(--s-3); }
+
+/* The pathway cards — an accessible radio group of reading plates. */
+.sub-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: var(--s-3);
+  margin: 0 0 var(--s-6);
+}
+
+.sub-card { display: block; cursor: pointer; }
+.sub-card__input {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
+}
+.sub-card__face {
+  display: grid; gap: var(--s-1); height: 100%;
+  background: var(--surface-plate-2);
+  border: 1px solid rgba(var(--ink-rgb), 0.18); border-radius: var(--radius);
+  padding: var(--s-3);
+  transition: border-color var(--motion-quick) var(--ease-settle),
+              background-color var(--motion-quick) var(--ease-settle);
+}
+.sub-card:hover .sub-card__face { border-color: var(--brass); }
+.sub-card__icon { font-size: 1.5rem; line-height: 1; }
+.sub-card__title {
+  font-family: var(--sans); font-weight: 600; font-size: var(--fs-body); color: var(--ink);
+}
+.sub-card__desc {
+  font-family: var(--serif); font-style: italic; color: var(--umber);
+  font-size: var(--fs-body-sm); line-height: var(--leading-body);
+}
+.sub-card__input:checked + .sub-card__face {
+  border-color: var(--umber);
+  box-shadow: inset 0 0 0 1px var(--umber);
+}
+.sub-card__input:focus-visible + .sub-card__face { box-shadow: var(--focus-ring); }
+
+/* The chosen type's form (or route-out panel) sits below the picker. */
+.sub-host { display: grid; }
+.sub-form { width: min(100%, var(--w-text)); margin-inline: auto; }
+
+.sub-routeout {
+  width: min(100%, var(--w-text)); margin-inline: auto;
+  display: grid; gap: var(--s-3); justify-items: start;
+}
+.sub-routeout__lede { color: var(--umber); margin: 0; }
+
+/* Optional-choice legends keep the optional flag inline. */
+.field--choice .field__optional { margin-left: var(--s-2); }

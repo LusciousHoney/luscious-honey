@@ -365,6 +365,12 @@
   letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--office-linen);
 }
 .eo-field dd { margin: 0; font-family: var(--serif); font-size: var(--fs-body); color: var(--office-limestone); line-height: var(--leading-body); }
+/* Multi-select values (e.g. proposed Collective involvement) read as quiet chips. */
+.eo-tag {
+  display: inline-block; margin: 0 4px 4px 0; padding: 2px 10px;
+  font-family: var(--sans); font-size: var(--fs-meta); letter-spacing: var(--tracking-label);
+  color: var(--office-linen); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 999px;
+}
 .eo-listen { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-2); }
 .eo-listen__label {
   font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.1em; text-transform: uppercase;

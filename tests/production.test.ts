@@ -12,7 +12,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { productionSprint, PRODUCTION_LANES, RECORDING_NOTE, REVIEW_NOTE } from '../src/headquarters/production.ts';
+import { productionSprint, PRODUCTION_LANES, RECORDING_NOTE, REVIEW_NOTE, VOICE_NOTES_STUDIO } from '../src/headquarters/production.ts';
 import type { Submission } from '../src/headquarters/adapters.ts';
 
 const sub = (id: number, name: string, status: string): Submission => ({
@@ -78,12 +78,25 @@ test('an empty spine yields a quiet studio (three empty lanes, zero total)', () 
 });
 
 // ── In-residence copy ────────────────────────────────────────────────────────
-test('the recording note stays in-residence and never claims a take is running', () => {
+test('the recording note is honest — a real entrance, never a running take', () => {
   assert.ok(RECORDING_NOTE.length > 0);
+  // Still never simulates a live recording…
   assert.ok(!/recording now|on air|on-air|live now/i.test(RECORDING_NOTE));
-  assert.ok(!/editorial office|production studio|voice notes/i.test(RECORDING_NOTE));
+  // …but now names the working Voice Notes Studio entrance (Milestone: Intake Activation).
+  assert.ok(/voice notes studio/i.test(RECORDING_NOTE));
 });
 
 test('the review note is a short environmental line', () => {
   assert.ok(REVIEW_NOTE.length > 0 && REVIEW_NOTE.length < 80);
+});
+
+// ── The Production → Voice Notes Studio entrance (links, never rebuilds) ──────
+test('the Voice Notes Studio entrance links to the existing private surface', () => {
+  assert.equal(VOICE_NOTES_STUDIO.href, '/production-studio/voice-notes/');
+  assert.ok(VOICE_NOTES_STUDIO.label.length > 0);
+});
+
+test('the entrance preserves the institutional breadcrumb hierarchy', () => {
+  assert.deepEqual(VOICE_NOTES_STUDIO.breadcrumb,
+    ['The Luscious Honey Collective', 'Production', 'Voice Notes Studio']);
 });
