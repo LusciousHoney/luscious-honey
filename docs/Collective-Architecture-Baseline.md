@@ -716,3 +716,10 @@ institution. Repository evidence over speculation; composition over expansion.*
   `/artist-features` were built but linked from no public surface — the front door
   for "creative opportunities enter the Collective" was unreachable. On-brand,
   reveal-aware, verified on desktop + mobile. No new architecture; navigation only.
+
+- **README brought current to V1.** The README top-matter still framed the repo as
+  the "Production Sprint 01 vertical slice" (a V0 walk: Arrival → Corridor →
+  Publishing → one Reader). Replaced with the certified V1 reality — the full
+  creative lifecycle and the public-House / private-institution split — and renamed
+  the stale "What's in this slice" / "Known limitations (this slice)" headings.
+  Founder-facing clarity; docs only.
