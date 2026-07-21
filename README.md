@@ -1,20 +1,27 @@
 # Luscious Honey Collective — Headquarters
 
-The digital Headquarters of the Luscious Honey Collective: *a house for storytellers.*
-This repository is the **Production Sprint 01 vertical slice** — the first working
-end-to-end walk through the House:
+The digital home of the Luscious Honey Collective: *a house for storytellers.*
+This repository is the Collective's institution — **Version 1 is complete and
+certified** (see [`docs/Collective-Architecture-Baseline.md`](docs/Collective-Architecture-Baseline.md) §15).
 
-> **Arrival → Front Desk → Long Corridor → Publishing Wing → one editorial Reader**
+It runs one coherent creative lifecycle, composed end to end:
 
-It is a **new, standalone production**, built to become the eventual root experience
-of **LusciousHoney.org**. It shares design-system DNA with the *Pull Me Under*
-residence site but is architecturally independent and does not depend on it.
-(The *Pull Me Under* residence will later become one destination within the
-Productions wing — integration is deferred until both are production-ready.)
+> **Submit → Editorial review → Founder decision → Approved creative matter →
+> Collective coordination → Voice Notes Studio → completion → the Archive**
 
-The canonical source of truth is **Sprint 04 — Production Definition ("Lock the
-House")**. Nothing visual here is invented; every token, motion value, frame and
-rule traces to that pack.
+Two faces share one codebase: the **public House** (Reception, the Long Corridor,
+the Publishing Wing and Reader, Press, the Permanent Collection, and the public
+**Submissions Desk** where creators bring their work) and the private,
+Cloudflare-Access–gated institution (the founder's **Headquarters**, the
+**Editorial Office** review workspace, and the **Production Studio** holding the
+**Voice Notes Studio**).
+
+It is a **standalone production** and the root experience of **LusciousHoney.org**.
+It shares design-system DNA with the *Pull Me Under* residence site but is
+architecturally independent. Nothing visual is invented; every token, motion value,
+frame and rule traces to the locked design system (see [`docs/Design-Tokens.md`](docs/Design-Tokens.md)),
+and the canonical architecture reference is the
+[Architecture Baseline](docs/Collective-Architecture-Baseline.md).
 
 ---
 
@@ -41,7 +48,7 @@ That's it. The site opens at **Reception**. Scroll to walk the corridor; click
 
 ---
 
-## What's in this slice
+## The public House
 
 | Route | File | The room |
 | --- | --- | --- |
@@ -105,7 +112,7 @@ governed by manual publish states — see [`docs/Content-Model.md`](docs/Content
 for the plain-language publishing workflow (how to post a Journal entry, change the
 Writing Wall, or swap the Held Frame).
 
-## Known limitations (this slice)
+## Known limitations
 
 - The operational **systems are real** (Journal, Writing Wall, Held Frame,
   editorial works, governance); the **content is still a clearly-labelled temporary
