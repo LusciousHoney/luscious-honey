@@ -723,3 +723,11 @@ institution. Repository evidence over speculation; composition over expansion.*
   creative lifecycle and the public-House / private-institution split — and renamed
   the stale "What's in this slice" / "Known limitations (this slice)" headings.
   Founder-facing clarity; docs only.
+
+- **Two-way navigation between the intake pages.** `/submit` already routes the
+  Interview / Artist Feature pathway out to `/artist-features.html`, but that form
+  had no link back — a creator who landed on the narrow interview form could not
+  discover the other six pathways (music, book, podcast, visual art, event, other).
+  Added a quiet aside on `artist-features.html` ("Bringing music, a book, … Start
+  at the Submissions Desk →") linking to `/submit.html`. Navigation only; the
+  retained artist_feature form's fields are unchanged. Verified desktop + mobile.
