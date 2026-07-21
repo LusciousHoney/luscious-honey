@@ -550,7 +550,7 @@ async function mountOperationsBoard(host: HTMLElement): Promise<void> {
   if (flow.total === 0) {
     host.replaceChildren(deskState(
       'The board is quiet',
-      'No work is in the House yet. As submissions arrive and move, the pipeline will fill in here — you’ll see the flow at a glance.',
+      'No work is in the House yet. As matters arrive and move through the House, they gather here — the day at a glance.',
     ));
     return;
   }
@@ -2358,7 +2358,7 @@ function hosArrival(): HTMLElement {
   if (total === 0) { section.setAttribute('hidden', ''); return section; }
 
   section.append(
-    el('p', { class: 'hq-cos__eyebrow label' }, 'The House, at present'),
+    el('p', { class: 'hq-cos__eyebrow label' }, 'The Chief of Staff'),
     el('p', { class: 'hq-cos__lead' }, brief.headline));
 
   // The House's execution posture — whether it can carry the next step out on its
@@ -2374,8 +2374,8 @@ function hosArrival(): HTMLElement {
       el('p', { class: 'hq-cos__field-label label' }, label), ul));
   };
   group('Awaiting your judgment', brief.awaitingJudgment);
-  group('Completed — ready to brief you', brief.readyToBrief);
-  group('Continuing without you', brief.continuing);
+  group('The Executive Team has completed — ready to brief you', brief.readyToBrief);
+  group('The Executive Team is continuing without you', brief.continuing);
 
   section.append(el('a', { class: 'hq-cos__more', href: '#/chief-of-staff/initiatives' }, 'Enter the matters →'));
   return section;
@@ -3088,7 +3088,7 @@ function cosInitiatives(repaint: () => void): HTMLElement {
 
   const { active, record } = partitionInitiatives(initiatives);
   for (const i of active) view.append(initiativeCard(i, persist));
-  if (record.length > 0) view.append(houseRegister(record));
+  if (record.length > 0) view.append(houseRegister(record, persist));
   return view;
 }
 
@@ -3099,17 +3099,17 @@ const DECISION_WORD: Record<FounderDecision, string> = {
 /** The House Register — completed and closed matters, kept as the institutional
     record. A calm bound register, not an audit log: each matter opens into its
     whole story, in reading order. */
-function houseRegister(records: Initiative[]): HTMLElement {
+function houseRegister(records: Initiative[], persist: (next: Initiative, note?: string) => void): HTMLElement {
   const section = el('section', { class: 'hq-cos__register', 'aria-label': 'The House Register' },
     el('p', { class: 'hq-cos__eyebrow label' }, 'The House Register'),
     el('p', { class: 'hq-cos__quiet' }, 'Completed and closed matters, kept as the House’s institutional record.'));
-  for (const i of records) section.append(initiativeRecordView(i));
+  for (const i of records) section.append(initiativeRecordView(i, persist));
   return section;
 }
 
 /** One matter as an institutional record — direction, recommendation, decision,
     responsibility, chronology, outcome, and current disposition, in one place. */
-function initiativeRecordView(i: Initiative): HTMLElement {
+function initiativeRecordView(i: Initiative, persist: (next: Initiative, note?: string) => void): HTMLElement {
   const r = initiativeRecord(i);
   const rec = el('details', { class: 'hq-cos__record' });
   rec.append(el('summary', { class: 'hq-cos__record-summary' },
@@ -3134,6 +3134,23 @@ function initiativeRecordView(i: Initiative): HTMLElement {
   if (r.outcome) rec.append(cosField('Outcome', r.outcome));
   const disp = r.disposition ? HISTORY_DISPOSITIONS.find((h) => h.id === r.disposition)?.label : undefined;
   rec.append(cosField('The House considers this', disp ? `In its history as ${disp}` : r.status));
+
+  // A completed matter still awaits the Founder's word on how it enters the
+  // record — the Chief of Staff presents the House's proposal here.
+  if (i.status === 'completed' && i.history) {
+    const recommended = HISTORY_DISPOSITIONS.find((h) => h.id === i.history!.recommended)!;
+    rec.append(cosField('The Chief of Staff proposes it enter the record as', recommended.label));
+    const acts = el('div', { class: 'hq-cos__responses' });
+    const confirm = el('button', { class: 'hq-cos__response hq-cos__response--primary', type: 'button' }, `Enter the record as ${recommended.label}`) as HTMLButtonElement;
+    confirm.addEventListener('click', () => persist(archiveInitiative(i, recommended.id), 'This work is now part of the institutional record.'));
+    acts.append(confirm);
+    if (recommended.id !== 'internal') {
+      const internal = el('button', { class: 'hq-cos__response', type: 'button' }, 'Keep as an internal record') as HTMLButtonElement;
+      internal.addEventListener('click', () => persist(archiveInitiative(i, 'internal'), 'Kept as an internal record of the House.'));
+      acts.append(internal);
+    }
+    rec.append(acts);
+  }
   return rec;
 }
 
@@ -3249,29 +3266,14 @@ function initiativeCard(i: Initiative, persist: (next: Initiative, note?: string
       exec.append(el('p', { class: 'hq-cos__execution-close' },
         'You may leave Headquarters. The House will continue its work and return only if your judgment is needed.'));
       const complete = el('button', { class: 'hq-cos__quiet-action', type: 'button' }, 'Record the House’s completion') as HTMLButtonElement;
-      complete.addEventListener('click', () => persist(completeInitiative(i), 'The House reports the work complete.'));
+      complete.addEventListener('click', () => persist(completeInitiative(i), 'The institution has accepted the completed work.'));
       exec.append(complete);
     }
     card.append(exec);
   }
 
-  // Institutional history — the workflow proposes; the Founder confirms once.
-  if (i.status === 'completed' && i.history) {
-    const recommended = HISTORY_DISPOSITIONS.find((h) => h.id === i.history!.recommended)!;
-    card.append(cosField('The House proposes it enter history as', recommended.label));
-    const acts = el('div', { class: 'hq-cos__responses' });
-    const confirm = el('button', { class: 'hq-cos__response', type: 'button' }, `Record as ${recommended.label}`) as HTMLButtonElement;
-    confirm.addEventListener('click', () => persist(archiveInitiative(i, recommended.id), 'Recorded in the institutional history.'));
-    const internal = el('button', { class: 'hq-cos__response', type: 'button' }, 'Keep internal') as HTMLButtonElement;
-    internal.addEventListener('click', () => persist(archiveInitiative(i, 'internal'), 'Kept internal.'));
-    acts.append(confirm);
-    if (recommended.id !== 'internal') acts.append(internal);
-    card.append(acts);
-  }
-  if (i.status === 'archived' && i.history?.chosen) {
-    const chosen = HISTORY_DISPOSITIONS.find((h) => h.id === i.history!.chosen)!;
-    card.append(cosField('In institutional history as', chosen.label));
-  }
+  // Completed and archived matters are shown in the House Register (their entry
+  // into the institutional record is confirmed there), never as an active card.
   return card;
 }
 
