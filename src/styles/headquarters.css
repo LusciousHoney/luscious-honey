@@ -667,6 +667,37 @@
 .hq-action--ghost:hover,
 .hq-action--ghost:focus-visible { background: rgba(var(--ink-rgb), 0.04); color: var(--hq-ink); border-color: var(--brass); }
 
+/* --- The accepted creative matter — institutional coordination, not a dashboard */
+.hq-matter {
+  margin-top: var(--s-3); padding: var(--s-4) var(--s-4);
+  background: linear-gradient(152deg, var(--hq-plaster) 0%, var(--hq-plaster-2) 100%);
+  border: var(--hairline); border-left: 2px solid var(--brass); border-radius: var(--radius);
+  display: grid; gap: var(--s-3);
+}
+.hq-matter__eyebrow { color: var(--umber); margin: 0; }
+.hq-matter__narrative {
+  font-family: var(--serif); font-weight: 300; font-size: var(--fs-h3);
+  line-height: var(--leading-tight); color: var(--hq-ink); margin: 0; max-width: 52ch;
+}
+.hq-matter__areas { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-1); }
+.hq-matter__area {
+  font-family: var(--serif); font-size: var(--fs-body); color: var(--hq-ink);
+  padding-left: var(--s-3); border-left: 1px solid rgba(var(--ink-rgb), 0.18);
+}
+.hq-matter__area-name { font-family: var(--sans); font-weight: 600; }
+.hq-matter__area-role { color: var(--umber); }
+.hq-matter__handoff {
+  display: grid; gap: var(--s-2); justify-items: start;
+  padding: var(--s-3); background: var(--alabaster);
+  border: var(--hairline); border-radius: var(--radius);
+}
+.hq-matter__handoff-eyebrow { color: var(--umber); margin: 0; }
+.hq-matter__handoff-context { font-family: var(--serif); font-style: italic; color: var(--hq-ink); margin: 0; max-width: 48ch; }
+.hq-matter__next { display: grid; gap: var(--s-2); justify-items: start; }
+.hq-matter__next-eyebrow { color: var(--umber); margin: 0; }
+.hq-matter__next-line { font-family: var(--serif); font-size: var(--fs-body); color: var(--hq-ink); margin: 0; max-width: 52ch; }
+.hq-matter__disposition { font-family: var(--serif); font-style: italic; color: var(--umber); margin: 0; }
+
 .hq-note { display: grid; gap: var(--s-1); margin-top: var(--s-3); }
 .hq-note__field {
   font-family: var(--serif); font-size: var(--fs-body-sm); color: var(--hq-ink);

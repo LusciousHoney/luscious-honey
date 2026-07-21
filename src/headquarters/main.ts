@@ -46,6 +46,10 @@ import {
   productionSprint, RECORDING_NOTE, REVIEW_NOTE, VOICE_NOTES_STUDIO,
   type ProductionSprint,
 } from './production.ts';
+import {
+  isAcceptedMatter, deriveCreativeMatter, matterNarrative, nextRecommendation,
+  responsibilityRole, type CreativeMatter,
+} from './creative-matter.ts';
 import { RELATIONSHIPS, SALON_LEDE, HORIZON_NOTE } from './growth.ts';
 import { SAFEGUARDS, STUDY_LEDE, CONTINUITY_NOTE } from './business.ts';
 import {
@@ -4310,7 +4314,7 @@ function renderAccessDenied(root: HTMLElement): void {
 // Founder-oriented groupings over the existing workflow states (the data model
 // and API are unchanged; grouping is a presentation concern). The Editorial
 // Office remains the detailed, per-status workflow environment.
-type DeskGroup = 'review' | 'waiting' | 'done' | 'all';
+type DeskGroup = 'review' | 'coordination' | 'waiting' | 'done' | 'all';
 interface GroupDef {
   id: DeskGroup;
   label: string;
@@ -4320,6 +4324,8 @@ interface GroupDef {
 const DESK_GROUPS: GroupDef[] = [
   { id: 'review', label: 'Needs My Review', statuses: ['sent_for_review', 'under_review'],
     empty: { title: 'Nothing needs you right now', lede: 'When a submission is waiting on your decision, it will rest here.' } },
+  { id: 'coordination', label: 'In Coordination', statuses: ['approved', 'scheduled'],
+    empty: { title: 'Nothing in coordination', lede: 'When you accept a submission, it becomes a coordinated creative matter and gathers here.' } },
   { id: 'waiting', label: 'Waiting on Others', statuses: ['changes_requested', 'approved', 'scheduled'],
     empty: { title: 'Nothing in waiting', lede: 'Submissions back with a creator, or moving toward publication, will appear here.' } },
   { id: 'done', label: 'Completed', statuses: ['published', 'not_accepted'],
@@ -4449,17 +4455,24 @@ function renderDetail(root: HTMLElement, host: HTMLElement, s: SubmissionDetail)
   );
   if (s.summary) head.append(el('p', { class: 'hq-detail__summary' }, s.summary));
 
-  // Valid inline decisions ONLY — derived from the shared transition rules for
-  // this item's CURRENT status. The submissions API re-validates on the server.
-  const actions = el('div', { class: 'hq-detail__actions', role: 'group', 'aria-label': 'Decisions' });
-  const available = inlineActions(s.status);
-  if (available.length === 0) {
-    actions.append(el('p', { class: 'hq-detail__resolved' }, 'Nothing to decide here — the Editorial Office holds the full review.'));
+  // Once ACCEPTED, the submission becomes a coordinated creative matter: the House
+  // derives who is responsible and the next step, so the Founder never re-enters
+  // the work or assigns departments by hand. Otherwise, the valid inline decisions
+  // (derived from the shared transition rules; the API re-validates on the server).
+  let actions: HTMLElement;
+  if (isAcceptedMatter(s.status)) {
+    actions = buildMatterPanel(deriveCreativeMatter(s)!);
   } else {
-    for (const a of available) {
-      const btn = el('button', { class: 'hq-action', type: 'button', 'data-to': a.status }, a.label);
-      btn.addEventListener('click', () => { void doAdvance(root, host, s.id, a.status, btn); });
-      actions.append(btn);
+    actions = el('div', { class: 'hq-detail__actions', role: 'group', 'aria-label': 'Decisions' });
+    const available = inlineActions(s.status);
+    if (available.length === 0) {
+      actions.append(el('p', { class: 'hq-detail__resolved' }, 'Nothing to decide here — the Editorial Office holds the full review.'));
+    } else {
+      for (const a of available) {
+        const btn = el('button', { class: 'hq-action', type: 'button', 'data-to': a.status }, a.label);
+        btn.addEventListener('click', () => { void doAdvance(root, host, s.id, a.status, btn); });
+        actions.append(btn);
+      }
     }
   }
 
@@ -4482,6 +4495,56 @@ function renderDetail(root: HTMLElement, host: HTMLElement, s: SubmissionDetail)
   }
 
   host.replaceChildren(head, actions, note, thread);
+}
+
+/**
+ * THE ACCEPTED CREATIVE MATTER — presented in the Headquarters' institutional
+ * language. It states what is true (which areas are responsible, the next step),
+ * offers the correct existing workspace to open, and never claims work has
+ * happened or exposes software mechanics. All of it is derived from the accepted
+ * submission and its requested involvement — no new state, no fabricated activity.
+ */
+function buildMatterPanel(m: CreativeMatter): HTMLElement {
+  const panel = el('section', { class: 'hq-matter', 'aria-label': 'The accepted creative matter' });
+  panel.append(el('p', { class: 'hq-matter__eyebrow label' }, m.phase === 'settled' ? 'In the House’s record' : 'Accepted — in coordination'));
+  panel.append(el('p', { class: 'hq-matter__narrative' }, matterNarrative(m)));
+
+  // The responsible Collective areas, each with what it holds (derived, not claimed).
+  if (m.responsibilities.length) {
+    const list = el('ul', { class: 'hq-matter__areas' });
+    for (const a of m.responsibilities) {
+      const role = a === 'Production' && m.voiceNotes.eligible
+        ? `will coordinate ${m.voiceNotes.purpose} in the Voice Notes Studio`
+        : responsibilityRole(a);
+      list.append(el('li', { class: 'hq-matter__area' },
+        el('span', { class: 'hq-matter__area-name' }, a),
+        el('span', { class: 'hq-matter__area-role' }, ` ${role}`)));
+    }
+    panel.append(list);
+  }
+
+  // The Voice Notes Studio handoff — only when a spoken/recorded element fits.
+  // The existing Studio does not ingest parameters, so the House carries the
+  // context here beside the entrance rather than inventing a parallel state.
+  if (m.voiceNotes.eligible && m.phase === 'active') {
+    const hand = el('div', { class: 'hq-matter__handoff' },
+      el('p', { class: 'hq-matter__handoff-eyebrow label' }, 'Production → Voice Notes Studio'),
+      el('p', { class: 'hq-matter__handoff-context' },
+        `For ${m.artist} — ${m.voiceNotes.purpose}. Carry this context into the session; the Studio opens ready.`),
+      el('a', { class: 'hq-matter__handoff-enter button', href: VOICE_NOTES_STUDIO.href }, VOICE_NOTES_STUDIO.label));
+    panel.append(hand);
+  }
+
+  // The single next institutional recommendation + the workspace it opens.
+  const next = nextRecommendation(m);
+  const nextEl = el('div', { class: 'hq-matter__next' },
+    el('p', { class: 'hq-matter__next-eyebrow label' }, 'Next'),
+    el('p', { class: 'hq-matter__next-line' }, next.line));
+  if (next.open) nextEl.append(el('a', { class: 'hq-action hq-action--ghost', href: next.open.href }, next.open.label));
+  panel.append(nextEl);
+
+  panel.append(el('p', { class: 'hq-matter__disposition' }, m.disposition));
+  return panel;
 }
 
 async function doAdvance(root: HTMLElement, host: HTMLElement, id: number, status: SubmissionStatus, btn: HTMLButtonElement): Promise<void> {
