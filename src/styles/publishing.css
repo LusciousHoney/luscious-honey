@@ -17,6 +17,21 @@
   color: var(--plaster);
   max-width: 46ch;
 }
+/* A quiet wayfinding aside — e.g. from the Artist Feature form to the full desk. */
+.wing-hero__aside {
+  margin-top: var(--s-4);
+  font-family: var(--sans);
+  font-size: var(--fs-body-sm);
+  color: var(--plaster);
+  max-width: 46ch;
+}
+.wing-hero__aside-link {
+  color: var(--alabaster); text-decoration: none;
+  border-bottom: 1px solid var(--brass); padding-bottom: 1px; white-space: nowrap;
+  transition: border-color var(--motion-quick) var(--ease-settle);
+}
+.wing-hero__aside-link:hover { border-color: var(--alabaster); }
+.wing-hero__aside-link:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: 2px; }
 
 .wing-body { padding: var(--s-6) 0 var(--s-8); }
 
