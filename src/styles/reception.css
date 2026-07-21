@@ -100,6 +100,19 @@
   color: var(--plaster);
 }
 
+/* The submissions invitation — a quiet line at the desk, not a loud CTA. */
+.arrival__invite { display: grid; gap: 4px; margin: 0; max-width: 34ch; }
+.arrival__invite-line { color: var(--plaster); font-style: italic; }
+.arrival__invite-link {
+  font-family: var(--sans); font-weight: 500; font-size: var(--fs-body-sm);
+  color: var(--alabaster); text-decoration: none;
+  border-bottom: 1px solid var(--brass);
+  padding-bottom: 1px; width: max-content;
+  transition: border-color var(--motion-quick) var(--ease-settle);
+}
+.arrival__invite-link:hover { border-color: var(--alabaster); }
+.arrival__invite-link:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: 2px; }
+
 /* Returning visitors and reduced motion: no light-up, quick settle. */
 .arrival[data-arrival="returning"]::after,
 .arrival[data-reduced="true"]::after { transition-duration: var(--motion-settle); }

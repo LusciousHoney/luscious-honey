@@ -702,3 +702,17 @@ Founder owns the decision; the Collective areas own their responsibilities.
 
 **Certification:** _The Luscious Honey Collective Version 1 has reached institutional
 completion._
+
+---
+
+## 16. Operations log (post-V1)
+
+*Repository Operations Executive — operational improvements on the completed
+institution. Repository evidence over speculation; composition over expansion.*
+
+- **Submissions Desk made reachable.** The public House now links creators to the
+  Submissions Desk: a quiet invitation at the Reception desk (`index.html`,
+  "Introduce your work → `/submit.html`"). Before this, `/submit` and
+  `/artist-features` were built but linked from no public surface — the front door
+  for "creative opportunities enter the Collective" was unreachable. On-brand,
+  reveal-aware, verified on desktop + mobile. No new architecture; navigation only.

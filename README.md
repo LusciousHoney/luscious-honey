@@ -49,6 +49,7 @@ That's it. The site opens at **Reception**. Scroll to walk the corridor; click
 | `/publishing.html` | `publishing.html` | **Publishing Wing** — the works shelf, the editor's desk, the Writing Wall. |
 | `/reader.html?work=…` | `reader.html` | **The Reader** — one work on a solid reading plate. |
 | `/press.html` | `press.html` | **Press** — the House Journal archive (published entries only). |
+| `/submit.html` | `submit.html` | **The Submissions Desk** — the public front door for every creative pathway. Reached from a quiet invitation at the Reception desk ("Introduce your work"). Routes the Interview / Artist Feature pathway to `/artist-features.html`. |
 
 Door `02` (Productions) shows a truthful **Now-Recording signal** — the Brass Studio
 Lamp, dark unless a real session is live. Door `03` (Press) opens the **Journal
