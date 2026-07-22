@@ -13,6 +13,7 @@
 
 import { getSubmissionType } from '../../_lib/submission-types.js'
 import { createSubmission } from '../../_lib/submissions.js'
+import { recordAndSendArrival } from '../../_lib/notifications.js'
 
 export async function onRequest({ request, params, env }) {
   if (request.method !== 'POST') {
@@ -60,13 +61,17 @@ export async function onRequest({ request, params, env }) {
   }
 
   try {
-    await createSubmission(env, {
+    const { id } = await createSubmission(env, {
       type: type.id,
       name: v.name,
       email: v.email,
       fields: v.fields,
       acknowledgment: typeof type.acknowledgment === 'function' ? type.acknowledgment({ name: v.name }) : null,
     })
+    // House arrival notice — recorded in D1 before any send; idempotent per
+    // submission; a send failure is a durable 'failed' row, never a thrown
+    // error (the submitter's 201 does not depend on the House's own notice).
+    await recordAndSendArrival(env, { id, type: type.id, name: v.name })
   } catch (err) {
     if (err.message && err.message.includes('UNIQUE')) {
       return json({

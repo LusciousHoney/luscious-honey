@@ -731,3 +731,16 @@ institution. Repository evidence over speculation; composition over expansion.*
   Added a quiet aside on `artist-features.html` ("Bringing music, a book, … Start
   at the Submissions Desk →") linking to `/submit.html`. Navigation only; the
   retained artist_feature form's fields are unchanged. Verified desktop + mobile.
+
+- **The House now speaks when work arrives or goes quiet.** First outbound
+  layer on the submissions spine (audit gap "manual re-entry #1" / no-outbound
+  -channel): a new submission records + emails one arrival notice (idempotent,
+  `migrations/0005_notifications.sql` unique index); a cooldown-bounded stale
+  sweep (`POST /api/notifications`, threshold `STALE_AFTER_HOURS`=48h default)
+  emails a gone-quiet digest; every attempt — including failures and
+  not-configured sends — is a durable D1 row, and the Headquarters
+  Notifications panel now renders that real state (`/api/notifications` via
+  `adapters.ts`), replacing the placeholder. D1-spine composition only; the
+  localStorage executive stores are untouched. Pages has no cron trigger, so
+  the sweep endpoint is scheduler-ready (Access session or `NOTIFY_SWEEP_KEY`
+  bearer) — attaching a scheduler is a deliberate, separate step.

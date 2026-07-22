@@ -2216,6 +2216,10 @@
 .hq-qa__soon { font-family: var(--sans); font-size: var(--fs-meta); letter-spacing: 0.04em; text-transform: uppercase; color: var(--umber); }
 .hq-notes__empty { font-family: var(--serif); font-weight: 300; font-size: var(--fs-h3); color: var(--hq-ink); margin: 0; }
 .hq-notes__note { font-family: var(--serif); font-style: italic; color: var(--umber); margin: var(--s-2) 0 0; }
+.hq-notes__body { display: grid; gap: var(--s-2); }
+.hq-notes__group { margin: var(--s-3) 0 0; color: var(--umber); }
+.hq-notes__item { font-family: var(--serif); color: var(--hq-ink); margin: 0; }
+.hq-notes__item.is-failed { color: var(--madder, #8a3324); }
 .hq-gsearch { display: grid; gap: var(--s-3); }
 .hq-gsearch__results { display: grid; gap: var(--s-2); }
 .hq-gsearch__list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); }

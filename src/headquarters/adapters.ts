@@ -131,3 +131,36 @@ export function advanceStatus(id: number, status: SubmissionStatus): Promise<Res
 export function addNote(id: number, note: string): Promise<Result<{ messageId: number }>> {
   return postJson<{ messageId: number }>({ id, note });
 }
+
+/* --- notifications (read; state lives in D1, never in the client) ----------- */
+
+export interface HouseNotification {
+  id: number;
+  submission_id: number;
+  kind: 'arrival' | 'stale' | string;
+  channel: string;
+  recipient: string | null;
+  subject: string | null;
+  delivery_status: 'sending' | 'sent' | 'failed' | 'not_configured' | string;
+  delivery_error: string | null;
+  created_at: string;
+  sent_at: string | null;
+  type: string | null;
+  status: string | null;
+  name: string | null;
+}
+
+export interface StaleReading {
+  id: number; type: string; status: string; name: string;
+  created_at: string; updated_at: string;
+}
+
+export interface NotificationState {
+  notifications: HouseNotification[];
+  stale: StaleReading[];
+  config: { recipientConfigured: boolean; staleAfterHours: number };
+}
+
+export function fetchNotifications(): Promise<Result<NotificationState>> {
+  return getJson<NotificationState>('/api/notifications');
+}

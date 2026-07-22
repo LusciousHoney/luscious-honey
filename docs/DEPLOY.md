@@ -190,3 +190,24 @@ Optionally repeat for `www.luscioushoneycollective.com` (or add a redirect).
 > Note: unmatched paths currently serve the homepage (index fallback) with `200`
 > rather than a `404`. This is cosmetic; if a true 404 is wanted later, add a
 > `dist/404.html` (via `public/404.html`) or set the project's not-found handling.
+
+## House notifications (submissions spine)
+
+The notification layer (`functions/_lib/notifications.js`, `/api/notifications`,
+`migrations/0005_notifications.sql`) records every outbound notice in D1 before
+any send is attempted — arrivals fire once per submission (unique index), and
+gone-quiet notices are cooldown-bounded.
+
+1. **Apply the migration** to the House database:
+   `npx wrangler d1 execute lhc-hq --file migrations/0005_notifications.sql --remote`
+2. **Env:** `NOTIFY_EMAIL` (wrangler.toml `[vars]`) is the notice recipient;
+   unset = notices recorded as `not_configured`, no email attempted. Optional
+   `STALE_AFTER_HOURS` (48) / `STALE_COOLDOWN_HOURS` (72).
+3. **Scheduling the stale sweep:** Cloudflare **Pages has no native cron
+   trigger**. `POST /api/notifications {action:'sweep'}` is idempotent and
+   cooldown-bounded; drive it from any scheduler — either a valid Access
+   session, or set a `NOTIFY_SWEEP_KEY` Production secret and call with
+   `Authorization: Bearer <key>` (e.g. from a one-line scheduled Worker or an
+   external cron). Until a scheduler is attached, the sweep can be run manually
+   and the Headquarters Notifications panel still shows the live staleness
+   reading on every open (display only, no send).

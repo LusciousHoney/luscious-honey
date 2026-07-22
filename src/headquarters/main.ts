@@ -28,8 +28,8 @@ import { loadLastRoom, saveLastRoom, shouldPlayArrival, markArrivalSeen } from '
 import { timeOfDay, greeting, dayKey } from './time.ts';
 import {
   fetchBriefing, fetchInbox, fetchItem, advanceStatus, addNote,
-  inlineActions, STATUS_LABELS,
-  type SubmissionDetail, type SubmissionStatus,
+  fetchNotifications, inlineActions, STATUS_LABELS,
+  type SubmissionDetail, type SubmissionStatus, type NotificationState,
 } from './adapters.ts';
 import { operationsFlow, type OperationsFlow } from './operations.ts';
 import {
@@ -4976,13 +4976,71 @@ function globalSearchPanel(): HTMLElement {
     results);
 }
 
-/* --- Notifications — an honest placeholder (no counts, no fabricated activity) - */
+/* --- Notifications — real notice state from the D1 spine (/api/notifications).
+   The panel mounts immediately and fills in when the desk answers; offline and
+   empty states stay honest. Nothing here is fabricated and nothing is stored
+   client-side. ------------------------------------------------------------- */
 function notificationsPanel(): HTMLElement {
-  return el('section', { class: 'hq-notes', 'aria-label': 'Notifications' },
-    el('p', { class: 'hq-modal__eyebrow label' }, 'Notifications'),
-    el('p', { class: 'hq-notes__empty' }, 'Nothing needs you right now.'),
-    el('p', { class: 'hq-notes__note' },
-      'When the House has something to surface, it will appear here — quietly, and never as a red badge. (Not yet connected.)'));
+  const body = el('div', { class: 'hq-notes__body', 'aria-busy': 'true' },
+    el('p', { class: 'hq-notes__note' }, 'Checking the desk…'));
+  const panel = el('section', { class: 'hq-notes', 'aria-label': 'Notifications' },
+    el('p', { class: 'hq-modal__eyebrow label' }, 'Notifications'), body);
+  void mountNotifications(body);
+  return panel;
+}
+
+async function mountNotifications(body: HTMLElement): Promise<void> {
+  const res = await fetchNotifications();
+  body.setAttribute('aria-busy', 'false');
+  if (!res.ok) {
+    body.replaceChildren(
+      el('p', { class: 'hq-notes__empty' }, res.offline ? 'The desk is offline.' : 'The desk couldn’t answer.'),
+      el('p', { class: 'hq-notes__note' }, res.offline ? 'Your work is safe — try again in a moment.' : res.error));
+    return;
+  }
+  body.replaceChildren(...notificationsContent(res.data));
+}
+
+function notificationsContent(state: NotificationState): Node[] {
+  const out: Node[] = [];
+
+  // Matters currently sitting quiet — the live reading, freshest truth first.
+  if (state.stale.length > 0) {
+    out.push(el('p', { class: 'hq-notes__group label' },
+      `Gone quiet (past ${state.config.staleAfterHours} hours)`));
+    for (const s of state.stale.slice(0, 8)) {
+      out.push(el('p', { class: 'hq-notes__item' },
+        `${s.name} — ${typeLabel(s.type)} · ${STATUS_LABELS[s.status as SubmissionStatus] ?? s.status} since ${s.updated_at.slice(0, 10)}`));
+    }
+  }
+
+  // The notice record — arrivals and stale digests, with delivery truth.
+  if (state.notifications.length > 0) {
+    out.push(el('p', { class: 'hq-notes__group label' }, 'Recent notices'));
+    for (const n of state.notifications.slice(0, 10)) {
+      const who = n.name ?? `#${n.submission_id}`;
+      const what = n.kind === 'arrival'
+        ? `New arrival — ${who}${n.type ? ` (${typeLabel(n.type)})` : ''}`
+        : n.kind === 'stale' ? `Gone-quiet notice — ${who}` : `${n.kind} — ${who}`;
+      const delivery = n.delivery_status === 'sent' ? 'notice sent'
+        : n.delivery_status === 'failed' ? `notice failed — ${n.delivery_error ?? 'unknown error'}`
+        : n.delivery_status === 'not_configured' ? 'recorded (no notice address configured)'
+        : 'sending…';
+      out.push(el('p', { class: `hq-notes__item${n.delivery_status === 'failed' ? ' is-failed' : ''}` },
+        `${what} · ${delivery}`));
+    }
+  }
+
+  if (out.length === 0) {
+    out.push(
+      el('p', { class: 'hq-notes__empty' }, 'Nothing needs you right now.'),
+      el('p', { class: 'hq-notes__note' },
+        'When work arrives or a matter goes quiet, it will appear here — quietly, and never as a red badge.'));
+  } else if (!state.config.recipientConfigured) {
+    out.push(el('p', { class: 'hq-notes__note' },
+      'Notices are being recorded, but no outbound address is configured yet (NOTIFY_EMAIL).'));
+  }
+  return out;
 }
 
 /* --- Room-specific Quick Actions — each routes into a real House service ----- */
