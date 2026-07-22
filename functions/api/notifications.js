@@ -15,7 +15,8 @@
 
 import { verifyAccessRequest } from '../_lib/access.js'
 import {
-  listNotifications, sweepStale, isStale, staleAfterHours, notifyRecipient,
+  listNotifications, sweepStale, isStale, staleAfterHours,
+  arrivalRecipient, sweepRecipient,
 } from '../_lib/notifications.js'
 import { FINAL_STATUSES } from '../../shared/workflow.js'
 
@@ -34,7 +35,8 @@ export async function onRequestGet({ request, env }) {
       notifications,
       stale: staleNow,
       config: {
-        recipientConfigured: !!notifyRecipient(env),
+        arrivalConfigured: !!arrivalRecipient(env),
+        sweepConfigured: !!sweepRecipient(env),
         staleAfterHours: staleAfterHours(env),
       },
     }, 200)

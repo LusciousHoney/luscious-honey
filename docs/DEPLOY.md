@@ -200,9 +200,10 @@ gone-quiet notices are cooldown-bounded.
 
 1. **Apply the migration** to the House database:
    `npx wrangler d1 execute lhc-hq --file migrations/0005_notifications.sql --remote`
-2. **Env:** `NOTIFY_EMAIL` (wrangler.toml `[vars]`) is the notice recipient;
-   unset = notices recorded as `not_configured`, no email attempted. Optional
-   `STALE_AFTER_HOURS` (48) / `STALE_COOLDOWN_HOURS` (72).
+2. **Env:** `ARRIVAL_NOTIFY_EMAIL` (new-submission notices) and
+   `SWEEP_NOTIFY_EMAIL` (gone-quiet digests) in wrangler.toml `[vars]`; either
+   unset = that notice type recorded as `not_configured`, no email attempted.
+   Optional `STALE_AFTER_HOURS` (48) / `STALE_COOLDOWN_HOURS` (72).
 3. **Scheduling the stale sweep:** Cloudflare **Pages has no native cron
    trigger**. `POST /api/notifications {action:'sweep'}` is idempotent and
    cooldown-bounded; drive it from any scheduler — either a valid Access

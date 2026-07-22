@@ -158,7 +158,7 @@ export interface StaleReading {
 export interface NotificationState {
   notifications: HouseNotification[];
   stale: StaleReading[];
-  config: { recipientConfigured: boolean; staleAfterHours: number };
+  config: { arrivalConfigured: boolean; sweepConfigured: boolean; staleAfterHours: number };
 }
 
 export function fetchNotifications(): Promise<Result<NotificationState>> {

@@ -738,7 +738,8 @@ institution. Repository evidence over speculation; composition over expansion.*
   `migrations/0005_notifications.sql` unique index); a cooldown-bounded stale
   sweep (`POST /api/notifications`, threshold `STALE_AFTER_HOURS`=48h default)
   emails a gone-quiet digest; every attempt — including failures and
-  not-configured sends — is a durable D1 row, and the Headquarters
+  not-configured sends — is a durable D1 row (arrivals →
+  `ARRIVAL_NOTIFY_EMAIL`, digests → `SWEEP_NOTIFY_EMAIL`), and the Headquarters
   Notifications panel now renders that real state (`/api/notifications` via
   `adapters.ts`), replacing the placeholder. D1-spine composition only; the
   localStorage executive stores are untouched. Pages has no cron trigger, so

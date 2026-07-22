@@ -12,7 +12,7 @@ import assert from 'node:assert/strict'
 import {
   recordAndSendArrival, sweepStale, listNotifications,
   isStale, cooldownElapsed, sqliteUtc,
-  staleAfterHours, staleCooldownHours, notifyRecipient,
+  staleAfterHours, staleCooldownHours, arrivalRecipient, sweepRecipient,
   DEFAULT_STALE_AFTER_HOURS, DEFAULT_STALE_COOLDOWN_HOURS,
 } from '../functions/_lib/notifications.js'
 
@@ -137,7 +137,8 @@ function envWith(db, extra = {}) {
     LHC_DB: db,
     RESEND_API_KEY: 'test-key',
     EMAIL_FROM: 'House <house@example.org>',
-    NOTIFY_EMAIL: 'founder@example.org',
+    ARRIVAL_NOTIFY_EMAIL: 'submission-desk@example.org',
+    SWEEP_NOTIFY_EMAIL: 'sweep-desk@example.org',
     ...extra,
   }
 }
@@ -152,8 +153,10 @@ test('thresholds default and read from env; junk falls back', () => {
   assert.equal(staleAfterHours({ STALE_AFTER_HOURS: '-3' }), DEFAULT_STALE_AFTER_HOURS)
   assert.equal(staleCooldownHours({}), DEFAULT_STALE_COOLDOWN_HOURS)
   assert.equal(staleCooldownHours({ STALE_COOLDOWN_HOURS: '6' }), 6)
-  assert.equal(notifyRecipient({}), null)
-  assert.equal(notifyRecipient({ NOTIFY_EMAIL: '  a@b.c ' }), 'a@b.c')
+  assert.equal(arrivalRecipient({}), null)
+  assert.equal(arrivalRecipient({ ARRIVAL_NOTIFY_EMAIL: '  a@b.c ' }), 'a@b.c')
+  assert.equal(sweepRecipient({}), null)
+  assert.equal(sweepRecipient({ SWEEP_NOTIFY_EMAIL: '  d@e.f ' }), 'd@e.f')
 })
 
 /* --- staleness boundary -------------------------------------------------------- */
@@ -194,7 +197,7 @@ test('a new submission records exactly one arrival notice and sends it', async (
   assert.equal(db.notifications[0].kind, 'arrival')
   assert.equal(db.notifications[0].delivery_status, 'sent')
   assert.equal(sends.length, 1)
-  assert.equal(sends[0].body.to, 'founder@example.org')
+  assert.equal(sends[0].body.to, 'submission-desk@example.org', 'arrival goes to the submissions desk')
   assert.match(sends[0].body.subject, /music/i)
 })
 
@@ -211,7 +214,7 @@ test('idempotency: a retried arrival neither duplicates the row nor re-sends', a
 
 test('no recipient configured: the arrival is still durably recorded, honestly', async () => {
   const db = fakeDb()
-  const r = await recordAndSendArrival(envWith(db, { NOTIFY_EMAIL: '' }), { id: 3, type: 'book', name: 'Kim' })
+  const r = await recordAndSendArrival(envWith(db, { ARRIVAL_NOTIFY_EMAIL: '' }), { id: 3, type: 'book', name: 'Kim' })
   assert.equal(r.ok, true)
   assert.equal(db.notifications[0].delivery_status, 'not_configured')
   assert.equal(sends.length, 0)
@@ -259,6 +262,7 @@ test('sweep notifies each newly-due stale submission once, as one digest', async
   assert.equal(staleRows.length, 2)
   assert.ok(staleRows.every((n) => n.delivery_status === 'sent'))
   assert.equal(sends.length, 1, 'one digest email, not one per item')
+  assert.equal(sends[0].body.to, 'sweep-desk@example.org', 'digest goes to the sweep desk')
   assert.match(sends[0].body.text, /S1/)
   assert.match(sends[0].body.text, /S2/)
 })

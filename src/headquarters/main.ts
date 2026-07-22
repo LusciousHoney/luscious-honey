@@ -5036,9 +5036,13 @@ function notificationsContent(state: NotificationState): Node[] {
       el('p', { class: 'hq-notes__empty' }, 'Nothing needs you right now.'),
       el('p', { class: 'hq-notes__note' },
         'When work arrives or a matter goes quiet, it will appear here — quietly, and never as a red badge.'));
-  } else if (!state.config.recipientConfigured) {
+  } else if (!state.config.arrivalConfigured || !state.config.sweepConfigured) {
+    const missing = [
+      !state.config.arrivalConfigured ? 'ARRIVAL_NOTIFY_EMAIL' : null,
+      !state.config.sweepConfigured ? 'SWEEP_NOTIFY_EMAIL' : null,
+    ].filter((x): x is string => x !== null).join(' / ');
     out.push(el('p', { class: 'hq-notes__note' },
-      'Notices are being recorded, but no outbound address is configured yet (NOTIFY_EMAIL).'));
+      `Notices are being recorded, but an outbound address is not configured yet (${missing}).`));
   }
   return out;
 }

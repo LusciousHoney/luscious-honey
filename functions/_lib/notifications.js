@@ -17,7 +17,8 @@
  *     201 to the submitter regardless of the House's own notification fate.
  *
  * Env (all optional; absence is recorded honestly, never fabricated):
- *   NOTIFY_EMAIL          — where House notices go (the Founder / editorial desk).
+ *   ARRIVAL_NOTIFY_EMAIL  — where new-arrival notices go (the submissions desk).
+ *   SWEEP_NOTIFY_EMAIL    — where gone-quiet digest notices go.
  *   STALE_AFTER_HOURS     — hours in a non-terminal status before a submission
  *                           counts as stale (default 48).
  *   STALE_COOLDOWN_HOURS  — minimum hours between 'stale' notices for the same
@@ -45,9 +46,19 @@ export function staleCooldownHours(env) {
   return positiveHours(env && env.STALE_COOLDOWN_HOURS, DEFAULT_STALE_COOLDOWN_HOURS)
 }
 
-export function notifyRecipient(env) {
-  const to = env && typeof env.NOTIFY_EMAIL === 'string' ? env.NOTIFY_EMAIL.trim() : ''
+function cleanAddress(raw) {
+  const to = typeof raw === 'string' ? raw.trim() : ''
   return to || null
+}
+
+/** Where new-arrival notices go (the submissions desk). */
+export function arrivalRecipient(env) {
+  return cleanAddress(env && env.ARRIVAL_NOTIFY_EMAIL)
+}
+
+/** Where gone-quiet digest notices go. */
+export function sweepRecipient(env) {
+  return cleanAddress(env && env.SWEEP_NOTIFY_EMAIL)
 }
 
 /* --- staleness decisions (pure, testable) ----------------------------------- */
@@ -90,7 +101,7 @@ export function sqliteUtc(ts) {
  */
 export async function recordAndSendArrival(env, { id, type, name }) {
   try {
-    const to = notifyRecipient(env)
+    const to = arrivalRecipient(env)
     const subject = `New submission on the desk — ${typeTitle(type)} from ${String(name || 'an artist')}`
 
     const insert = await env.LHC_DB.prepare(`
@@ -143,7 +154,7 @@ export async function sweepStale(env, now = new Date()) {
   try {
     const threshold = staleAfterHours(env)
     const cooldown = staleCooldownHours(env)
-    const to = notifyRecipient(env)
+    const to = sweepRecipient(env)
 
     const { results: rows } = await env.LHC_DB.prepare(`
       SELECT s.id, s.type, s.status, s.submitter_name AS name, s.created_at, s.updated_at,
